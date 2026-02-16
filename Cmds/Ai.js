@@ -1,4 +1,3 @@
-
 const { keith } = require('../commandHandler');
 const axios = require('axios');
 const fs = require('fs-extra');
@@ -356,7 +355,7 @@ async (from, client, conText) => {
 keith({
   pattern: "mistral",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
   const { q, reply, api } = conText;
 
@@ -371,7 +370,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("mistral error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -379,7 +378,7 @@ keith({
 keith({
   pattern: "claudeai",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
   const { q, reply, api } = conText;
 
@@ -402,7 +401,7 @@ keith({
 keith({
   pattern: "bard",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
   const { q, reply, api } = conText;
 
@@ -417,7 +416,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("bard error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -425,7 +424,7 @@ keith({
 keith({
   pattern: "perplexity",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
   const { q, reply, api } = conText;
 
@@ -440,7 +439,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("perplexity error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -448,7 +447,7 @@ keith({
 keith({
   pattern: "o3",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
   const { q, reply, api } = conText;
 
@@ -463,7 +462,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("o3 error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -471,7 +470,7 @@ keith({
 keith({
   pattern: "chatgpt4",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
   const { q, reply, api } = conText;
 
@@ -486,7 +485,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("chatgpt4 error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -494,7 +493,7 @@ keith({
 keith({
   pattern: "venice",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
   const { q, reply, api } = conText;
 
@@ -509,7 +508,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("venice error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -517,7 +516,7 @@ keith({
 keith({
   pattern: "qwenai",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
   const { q, reply, api } = conText;
 
@@ -532,7 +531,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("qwenai error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -540,14 +539,14 @@ keith({
 keith({
   pattern: "metai",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) return reply("❌ Provide a query");
 
   try {
-    const res = await axios.get(`https://apiskeith.top/ai/metai?q=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/ai/metai?q=${encodeURIComponent(q)}`);
 
     if (res.data?.status) {
       reply(res.data.result); 
@@ -555,7 +554,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("metai error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -563,14 +562,14 @@ keith({
 keith({
   pattern: "blackbox",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) return reply("❌ Provide a query");
 
   try {
-    const res = await axios.get(`https://apiskeith.top/ai/blackbox?q=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/ai/blackbox?q=${encodeURIComponent(q)}`);
 
     if (res.data?.status) {
       reply(res.data.result); 
@@ -578,7 +577,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("blackbox error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -586,14 +585,14 @@ keith({
 keith({
   pattern: "ilama",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) return reply("❌ Provide a query");
 
   try {
-    const res = await axios.get(`https://apiskeith.top/ai/ilama?q=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/ai/ilama?q=${encodeURIComponent(q)}`);
 
     if (res.data?.status) {
       reply(res.data.result); 
@@ -601,7 +600,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("ilama error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -609,14 +608,14 @@ keith({
 keith({
   pattern: "gemini",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) return reply("❌ Provide a query");
 
   try {
-    const res = await axios.get(`https://apiskeith.top/ai/gemini?q=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/ai/gemini?q=${encodeURIComponent(q)}`);
 
     if (res.data?.status) {
       reply(res.data.result); 
@@ -624,7 +623,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("gemini error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -632,14 +631,14 @@ keith({
 keith({
   pattern: "deepseek",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) return reply("❌ Provide a query");
 
   try {
-    const res = await axios.get(`https://apiskeith.top/ai/deepseek?q=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/ai/deepseek?q=${encodeURIComponent(q)}`);
 
     if (res.data?.status) {
       reply(res.data.result); 
@@ -647,7 +646,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("deepseek error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -655,14 +654,14 @@ keith({
 keith({
   pattern: "grok",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) return reply("❌ Provide a query");
 
   try {
-    const res = await axios.get(`https://apiskeith.top/ai/grok?q=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/ai/grok?q=${encodeURIComponent(q)}`);
 
     if (res.data?.status) {
       reply(res.data.result); 
@@ -670,7 +669,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("grok error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -678,14 +677,14 @@ keith({
 keith({
   pattern: "keithai",
   category: "Ai",
-  description: "Query  via Keith's API"
+  description: "Query via Keith's API"
 }, async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) return reply("❌ Provide a query");
 
   try {
-    const res = await axios.get(`https://apiskeith.top/keithai?q=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/keithai?q=${encodeURIComponent(q)}`);
 
     if (res.data?.status) {
       reply(res.data.result); 
@@ -693,7 +692,7 @@ keith({
       reply("API returned an error.");
     }
   } catch (err) {
-    console.error("claudeai error:", err);
+    console.error("keithai error:", err);
     reply("⚠️ Failed .");
   }
 });
@@ -821,14 +820,14 @@ keith({
   description: "Generate video from text using Sora API"
 },
 async (from, client, conText) => {
-  const { q, mek, reply } = conText;
+  const { q, mek, reply, api } = conText;
 
   if (!q) {
     return reply("❌ Provide a query, e.g. .sora monkey running");
   }
 
   try {
-    const apiUrl = `https://apiskeith.top/text2video?q=${encodeURIComponent(q)}`;
+    const apiUrl = `${api}/text2video?q=${encodeURIComponent(q)}`;
     const response = await axios.get(apiUrl, { timeout: 120000 });
     const result = response.data?.results;
 
@@ -857,13 +856,13 @@ keith({
   description: "Generate an image using Flux API"
 },
 async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) return reply("❌ Provide a query, e.g. .flux dog");
 
   try {
     // Call Flux API (returns raw image)
-    const res = await axios.get(`https://apiskeith.top/ai/flux?q=${encodeURIComponent(q)}`, {
+    const res = await axios.get(`${api}/ai/flux?q=${encodeURIComponent(q)}`, {
       responseType: "arraybuffer"
     });
 
@@ -891,7 +890,7 @@ keith({
   description: "Generate a speech using the Speechwriter API"
 },
 async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) {
     return reply("❌ Provide a topic, e.g. .speechwriter how to pass exam");
@@ -904,7 +903,7 @@ async (from, client, conText) => {
     const tone = "serious";
 
     // Build API URL with defaults
-    const url = `https://apiskeith.top/ai/speechwriter?topic=${encodeURIComponent(q)}&length=${length}&type=${type}&tone=${tone}`;
+    const url = `${api}/ai/speechwriter?topic=${encodeURIComponent(q)}&length=${length}&type=${type}&tone=${tone}`;
 
     // Call API
     const res = await axios.get(url);
@@ -932,13 +931,13 @@ keith({
   description: "Query MuslimAI API for Qur'anic references"
 },
 async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) return reply("❌ Provide a query, e.g. .muslimai who is Allah");
 
   try {
     // Call MuslimAI API
-    const res = await axios.get(`https://apiskeith.top/ai/muslim?q=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/ai/muslim?q=${encodeURIComponent(q)}`);
 
     if (!res.data || !res.data.status || !res.data.result) {
       return reply("❌ MuslimAI API returned an invalid response.");
@@ -971,13 +970,13 @@ keith({
   description: "Interact with WormGPT API"
 },
 async (from, client, conText) => {
-  const { q, reply } = conText;
+  const { q, reply, api } = conText;
 
   if (!q) return reply("❌ Provide a query, e.g. .wormgpt hi");
 
   try {
     // Call WormGPT API
-    const res = await axios.get(`https://apiskeith.top/ai/wormgpt?q=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/ai/wormgpt?q=${encodeURIComponent(q)}`);
 
     if (!res.data || !res.data.status) {
       return reply("❌ WormGPT API returned an invalid response.");
@@ -1001,12 +1000,12 @@ keith({
   category: "ai",
   filename: __filename
 }, async (from, client, conText) => {
-  const { q, reply, mek } = conText;
+  const { q, reply, mek, api } = conText;
 
   if (!q) return reply("📖 Ask a Bible question.\n\nExample: bibleai what is faith");
 
   try {
-    const res = await axios.get(`https://apiskeith.top/ai/bible?q=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/ai/bible?q=${encodeURIComponent(q)}`);
     const data = res.data;
 
     if (!data.status || !data.result?.results?.data?.answer) {
@@ -1050,7 +1049,7 @@ keith({
       if (selected.type === "verse") {
         const ref = selected.bcv.referenceLong.replace(/\s+/g, "").replace(":", ":");
         try {
-          const verseRes = await axios.get(`https://apiskeith.top/search/bible?q=${encodeURIComponent(ref)}`);
+          const verseRes = await axios.get(`${api}/search/bible?q=${encodeURIComponent(ref)}`);
           const verseData = verseRes.data;
 
           if (!verseData.status || !verseData.result?.verses) {
@@ -1140,7 +1139,7 @@ keith({
   category: "Ai",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, quoted, quotedMsg, reply } = conText;
+  const { mek, quoted, quotedMsg, reply, api } = conText;
 
   if (!quotedMsg) return reply("📌 Reply to an image message to remove its background");
 
@@ -1160,7 +1159,7 @@ keith({
 
     // Call removebg API
     const { data: result } = await axios.get(
-      `https://apiskeith.top/ai/removebg?url=${encodeURIComponent(imageUrl)}`
+      `${api}/ai/removebg?url=${encodeURIComponent(imageUrl)}`
     );
 
     if (!result?.status || !result?.result) {
@@ -1192,7 +1191,7 @@ keith({
   category: "Ai",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, quoted, quotedMsg, reply, q } = conText;
+  const { mek, quoted, quotedMsg, reply, q, api } = conText;
 
   if (!quotedMsg) return reply("📌 Reply to an image message to analyze it");
   if (!q || typeof q !== "string") return reply("❌ Missing query. Use q='your question'");
@@ -1208,7 +1207,7 @@ keith({
     filePath = await saveMediaToTemp(client, mediaNode, type);
     const imageUrl = await uploadToUguu(filePath);
 
-    const { data: result } = await axios.get(`https://apiskeith.top/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(q)}`);
+    const { data: result } = await axios.get(`${api}/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(q)}`);
     if (!result?.status || !result?.result) return reply("❌ No response from Vision AI");
 
     await client.sendMessage(from, { text: result.result }, { quoted: mek });
@@ -1233,7 +1232,7 @@ keith({
   category: "Ai",
   filename: __filename
 }, async (from, client, conText) => {
-  const { q, mek, quoted, quotedMsg, reply } = conText;
+  const { q, mek, quoted, quotedMsg, reply, api } = conText;
 
   if (!quotedMsg) return reply("📌 Reply to an image with your edit prompt.");
   if (!q) return reply("❌ Provide a prompt!\nExample: imageedit make it black and white");
@@ -1256,7 +1255,7 @@ keith({
 
     // Call your API
     const { data: result } = await axios.get(
-      `https://apiskeith.top/ai/imageedit?q=${encodeURIComponent(q)}&url=${encodeURIComponent(mediaUrl)}`
+      `${api}/ai/imageedit?q=${encodeURIComponent(q)}&url=${encodeURIComponent(mediaUrl)}`
     );
 
     if (!result?.status || !result?.result) return reply("❌ Failed to edit image");
@@ -1286,7 +1285,7 @@ keith({
   category: "Ai",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, quoted, quotedMsg, reply, botname, botPic } = conText;
+  const { mek, quoted, quotedMsg, reply, botname, botPic, api } = conText;
 
   if (!quotedMsg) return reply("📌 Reply to an audio or video message to extract vocals");
 
@@ -1301,7 +1300,7 @@ keith({
     filePath = await saveMediaToTemp(client, mediaNode, type);
     const mediaUrl = await uploadToUguu(filePath);
 
-    const { data: result } = await axios.get(`https://apiskeith.top/ai/vocalremover?url=${mediaUrl}`);
+    const { data: result } = await axios.get(`${api}/ai/vocalremover?url=${mediaUrl}`);
     if (!result?.status || !result?.result?.vocal) return reply("❌ No vocal track found");
 
     const vocalUrl = result.result.vocal;
@@ -1341,7 +1340,7 @@ keith({
   category: "Ai",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, quoted, quotedMsg, reply } = conText;
+  const { mek, quoted, quotedMsg, reply, api } = conText;
 
   if (!quotedMsg) return reply("📌 Reply to an audio or video message to transcribe it");
 
@@ -1356,7 +1355,7 @@ keith({
     filePath = await saveMediaToTemp(client, mediaNode, type);
     const mediaUrl = await uploadToUguu(filePath);
 
-    const { data: result } = await axios.get(`https://apiskeith.top/ai/transcribe?q=${encodeURIComponent(mediaUrl)}`);
+    const { data: result } = await axios.get(`${api}/ai/transcribe?q=${encodeURIComponent(mediaUrl)}`);
     if (!result?.status || !result?.result?.text) return reply("❌ No transcription found");
 
     await client.sendMessage(from, { text: result.result.text }, { quoted: mek });
@@ -1380,7 +1379,7 @@ keith({
   category: "Ai",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, quoted, quotedMsg, reply, botname } = conText;
+  const { mek, quoted, quotedMsg, reply, botname, api } = conText;
 
   if (!quotedMsg) return reply("📌 Reply to an audio or video message to identify music");
 
@@ -1395,7 +1394,7 @@ keith({
     filePath = await saveMediaToTemp(client, mediaNode, type);
     const mediaUrl = await uploadToUguu(filePath);
 
-    const { data: result } = await axios.get(`https://apiskeith.top/ai/shazam?url=${mediaUrl}`);
+    const { data: result } = await axios.get(`${api}/ai/shazam?url=${mediaUrl}`);
     if (!result?.status || !result?.result?.title) return reply("❌ No music info found");
 
     const { title, artists, album, release_date } = result.result;
