@@ -325,6 +325,282 @@ async (from, client, conText) => {
     );
   }
 });
+
+
+const { 
+    getGroupEventsSettings, 
+    updateGroupEventsSettings,
+    clearAllWarns
+} = require('../database/groupevents');
+
+keith({
+  pattern: "antidemote",
+  aliases: ["antidem", "nodemote"],
+  category: "Settings",
+  description: "Prevent unauthorized demotions in group"
+  
+},
+async (from, client, conText) => {
+  const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
+
+  if (!isGroup) return reply("❌ This command can only be used in groups!");
+  if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-demote!");
+
+  const args = q?.trim().split(/\s+/) || [];
+  const subcommand = args[0]?.toLowerCase();
+  const value = args[1];
+
+  // Get settings for this specific group
+  const settings = await getGroupEventsSettings(from);
+
+  // Handle list command - shows all groups with anti-demote enabled
+  if (subcommand === 'list') {
+    const allGroups = await require('../database/groupevents').getAllGroupEventsGroups();
+    const antiDemoteGroups = allGroups.filter(g => g.antiDemote === 'on');
+    
+    if (antiDemoteGroups.length === 0) {
+      return reply("📋 No groups have anti-demote enabled.");
+    }
+
+    let listMessage = "*🔄 Anti-Demote Active Groups*\n\n";
+    
+    for (let i = 0; i < antiDemoteGroups.length; i++) {
+      const group = antiDemoteGroups[i];
+      const groupNameDisplay = group.groupName || 'Unknown Group';
+      
+      listMessage += `*${i + 1}.* ${groupNameDisplay}\n`;
+      listMessage += `   └ 📍 JID: \`${group.groupJid}\`\n`;
+      listMessage += `   └ ⚙️ Action: *${group.antiDemoteAction?.toUpperCase() || 'PROMOTE'}*\n`;
+      listMessage += `   └ ⚠️ Warn Limit: *${group.warn_limit || 3}*\n\n`;
+    }
+    
+    return reply(listMessage);
+  }
+
+  // Check permissions for other commands
+  if (!isSuperUser && !conText.isAdmin) return reply("❌ Only group admins can use this command!");
+
+  if (!subcommand) {
+    const statusText = settings?.antiDemote === 'on' ? '✅ ENABLED' : '❌ DISABLED';
+    const actionMap = {
+      'promote': '⬆️ Re-promote + Demote demoter',
+      'remove': '🚫 Remove Both',
+      'warn': '⚠️ Warn + Re-promote'
+    };
+
+    return reply(
+      `*🔄 Anti-Demote Settings for this Group*\n\n` +
+      `📌 *Group:* ${groupName || 'Unknown'}\n` +
+      `📍 *JID:* \`${from}\`\n\n` +
+      `🔹 *Status:* ${statusText}\n` +
+      `🔹 *Action:* ${actionMap[settings?.antiDemoteAction || 'promote']}\n` +
+      `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n\n` +
+      `*What it does:*\n` +
+      `Prevents unauthorized demotions by taking action against the demoter and protecting the victim.\n\n` +
+      `*Actions:*\n` +
+      `▸ *promote* - Re-promote victim + demote demoter\n` +
+      `▸ *remove* - Remove both users from group\n` +
+      `▸ *warn* - Warn first, then remove after limit\n\n` +
+      `*Commands:*\n` +
+      `▸ *${conText.prefix}antidemote on* - Enable\n` +
+      `▸ *${conText.prefix}antidemote off* - Disable\n` +
+      `▸ *${conText.prefix}antidemote action promote/remove/warn* - Set action\n` +
+      `▸ *${conText.prefix}antidemote limit <1-10>* - Set warn limit\n` +
+      `▸ *${conText.prefix}antidemote reset* - Reset warnings\n` +
+      `▸ *${conText.prefix}antidemote list* - List active groups`
+    );
+  }
+
+  switch (subcommand) {
+    case 'on':
+    case 'enable':
+      await updateGroupEventsSettings(from, { 
+        antiDemote: 'on', 
+        groupName: groupName 
+      });
+      return reply(`✅ Anti-Demote has been *ENABLED* for this group!\nAction: *${(settings?.antiDemoteAction || 'promote').toUpperCase()}*`);
+
+    case 'off':
+    case 'disable':
+      await updateGroupEventsSettings(from, { antiDemote: 'off' });
+      return reply(`❌ Anti-Demote has been *DISABLED* for this group!`);
+
+    case 'action':
+      if (!value || !['promote', 'remove', 'warn'].includes(value)) {
+        return reply("❌ Use: `antidemote action promote/remove/warn`");
+      }
+      await updateGroupEventsSettings(from, { 
+        antiDemoteAction: value,
+        antiDemote: settings?.antiDemote || 'on' // Auto-enable if setting action
+      });
+      const actionMessages = {
+        'promote': '⬆️ Victim re-promoted, demoter demoted',
+        'remove': '🚫 Both users will be removed',
+        'warn': '⚠️ Users will be warned, then removed after limit'
+      };
+      return reply(`✅ Anti-Demote action set to: *${value.toUpperCase()}*\n${actionMessages[value]}`);
+
+    case 'limit':
+      const limit = parseInt(value);
+      if (isNaN(limit) || limit < 1 || limit > 10) {
+        return reply("❌ Limit must be between 1 and 10");
+      }
+      await updateGroupEventsSettings(from, { warn_limit: limit });
+      return reply(`✅ Anti-Demote warn limit set to: *${limit}*`);
+
+    case 'reset':
+    case 'resetwarns':
+      clearAllWarns(from);
+      return reply(`✅ All anti-demote warning counts reset for this group!`);
+
+    default:
+      return reply(
+        "❌ Invalid command!\n\n" +
+        `▸ *${conText.prefix}antidemote on* - Enable\n` +
+        `▸ *${conText.prefix}antidemote off* - Disable\n` +
+        `▸ *${conText.prefix}antidemote action promote/remove/warn* - Set action\n` +
+        `▸ *${conText.prefix}antidemote limit <1-10>* - Set warn limit\n` +
+        `▸ *${conText.prefix}antidemote reset* - Reset warnings\n` +
+        `▸ *${conText.prefix}antidemote list* - List active groups`
+      );
+  }
+});
+
+
+
+keith({
+  pattern: "antipromote",
+  aliases: ["antiprom", "nopromote"],
+  category: "Settings",
+  description: "Prevent unauthorized promotions in group"
+  
+},
+async (from, client, conText) => {
+  const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
+
+  if (!isGroup) return reply("❌ This command can only be used in groups!");
+  if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-promote!");
+
+  const args = q?.trim().split(/\s+/) || [];
+  const subcommand = args[0]?.toLowerCase();
+  const value = args[1];
+
+  // Get settings for this specific group
+  const settings = await getGroupEventsSettings(from);
+
+  // Handle list command - shows all groups with anti-promote enabled
+  if (subcommand === 'list') {
+    const allGroups = await require('../database/groupevents').getAllGroupEventsGroups();
+    const antiPromoteGroups = allGroups.filter(g => g.antiPromote === 'on');
+    
+    if (antiPromoteGroups.length === 0) {
+      return reply("📋 No groups have anti-promote enabled.");
+    }
+
+    let listMessage = "*🚫 Anti-Promote Active Groups*\n\n";
+    
+    for (let i = 0; i < antiPromoteGroups.length; i++) {
+      const group = antiPromoteGroups[i];
+      const groupNameDisplay = group.groupName || 'Unknown Group';
+      
+      listMessage += `*${i + 1}.* ${groupNameDisplay}\n`;
+      listMessage += `   └ 📍 JID: \`${group.groupJid}\`\n`;
+      listMessage += `   └ ⚙️ Action: *${group.antiPromoteAction?.toUpperCase() || 'DEMOTE'}*\n`;
+      listMessage += `   └ ⚠️ Warn Limit: *${group.warn_limit || 3}*\n\n`;
+    }
+    
+    return reply(listMessage);
+  }
+
+  // Check permissions for other commands
+  if (!isSuperUser && !conText.isAdmin) return reply("❌ Only group admins can use this command!");
+
+  if (!subcommand) {
+    const statusText = settings?.antiPromote === 'on' ? '✅ ENABLED' : '❌ DISABLED';
+    const actionMap = {
+      'demote': '⬇️ Demote Both',
+      'remove': '🚫 Remove Both',
+      'warn': '⚠️ Warn + Demote'
+    };
+
+    return reply(
+      `*🚫 Anti-Promote Settings for this Group*\n\n` +
+      `📌 *Group:* ${groupName || 'Unknown'}\n` +
+      `📍 *JID:* \`${from}\`\n\n` +
+      `🔹 *Status:* ${statusText}\n` +
+      `🔹 *Action:* ${actionMap[settings?.antiPromoteAction || 'demote']}\n` +
+      `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n\n` +
+      `*What it does:*\n` +
+      `Prevents unauthorized promotions by taking action against both the promoter and promoted person.\n\n` +
+      `*Actions:*\n` +
+      `▸ *demote* - Demote both users\n` +
+      `▸ *remove* - Remove both users from group\n` +
+      `▸ *warn* - Warn first, then remove after limit\n\n` +
+      `*Commands:*\n` +
+      `▸ *${conText.prefix}antipromote on* - Enable\n` +
+      `▸ *${conText.prefix}antipromote off* - Disable\n` +
+      `▸ *${conText.prefix}antipromote action demote/remove/warn* - Set action\n` +
+      `▸ *${conText.prefix}antipromote limit <1-10>* - Set warn limit\n` +
+      `▸ *${conText.prefix}antipromote reset* - Reset warnings\n` +
+      `▸ *${conText.prefix}antipromote list* - List active groups`
+    );
+  }
+
+  switch (subcommand) {
+    case 'on':
+    case 'enable':
+      await updateGroupEventsSettings(from, { 
+        antiPromote: 'on', 
+        groupName: groupName 
+      });
+      return reply(`✅ Anti-Promote has been *ENABLED* for this group!\nAction: *${(settings?.antiPromoteAction || 'demote').toUpperCase()}*`);
+
+    case 'off':
+    case 'disable':
+      await updateGroupEventsSettings(from, { antiPromote: 'off' });
+      return reply(`❌ Anti-Promote has been *DISABLED* for this group!`);
+
+    case 'action':
+      if (!value || !['demote', 'remove', 'warn'].includes(value)) {
+        return reply("❌ Use: `antipromote action demote/remove/warn`");
+      }
+      await updateGroupEventsSettings(from, { 
+        antiPromoteAction: value,
+        antiPromote: settings?.antiPromote || 'on' // Auto-enable if setting action
+      });
+      const actionMessages = {
+        'demote': '⬇️ Both users will be demoted',
+        'remove': '🚫 Both users will be removed',
+        'warn': '⚠️ Users will be warned, then removed after limit'
+      };
+      return reply(`✅ Anti-Promote action set to: *${value.toUpperCase()}*\n${actionMessages[value]}`);
+
+    case 'limit':
+      const limit = parseInt(value);
+      if (isNaN(limit) || limit < 1 || limit > 10) {
+        return reply("❌ Limit must be between 1 and 10");
+      }
+      await updateGroupEventsSettings(from, { warn_limit: limit });
+      return reply(`✅ Anti-Promote warn limit set to: *${limit}*`);
+
+    case 'reset':
+    case 'resetwarns':
+      clearAllWarns(from);
+      return reply(`✅ All anti-promote warning counts reset for this group!`);
+
+    default:
+      return reply(
+        "❌ Invalid command!\n\n" +
+        `▸ *${conText.prefix}antipromote on* - Enable\n` +
+        `▸ *${conText.prefix}antipromote off* - Disable\n` +
+        `▸ *${conText.prefix}antipromote action demote/remove/warn* - Set action\n` +
+        `▸ *${conText.prefix}antipromote limit <1-10>* - Set warn limit\n` +
+        `▸ *${conText.prefix}antipromote reset* - Reset warnings\n` +
+        `▸ *${conText.prefix}antipromote list* - List active groups`
+      );
+  }
+});
+
 keith({
   pattern: "gtcdd",
   aliases: ["get", "plugin"],
