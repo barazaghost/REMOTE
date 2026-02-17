@@ -1,7 +1,11 @@
 
 const { keith } = require('../commandHandler');
 const axios = require('axios');
-
+const { 
+    getGroupEventsSettings, 
+    updateGroupEventsSettings,
+    clearAllWarns
+} = require('../database/groupevents');
 const { 
     getWarnSettings,
     updateWarnSettings,
@@ -34,7 +38,7 @@ async (from, client, conText) => {
 
   if (!isGroup) return reply("❌ This command only works in groups!");
   if (!isBotAdmin) return reply("❌ I need to be an admin to warn users!");
-  if (!isSuperUser && !isAdmin) return reply("❌ Only admins can use this command!");
+  if (!isSuperUser) return reply("❌ Only admins can use this command!");
 
   const args = q?.trim().split(/\s+/) || [];
   const subcommand = args[0]?.toLowerCase();
@@ -327,11 +331,7 @@ async (from, client, conText) => {
 });
 
 
-const { 
-    getGroupEventsSettings, 
-    updateGroupEventsSettings,
-    clearAllWarns
-} = require('../database/groupevents');
+
 
 keith({
   pattern: "antidemote",
@@ -344,7 +344,8 @@ async (from, client, conText) => {
   const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
 
   if (!isGroup) return reply("❌ This command can only be used in groups!");
-  if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-demote!");
+if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+    if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-demote!");
 
   const args = q?.trim().split(/\s+/) || [];
   const subcommand = args[0]?.toLowerCase();
@@ -479,7 +480,9 @@ async (from, client, conText) => {
   const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
 
   if (!isGroup) return reply("❌ This command can only be used in groups!");
-  if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-promote!");
+if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+
+    if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-promote!");
 
   const args = q?.trim().split(/\s+/) || [];
   const subcommand = args[0]?.toLowerCase();
