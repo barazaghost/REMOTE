@@ -15,6 +15,1209 @@ const { getPresenceSettings, updatePresenceSettings } = require('../database/pre
 const { updateSettings, getSettings } = require('../database/settings');
 
 //========================================================================================================================
+
+
+// ==================== DATABASE IMPORTS ====================
+const { 
+    getAntiSpamSettings, 
+    updateAntiSpamSettings, 
+    getAllAntiSpamGroups,
+    clearAllGroupMessages,
+    clearAllSpamWarns
+} = require('../database/antispam');
+
+const { 
+    getAntiCallSettings, 
+    updateAntiCallSettings,
+    clearAllCallWarns
+} = require('../database/anticall');
+
+const { 
+    getAutoBlockSettings, 
+    updateAutoBlockSettings, 
+    addTriggerWord,
+    removeTriggerWord,
+    getTriggerWords,
+    clearAllTriggerWords,
+    clearAllBlockWarns
+} = require('../database/autoblock');
+
+const { 
+    getAntiBadSettings, 
+    updateAntiBadSettings, 
+    getAllAntiBadGroups,
+    addBadWord,
+    removeBadWord,
+    getBadWords,
+    clearAllBadWords,
+    clearAllBadWarns
+} = require('../database/antibad');
+
+const { 
+    getAntiTagSettings, 
+    updateAntiTagSettings, 
+    getAllAntiTagGroups,
+    clearAllTagWarns,
+    toggleAntiTag 
+} = require('../database/antitag');
+
+const { 
+    getAntiStickerSettings, 
+    updateAntiStickerSettings, 
+    getAllAntiStickerGroups,
+    clearAllStickerWarns,
+    toggleAntiSticker 
+} = require('../database/antisticker');
+
+const { 
+    getChatbotSettings, 
+    updateChatbotSettings, 
+    clearConversationHistory, 
+    getConversationHistory, 
+    getAllActiveChatbots,
+    availableVoices 
+} = require('../database/chatbot');
+
+const { 
+    getGroupEventsSettings, 
+    updateGroupEventsSettings,
+    getAllGroupEventsGroups
+} = require('../database/groupevents');
+
+const { 
+    getAntiStatusMentionSettings, 
+    updateAntiStatusMentionSettings, 
+    getAllAntiStatusMentionGroups,
+    clearAllStatusWarns,
+    toggleAntiStatusMention 
+} = require('../database/antistatusmention');
+
+const { 
+    getAntiLinkSettings, 
+    updateAntiLinkSettings, 
+    getAllAntiLinkGroups,
+    clearAllWarns,
+    toggleAntiLink 
+} = require('../database/antilink');
+
+
+
+// ==================== HELPER FUNCTIONS ====================
+async function downloadMedia(mediaUrl) {
+    try {
+        const response = await axios.get(mediaUrl, { responseType: 'arraybuffer' });
+        return Buffer.from(response.data);
+    } catch (error) {
+        console.error('Error downloading media:', error);
+        return null;
+    }
+}
+
+function getTypeIcon(type) {
+    const icons = {
+        'text': '📝',
+        'audio': '🎵',
+        'video': '🎥',
+        'image': '🖼️',
+        'vision': '🔍'
+    };
+    return icons[type] || '📝';
+}
+
+// ==================== ANTI-SPAM COMMAND ====================
+keith({
+    pattern: "antispam",
+    aliases: ["spamguard", "nospam"],
+    category: "Settings",
+    description: "Prevent message spamming in group"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+    if (!isGroup) return reply("❌ This command can only be used in groups!");
+    if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-spam!");
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args[1];
+    const secondValue = args[2];
+
+    const settings = await getAntiSpamSettings(from);
+
+    if (subcommand === 'list') {
+        const allGroups = await getAllAntiSpamGroups();
+        if (allGroups.length === 0) return reply("📋 No groups have anti-spam enabled.");
+        
+        let listMessage = "*🛡️ Anti-Spam Active Groups*\n\n";
+        for (let i = 0; i < allGroups.length; i++) {
+            const group = allGroups[i];
+            const groupNameDisplay = group.groupName || 'Unknown Group';
+            listMessage += `*${i + 1}.* ${groupNameDisplay}\n`;
+            listMessage += `   └ 📍 JID: \`${group.groupJid}\`\n`;
+            listMessage += `   └ ⚙️ Action: *${group.action?.toUpperCase() || 'WARN'}*\n`;
+            listMessage += `   └ 📊 Limit: *${group.message_limit}* msgs / *${group.time_window}* sec\n`;
+            listMessage += `   └ ⚠️ Warn Limit: *${group.warn_limit}*\n\n`;
+        }
+        return reply(listMessage);
+    }
+
+    if (!isSuperUser && !conText.isAdmin) return reply("❌ Only group admins can use this command!");
+
+    if (!subcommand) {
+        const statusText = settings?.status === 'on' ? '✅ ENABLED' : '❌ DISABLED';
+        const actionMap = { 'delete': '🗑️ Delete Spam', 'remove': '🚫 Remove User', 'warn': '⚠️ Warn + Remove' };
+        const adminExempt = settings?.exempt_admins ? '✅ Yes' : '❌ No';
+
+        return reply(
+            `*🛡️ Anti-Spam Settings for this Group*\n\n` +
+            `📌 *Group:* ${groupName || 'Unknown'}\n` +
+            `📍 *JID:* \`${from}\`\n\n` +
+            `🔹 *Status:* ${statusText}\n` +
+            `🔹 *Action:* ${actionMap[settings?.action || 'warn']}\n` +
+            `🔹 *Message Limit:* ${settings?.message_limit || 5} messages\n` +
+            `🔹 *Time Window:* ${settings?.time_window || 5} seconds\n` +
+            `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n` +
+            `🔹 *Exempt Admins:* ${adminExempt}\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}antispam on/off*\n` +
+            `▸ *${conText.prefix}antispam delete/remove/warn*\n` +
+            `▸ *${conText.prefix}antispam set <msgs> <seconds>*\n` +
+            `▸ *${conText.prefix}antispam limit <1-10>*\n` +
+            `▸ *${conText.prefix}antispam adminexempt on/off*\n` +
+            `▸ *${conText.prefix}antispam reset*\n` +
+            `▸ *${conText.prefix}antispam list*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+        case 'enable':
+            await updateAntiSpamSettings(from, { status: 'on', groupName: groupName });
+            return reply(`✅ Anti-Spam has been *ENABLED* for this group!`);
+
+        case 'off':
+        case 'disable':
+            await updateAntiSpamSettings(from, { status: 'off' });
+            clearAllGroupMessages(from);
+            return reply(`❌ Anti-Spam has been *DISABLED* for this group!`);
+
+        case 'delete':
+        case 'remove':
+        case 'warn':
+            await updateAntiSpamSettings(from, { status: 'on', action: subcommand });
+            return reply(`✅ Anti-Spam action set to: *${subcommand.toUpperCase()}*`);
+
+        case 'set':
+            const msgLimit = parseInt(value);
+            const timeWin = parseInt(secondValue);
+            if (isNaN(msgLimit) || msgLimit < 2 || msgLimit > 50) return reply("❌ Message limit must be between 2 and 50");
+            if (isNaN(timeWin) || timeWin < 2 || timeWin > 60) return reply("❌ Time window must be between 2 and 60 seconds");
+            await updateAntiSpamSettings(from, { message_limit: msgLimit, time_window: timeWin });
+            return reply(`✅ Anti-Spam limit set to: *${msgLimit} messages* in *${timeWin} seconds*`);
+
+        case 'warnlimit':
+            const warnLimit = parseInt(value);
+            if (isNaN(warnLimit) || warnLimit < 1 || warnLimit > 10) return reply("❌ Warn limit must be between 1 and 10");
+            await updateAntiSpamSettings(from, { warn_limit: warnLimit });
+            return reply(`✅ Anti-Spam warn limit set to: *${warnLimit}*`);
+
+        case 'adminexempt':
+            if (!value || !['on', 'off'].includes(value)) return reply("❌ Use: `antispam adminexempt on/off`");
+            await updateAntiSpamSettings(from, { exempt_admins: value === 'on' });
+            return reply(`✅ Admin exemption ${value === 'on' ? 'enabled' : 'disabled'}.`);
+
+        case 'reset':
+        case 'resetall':
+            clearAllGroupMessages(from);
+            clearAllSpamWarns(from);
+            return reply(`✅ All spam counters and warnings reset for this group!`);
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}antispam on/off*\n` +
+                `▸ *${conText.prefix}antispam delete/remove/warn*\n` +
+                `▸ *${conText.prefix}antispam set <msgs> <seconds>*\n` +
+                `▸ *${conText.prefix}antispam warnlimit <1-10>*\n` +
+                `▸ *${conText.prefix}antispam adminexempt on/off*\n` +
+                `▸ *${conText.prefix}antispam reset*\n` +
+                `▸ *${conText.prefix}antispam list*`
+            );
+    }
+});
+
+// ==================== ANTI-CALL COMMAND ====================
+keith({
+    pattern: "anticall",
+    aliases: ["callblock", "blockcalls"],
+    category: "Settings",
+    description: "Manage anti-call settings"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args.slice(1).join(" ");
+    const firstValue = args[1];
+
+    const settings = await getAntiCallSettings();
+
+    if (!subcommand) {
+        const statusText = settings?.status ? '✅ ENABLED' : '❌ DISABLED';
+        const actionMap = { 'reject': '📵 Reject Call', 'block': '🔨 Block Caller', 'warn': '⚠️ Warn + Block' };
+
+        return reply(
+            `*📵 Anti-Call Settings*\n\n` +
+            `🔹 *Status:* ${statusText}\n` +
+            `🔹 *Action:* ${actionMap[settings?.action || 'reject']}\n` +
+            `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n` +
+            `🔹 *Message:* ${settings?.message || 'Not set'}\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}anticall on/off*\n` +
+            `▸ *${conText.prefix}anticall reject*\n` +
+            `▸ *${conText.prefix}anticall block*\n` +
+            `▸ *${conText.prefix}anticall warn*\n` +
+            `▸ *${conText.prefix}anticall message <text>*\n` +
+            `▸ *${conText.prefix}anticall limit <1-10>*\n` +
+            `▸ *${conText.prefix}anticall reset*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+        case 'enable':
+            await updateAntiCallSettings({ status: true });
+            return reply(`✅ Anti-Call has been *ENABLED*!`);
+
+        case 'off':
+        case 'disable':
+            await updateAntiCallSettings({ status: false });
+            return reply(`❌ Anti-Call has been *DISABLED*!`);
+
+        case 'reject':
+            await updateAntiCallSettings({ action: 'reject' });
+            return reply(`✅ Anti-Call action set to: *REJECT*`);
+
+        case 'block':
+            await updateAntiCallSettings({ action: 'block' });
+            return reply(`✅ Anti-Call action set to: *BLOCK*`);
+
+        case 'warn':
+            await updateAntiCallSettings({ action: 'warn' });
+            return reply(`✅ Anti-Call action set to: *WARN*`);
+
+        case 'message':
+        case 'msg':
+            if (!value) return reply("❌ Please provide a message.");
+            await updateAntiCallSettings({ message: value });
+            return reply(`✅ Anti-Call message set.`);
+
+        case 'limit':
+            const limit = parseInt(firstValue);
+            if (isNaN(limit) || limit < 1 || limit > 10) return reply("❌ Limit must be between 1 and 10");
+            await updateAntiCallSettings({ warn_limit: limit });
+            return reply(`✅ Anti-Call warn limit set to: *${limit}*`);
+
+        case 'reset':
+        case 'resetwarns':
+            clearAllCallWarns();
+            return reply(`✅ All call warning counts reset!`);
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}anticall on/off*\n` +
+                `▸ *${conText.prefix}anticall reject*\n` +
+                `▸ *${conText.prefix}anticall block*\n` +
+                `▸ *${conText.prefix}anticall warn*\n` +
+                `▸ *${conText.prefix}anticall message <text>*\n` +
+                `▸ *${conText.prefix}anticall limit <1-10>*\n` +
+                `▸ *${conText.prefix}anticall reset*`
+            );
+    }
+});
+
+// ==================== AUTO-BLOCK COMMAND ====================
+keith({
+    pattern: "autoblock",
+    aliases: ["blockwords", "autoban"],
+    category: "Settings",
+    description: "Manage auto-block trigger words for DMs"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser, sender } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args.slice(1).join(" ");
+    const firstValue = args[1];
+
+    const settings = await getAutoBlockSettings();
+    const triggerWords = await getTriggerWords();
+
+    if (!subcommand) {
+        const statusText = settings?.status === 'on' ? '✅ ENABLED' : '❌ DISABLED';
+        const actionMap = { 'block': '🔨 Block User', 'delete': '🗑️ Delete Only', 'warn': '⚠️ Warn + Block' };
+
+        return reply(
+            `*🔨 Auto-Block Settings (DM Only)*\n\n` +
+            `🔹 *Status:* ${statusText}\n` +
+            `🔹 *Action:* ${actionMap[settings?.action || 'block']}\n` +
+            `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n` +
+            `🔹 *Trigger Words:* ${triggerWords.length} words\n` +
+            `🔹 *Block Message:* ${settings?.block_message || 'Not set'}\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}autoblock on/off*\n` +
+            `▸ *${conText.prefix}autoblock add <word>*\n` +
+            `▸ *${conText.prefix}autoblock remove <word>*\n` +
+            `▸ *${conText.prefix}autoblock list*\n` +
+            `▸ *${conText.prefix}autoblock clear*\n` +
+            `▸ *${conText.prefix}autoblock block/delete/warn*\n` +
+            `▸ *${conText.prefix}autoblock message <text>*\n` +
+            `▸ *${conText.prefix}autoblock limit <1-10>*\n` +
+            `▸ *${conText.prefix}autoblock reset*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+        case 'enable':
+            await updateAutoBlockSettings({ status: 'on' });
+            return reply(`✅ Auto-Block has been *ENABLED* for DMs!`);
+
+        case 'off':
+        case 'disable':
+            await updateAutoBlockSettings({ status: 'off' });
+            return reply(`❌ Auto-Block has been *DISABLED* for DMs!`);
+
+        case 'add':
+            if (!value) return reply("❌ Please provide a word to add.");
+            const result = await addTriggerWord(value, sender);
+            return reply(result.success ? `✅ Added "*${value}*" to trigger words.` : `❌ ${result.message}`);
+
+        case 'remove':
+        case 'rm':
+            if (!value) return reply("❌ Please provide a word to remove.");
+            const removed = await removeTriggerWord(value);
+            return removed ? reply(`✅ Removed "*${value}*" from trigger words.`) : reply(`❌ Word not found.`);
+
+        case 'list':
+        case 'words':
+            if (triggerWords.length === 0) return reply("📋 No trigger words added yet.");
+            let wordList = `*📋 Trigger Words (${triggerWords.length})*\n\n`;
+            triggerWords.forEach((item, index) => {
+                const addedBy = item.addedBy.split('@')[0];
+                wordList += `*${index + 1}.* "${item.word}" (added by @${addedBy})\n`;
+            });
+            return reply(wordList);
+
+        case 'clear':
+        case 'clearall':
+            const confirm = firstValue === 'confirm' || firstValue === '--yes';
+            if (!confirm) return reply(`⚠️ This will delete ALL ${triggerWords.length} trigger words.\nType: *${conText.prefix}autoblock clear confirm* to proceed.`);
+            await clearAllTriggerWords();
+            return reply(`✅ Cleared all trigger words.`);
+
+        case 'block':
+        case 'delete':
+        case 'warn':
+            await updateAutoBlockSettings({ action: subcommand });
+            return reply(`✅ Auto-Block action set to: *${subcommand.toUpperCase()}*`);
+
+        case 'message':
+        case 'msg':
+            if (!value) return reply("❌ Please provide a block message.");
+            await updateAutoBlockSettings({ block_message: value });
+            return reply(`✅ Block message set.`);
+
+        case 'limit':
+            const limit = parseInt(firstValue);
+            if (isNaN(limit) || limit < 1 || limit > 10) return reply("❌ Limit must be between 1 and 10");
+            await updateAutoBlockSettings({ warn_limit: limit });
+            return reply(`✅ Auto-Block warn limit set to: *${limit}*`);
+
+        case 'reset':
+        case 'resetwarns':
+            clearAllBlockWarns();
+            return reply(`✅ All warning counts reset!`);
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}autoblock on/off*\n` +
+                `▸ *${conText.prefix}autoblock add <word>*\n` +
+                `▸ *${conText.prefix}autoblock remove <word>*\n` +
+                `▸ *${conText.prefix}autoblock list*\n` +
+                `▸ *${conText.prefix}autoblock clear*\n` +
+                `▸ *${conText.prefix}autoblock block/delete/warn*\n` +
+                `▸ *${conText.prefix}autoblock message <text>*\n` +
+                `▸ *${conText.prefix}autoblock limit <1-10>*\n` +
+                `▸ *${conText.prefix}autoblock reset*`
+            );
+    }
+});
+
+// ==================== ANTI-BAD COMMAND ====================
+keith({
+    pattern: "antibad",
+    aliases: ["badword", "filter", "antiprofanity"],
+    category: "Settings",
+    description: "Manage bad words filter"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName, sender } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+    if (!isGroup) return reply("❌ This command can only be used in groups!");
+    if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-bad!");
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args.slice(1).join(" ");
+    const firstValue = args[1];
+
+    const settings = await getAntiBadSettings(from);
+    const badWords = await getBadWords(from);
+
+    if (subcommand === 'listgroups') {
+        if (!isSuperUser) return reply("❌ Only owner can view all groups!");
+        const allGroups = await getAllAntiBadGroups();
+        if (allGroups.length === 0) return reply("📋 No groups have anti-bad enabled.");
+        
+        let listMessage = "*🔞 Anti-Bad Active Groups*\n\n";
+        for (let i = 0; i < allGroups.length; i++) {
+            const group = allGroups[i];
+            listMessage += `*${i + 1}.* ${group.groupName || 'Unknown'}\n`;
+            listMessage += `   └ 📍 JID: \`${group.groupJid}\`\n`;
+            listMessage += `   └ ⚙️ Action: *${group.action?.toUpperCase() || 'DELETE'}*\n\n`;
+        }
+        return reply(listMessage);
+    }
+
+    if (!isSuperUser && !conText.isAdmin) return reply("❌ Only group admins can use this command!");
+
+    if (!subcommand) {
+        const statusText = settings?.status === 'on' ? '✅ ENABLED' : '❌ DISABLED';
+        const actionMap = { 'delete': '🗑️ Delete Only', 'remove': '🚫 Remove User', 'warn': '⚠️ Warn + Delete' };
+        const typeMap = { 'strict': '🔍 Strict', 'normal': '📝 Normal', 'loose': '🌊 Loose' };
+        const adminExempt = settings?.exempt_admins ? '✅ Yes' : '❌ No';
+
+        return reply(
+            `*🔞 Anti-Bad Words Settings*\n\n` +
+            `📌 *Group:* ${groupName || 'Unknown'}\n` +
+            `📍 *JID:* \`${from}\`\n\n` +
+            `🔹 *Status:* ${statusText}\n` +
+            `🔹 *Action:* ${actionMap[settings?.action || 'delete']}\n` +
+            `🔹 *Filter Type:* ${typeMap[settings?.filter_type || 'normal']}\n` +
+            `🔹 *Exempt Admins:* ${adminExempt}\n` +
+            `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n` +
+            `🔹 *Bad Words:* ${badWords.length} words\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}antibad on/off*\n` +
+            `▸ *${conText.prefix}antibad add <word>*\n` +
+            `▸ *${conText.prefix}antibad remove <word>*\n` +
+            `▸ *${conText.prefix}antibad list*\n` +
+            `▸ *${conText.prefix}antibad clear*\n` +
+            `▸ *${conText.prefix}antibad delete/remove/warn*\n` +
+            `▸ *${conText.prefix}antibad type strict/normal/loose*\n` +
+            `▸ *${conText.prefix}antibad adminexempt on/off*\n` +
+            `▸ *${conText.prefix}antibad limit <1-10>*\n` +
+            `▸ *${conText.prefix}antibad reset*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+        case 'enable':
+            await updateAntiBadSettings(from, { status: 'on', groupName: groupName });
+            return reply(`✅ Anti-Bad has been *ENABLED*!`);
+
+        case 'off':
+        case 'disable':
+            await updateAntiBadSettings(from, { status: 'off' });
+            return reply(`❌ Anti-Bad has been *DISABLED*!`);
+
+        case 'add':
+            if (!value) return reply("❌ Please provide a word to add.");
+            const result = await addBadWord(from, value, sender);
+            return result.success ? reply(`✅ Added "*${value}*" to bad words.`) : reply(`❌ ${result.message}`);
+
+        case 'remove':
+        case 'rm':
+            if (!value) return reply("❌ Please provide a word to remove.");
+            const removed = await removeBadWord(from, value);
+            return removed ? reply(`✅ Removed "*${value}*" from bad words.`) : reply(`❌ Word not found.`);
+
+        case 'list':
+        case 'words':
+            if (badWords.length === 0) return reply("📋 No bad words added yet.");
+            let wordList = `*📋 Bad Words List (${badWords.length})*\n\n`;
+            badWords.forEach(word => wordList += `• ${word}\n`);
+            return reply(wordList);
+
+        case 'clear':
+        case 'clearall':
+            const confirm = firstValue === 'confirm' || firstValue === '--yes';
+            if (!confirm) return reply(`⚠️ This will delete ALL ${badWords.length} bad words.\nType: *${conText.prefix}antibad clear confirm* to proceed.`);
+            await clearAllBadWords(from);
+            return reply(`✅ Cleared all bad words.`);
+
+        case 'delete':
+        case 'remove':
+        case 'warn':
+            await updateAntiBadSettings(from, { status: 'on', action: subcommand });
+            return reply(`✅ Anti-Bad action set to: *${subcommand.toUpperCase()}*`);
+
+        case 'type':
+        case 'filter':
+            if (!['strict', 'normal', 'loose'].includes(value)) return reply("❌ Filter type must be: strict, normal, or loose");
+            await updateAntiBadSettings(from, { filter_type: value });
+            return reply(`✅ Filter type set to: *${value.toUpperCase()}*`);
+
+        case 'adminexempt':
+            if (!value || !['on', 'off'].includes(value)) return reply("❌ Use: `antibad adminexempt on/off`");
+            await updateAntiBadSettings(from, { exempt_admins: value === 'on' });
+            return reply(`✅ Admin exemption ${value === 'on' ? 'enabled' : 'disabled'}.`);
+
+        case 'limit':
+            const limit = parseInt(firstValue);
+            if (isNaN(limit) || limit < 1 || limit > 10) return reply("❌ Limit must be between 1 and 10");
+            await updateAntiBadSettings(from, { warn_limit: limit });
+            return reply(`✅ Warn limit set to: *${limit}*`);
+
+        case 'reset':
+        case 'resetwarns':
+            clearAllBadWarns(from);
+            return reply(`✅ All warning counts reset!`);
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}antibad on/off*\n` +
+                `▸ *${conText.prefix}antibad add <word>*\n` +
+                `▸ *${conText.prefix}antibad remove <word>*\n` +
+                `▸ *${conText.prefix}antibad list*\n` +
+                `▸ *${conText.prefix}antibad clear*\n` +
+                `▸ *${conText.prefix}antibad delete/remove/warn*\n` +
+                `▸ *${conText.prefix}antibad type strict/normal/loose*\n` +
+                `▸ *${conText.prefix}antibad adminexempt on/off*\n` +
+                `▸ *${conText.prefix}antibad limit <1-10>*\n` +
+                `▸ *${conText.prefix}antibad reset*`
+            );
+    }
+});
+
+// ==================== ANTI-TAG COMMAND ====================
+keith({
+    pattern: "antitag",
+    aliases: ["antiment", "notag", "antimention"],
+    category: "Settings",
+    description: "Prevent mentioning/tagging in group"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+    if (!isGroup) return reply("❌ This command can only be used in groups!");
+    if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-tag!");
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args[1];
+
+    const settings = await getAntiTagSettings(from);
+
+    if (subcommand === 'list') {
+        const allGroups = await getAllAntiTagGroups();
+        if (allGroups.length === 0) return reply("📋 No groups have anti-tag enabled.");
+        
+        let listMessage = "*🚫 Anti-Tag Active Groups*\n\n";
+        for (let i = 0; i < allGroups.length; i++) {
+            const group = allGroups[i];
+            listMessage += `*${i + 1}.* ${group.groupName || 'Unknown'}\n`;
+            listMessage += `   └ 📍 JID: \`${group.groupJid}\`\n`;
+            listMessage += `   └ ⚙️ Action: *${group.action?.toUpperCase() || 'DELETE'}*\n\n`;
+        }
+        return reply(listMessage);
+    }
+
+    if (!isSuperUser && !conText.isAdmin) return reply("❌ Only group admins can use this command!");
+
+    if (!subcommand) {
+        const statusText = settings?.status === 'on' ? '✅ ENABLED' : '❌ DISABLED';
+        const actionMap = { 'delete': '🗑️ Delete Only', 'remove': '🚫 Remove User', 'warn': '⚠️ Warn + Delete' };
+        const adminExempt = settings?.exempt_admins ? '✅ Yes' : '❌ No';
+
+        return reply(
+            `*🚫 Anti-Tag Settings*\n\n` +
+            `📌 *Group:* ${groupName || 'Unknown'}\n` +
+            `📍 *JID:* \`${from}\`\n\n` +
+            `🔹 *Status:* ${statusText}\n` +
+            `🔹 *Action:* ${actionMap[settings?.action || 'delete']}\n` +
+            `🔹 *Allowed Mentions:* ${settings?.allowed_mentions || 0}\n` +
+            `🔹 *Exempt Admins:* ${adminExempt}\n` +
+            `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}antitag on/off*\n` +
+            `▸ *${conText.prefix}antitag delete/remove/warn*\n` +
+            `▸ *${conText.prefix}antitag allowed <0-10>*\n` +
+            `▸ *${conText.prefix}antitag adminexempt on/off*\n` +
+            `▸ *${conText.prefix}antitag limit <1-10>*\n` +
+            `▸ *${conText.prefix}antitag reset*\n` +
+            `▸ *${conText.prefix}antitag list*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+        case 'enable':
+            await toggleAntiTag(from, groupName, 'on', settings?.action || 'delete', settings?.warn_limit || 3, settings?.allowed_mentions || 0, settings?.exempt_admins !== false);
+            return reply(`✅ Anti-Tag has been *ENABLED*!`);
+
+        case 'off':
+        case 'disable':
+            await updateAntiTagSettings(from, { status: 'off' });
+            return reply(`❌ Anti-Tag has been *DISABLED*!`);
+
+        case 'delete':
+        case 'remove':
+        case 'warn':
+            await updateAntiTagSettings(from, { status: 'on', action: subcommand });
+            return reply(`✅ Anti-Tag action set to: *${subcommand.toUpperCase()}*`);
+
+        case 'allowed':
+            const allowed = parseInt(value);
+            if (isNaN(allowed) || allowed < 0 || allowed > 10) return reply("❌ Allowed mentions must be between 0 and 10");
+            await updateAntiTagSettings(from, { allowed_mentions: allowed });
+            return reply(`✅ Allowed mentions set to: *${allowed}*`);
+
+        case 'adminexempt':
+            if (!value || !['on', 'off'].includes(value)) return reply("❌ Use: `antitag adminexempt on/off`");
+            await updateAntiTagSettings(from, { exempt_admins: value === 'on' });
+            return reply(`✅ Admin exemption ${value === 'on' ? 'enabled' : 'disabled'}.`);
+
+        case 'limit':
+            const limit = parseInt(value);
+            if (isNaN(limit) || limit < 1 || limit > 10) return reply("❌ Limit must be between 1 and 10");
+            await updateAntiTagSettings(from, { warn_limit: limit });
+            return reply(`✅ Warn limit set to: *${limit}*`);
+
+        case 'reset':
+        case 'resetwarns':
+            clearAllTagWarns(from);
+            return reply(`✅ All warning counts reset!`);
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}antitag on/off*\n` +
+                `▸ *${conText.prefix}antitag delete/remove/warn*\n` +
+                `▸ *${conText.prefix}antitag allowed <0-10>*\n` +
+                `▸ *${conText.prefix}antitag adminexempt on/off*\n` +
+                `▸ *${conText.prefix}antitag limit <1-10>*\n` +
+                `▸ *${conText.prefix}antitag reset*\n` +
+                `▸ *${conText.prefix}antitag list*`
+            );
+    }
+});
+
+// ==================== ANTI-STICKER COMMAND ====================
+keith({
+    pattern: "antisticker",
+    aliases: ["antistick", "nosticker", "antis"],
+    category: "Settings",
+    description: "Prevent stickers in group"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+    if (!isGroup) return reply("❌ This command can only be used in groups!");
+    if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-sticker!");
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args[1];
+
+    const settings = await getAntiStickerSettings(from);
+
+    if (subcommand === 'list') {
+        const allGroups = await getAllAntiStickerGroups();
+        if (allGroups.length === 0) return reply("📋 No groups have anti-sticker enabled.");
+        
+        let listMessage = "*🚫 Anti-Sticker Active Groups*\n\n";
+        for (let i = 0; i < allGroups.length; i++) {
+            const group = allGroups[i];
+            listMessage += `*${i + 1}.* ${group.groupName || 'Unknown'}\n`;
+            listMessage += `   └ 📍 JID: \`${group.groupJid}\`\n`;
+            listMessage += `   └ ⚙️ Action: *${group.action?.toUpperCase() || 'DELETE'}*\n\n`;
+        }
+        return reply(listMessage);
+    }
+
+    if (!isSuperUser && !conText.isAdmin) return reply("❌ Only group admins can use this command!");
+
+    if (!subcommand) {
+        const statusText = settings?.status === 'on' ? '✅ ENABLED' : '❌ DISABLED';
+        const actionMap = { 'delete': '🗑️ Delete Only', 'remove': '🚫 Remove User', 'warn': '⚠️ Warn + Delete' };
+
+        return reply(
+            `*🚫 Anti-Sticker Settings*\n\n` +
+            `📌 *Group:* ${groupName || 'Unknown'}\n` +
+            `📍 *JID:* \`${from}\`\n\n` +
+            `🔹 *Status:* ${statusText}\n` +
+            `🔹 *Action:* ${actionMap[settings?.action || 'delete']}\n` +
+            `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}antisticker on/off*\n` +
+            `▸ *${conText.prefix}antisticker delete/remove/warn*\n` +
+            `▸ *${conText.prefix}antisticker limit <1-10>*\n` +
+            `▸ *${conText.prefix}antisticker reset*\n` +
+            `▸ *${conText.prefix}antisticker list*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+        case 'enable':
+            await toggleAntiSticker(from, groupName, 'on', settings?.action || 'delete', settings?.warn_limit || 3);
+            return reply(`✅ Anti-Sticker has been *ENABLED*!`);
+
+        case 'off':
+        case 'disable':
+            await updateAntiStickerSettings(from, { status: 'off' });
+            return reply(`❌ Anti-Sticker has been *DISABLED*!`);
+
+        case 'delete':
+        case 'remove':
+        case 'warn':
+            await updateAntiStickerSettings(from, { status: 'on', action: subcommand });
+            return reply(`✅ Anti-Sticker action set to: *${subcommand.toUpperCase()}*`);
+
+        case 'limit':
+            const limit = parseInt(value);
+            if (isNaN(limit) || limit < 1 || limit > 10) return reply("❌ Limit must be between 1 and 10");
+            await updateAntiStickerSettings(from, { warn_limit: limit });
+            return reply(`✅ Warn limit set to: *${limit}*`);
+
+        case 'reset':
+        case 'resetwarns':
+            clearAllStickerWarns(from);
+            return reply(`✅ All warning counts reset!`);
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}antisticker on/off*\n` +
+                `▸ *${conText.prefix}antisticker delete/remove/warn*\n` +
+                `▸ *${conText.prefix}antisticker limit <1-10>*\n` +
+                `▸ *${conText.prefix}antisticker reset*\n` +
+                `▸ *${conText.prefix}antisticker list*`
+            );
+    }
+});
+
+// ==================== CHATBOT COMMAND ====================
+keith({
+    pattern: "chatbot",
+    aliases: ["chatai", "bot"],
+    category: "Settings",
+    description: "Manage chatbot per chat/group"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser, isGroup, groupName, pushName } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+
+    const chatName = isGroup ? groupName : pushName || 'Private Chat';
+    const chatType = isGroup ? 'group' : 'private';
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args.slice(1).join(" ");
+
+    const settings = await getChatbotSettings(from, chatName, chatType);
+
+    if (subcommand === 'list') {
+        const activeChats = await getAllActiveChatbots();
+        if (activeChats.length === 0) return reply("📋 No active chatbots found.");
+        
+        let listMessage = "*🤖 Active Chatbots*\n\n";
+        for (let i = 0; i < activeChats.length; i++) {
+            const chat = activeChats[i];
+            const typeIcon = chat.chat_type === 'group' ? '👥' : '👤';
+            listMessage += `*${i + 1}.* ${typeIcon} ${chat.chat_name || 'Unknown'}\n`;
+            listMessage += `   └ 📍 JID: \`${chat.chat_jid}\`\n`;
+        }
+        return reply(listMessage);
+    }
+
+    if (subcommand === 'status' || !subcommand) {
+        const statusIcon = settings?.status === 'on' ? '✅' : '❌';
+        const triggerMap = { 'dm': '📨 DM Only', 'mention': '🔔 @mention', 'all': '📢 All Messages' };
+        const responseMap = { 'text': '📝 Text', 'audio': '🎵 Audio' };
+
+        return reply(
+            `*🤖 Chatbot Settings*\n\n` +
+            `📌 *Name:* ${chatName}\n` +
+            `📍 *JID:* \`${from}\`\n\n` +
+            `🔹 *Status:* ${statusIcon} ${settings?.status?.toUpperCase() || 'OFF'}\n` +
+            `🔹 *Trigger:* ${triggerMap[settings?.trigger || (isGroup ? 'mention' : 'dm')]}\n` +
+            `🔹 *Response:* ${responseMap[settings?.default_response || 'text']}\n` +
+            `🔹 *Voice:* ${settings?.voice || 'Kimberly'}\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}chatbot on/off*\n` +
+            `▸ *${conText.prefix}chatbot trigger ${isGroup ? 'mention/all' : 'dm/all'}*\n` +
+            `▸ *${conText.prefix}chatbot response text/audio*\n` +
+            `▸ *${conText.prefix}chatbot voice <name>*\n` +
+            `▸ *${conText.prefix}chatbot voices*\n` +
+            `▸ *${conText.prefix}chatbot clear*\n` +
+            `▸ *${conText.prefix}chatbot history*\n` +
+            `▸ *${conText.prefix}chatbot status*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+        case 'off':
+            await updateChatbotSettings(from, { status: subcommand, chat_name: chatName, chat_type: chatType });
+            return reply(`✅ Chatbot *${subcommand.toUpperCase()}* for this ${chatType}!`);
+
+        case 'trigger':
+            const validTriggers = isGroup ? ['mention', 'all'] : ['dm', 'all'];
+            if (!validTriggers.includes(value)) return reply(`❌ Invalid trigger! Use: ${validTriggers.join(' or ')}`);
+            await updateChatbotSettings(from, { trigger: value });
+            return reply(`✅ Trigger set to: *${value.toUpperCase()}*`);
+
+        case 'response':
+            if (!['text', 'audio'].includes(value)) return reply("❌ Invalid response! Use: text or audio");
+            await updateChatbotSettings(from, { default_response: value });
+            return reply(`✅ Default response: *${value.toUpperCase()}*`);
+
+        case 'voice':
+            if (!availableVoices.includes(value)) return reply(`❌ Invalid voice! Available: ${availableVoices.join(', ')}`);
+            await updateChatbotSettings(from, { voice: value });
+            return reply(`✅ Voice set to: *${value}*`);
+
+        case 'voices':
+            return reply(`*🎙️ Available Voices:*\n\n${availableVoices.join(', ')}`);
+
+        case 'clear':
+            const cleared = await clearConversationHistory(from);
+            return reply(cleared ? "✅ Conversation history cleared!" : "❌ No history to clear!");
+
+        case 'history':
+            const history = await getConversationHistory(from, 10);
+            if (history.length === 0) return reply("📝 No conversations yet.");
+            let historyText = `*📚 Recent Conversations (${history.length})*\n\n`;
+            history.forEach((conv, index) => {
+                const typeIcon = getTypeIcon(conv.type);
+                historyText += `*${index + 1}.* ${typeIcon}: ${conv.user.substring(0, 30)}...\n`;
+            });
+            return reply(historyText);
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}chatbot on/off*\n` +
+                `▸ *${conText.prefix}chatbot trigger ${isGroup ? 'mention/all' : 'dm/all'}*\n` +
+                `▸ *${conText.prefix}chatbot response text/audio*\n` +
+                `▸ *${conText.prefix}chatbot voice <name>*\n` +
+                `▸ *${conText.prefix}chatbot voices*\n` +
+                `▸ *${conText.prefix}chatbot clear*\n` +
+                `▸ *${conText.prefix}chatbot history*\n` +
+                `▸ *${conText.prefix}chatbot status*`
+            );
+    }
+});
+
+// ==================== EVENTS COMMAND ====================
+keith({
+    pattern: "events",
+    aliases: ["gevents", "groupevents"],
+    category: "Settings",
+    description: "Manage group welcome/leave events"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+    if (!isGroup) return reply("❌ This command can only be used in groups!");
+    if (!isBotAdmin) return reply("❌ I need to be an admin to manage group events!");
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args[1];
+
+    const settings = await getGroupEventsSettings(from);
+
+    if (subcommand === 'list') {
+        const allGroups = await getAllGroupEventsGroups();
+        const activeGroups = allGroups.filter(g => g.enabled === true);
+        if (activeGroups.length === 0) return reply("📋 No groups have events enabled.");
+        
+        let listMessage = "*🎉 Active Events Groups*\n\n";
+        for (let i = 0; i < activeGroups.length; i++) {
+            const group = activeGroups[i];
+            listMessage += `*${i + 1}.* ${group.groupName || 'Unknown'}\n`;
+            listMessage += `   └ 📍 JID: \`${group.groupJid}\`\n`;
+        }
+        return reply(listMessage);
+    }
+
+    if (!isSuperUser && !conText.isAdmin) return reply("❌ Only group admins can use this command!");
+
+    if (!subcommand) {
+        const statusText = settings?.enabled ? '✅ ENABLED' : '❌ DISABLED';
+
+        return reply(
+            `*🎉 Welcome/Goodbye Events Settings*\n\n` +
+            `📌 *Group:* ${groupName || 'Unknown'}\n` +
+            `📍 *JID:* \`${from}\`\n\n` +
+            `🔹 *Status:* ${statusText}\n` +
+            `🔹 *Show Promotions:* ${settings?.showPromotions ? '✅' : '❌'}\n\n` +
+            `*💬 Welcome:* ${settings?.welcomeMessage || 'Not set'}\n` +
+            `*👋 Goodbye:* ${settings?.goodbyeMessage || 'Not set'}\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}events on/off*\n` +
+            `▸ *${conText.prefix}events promote on/off*\n` +
+            `▸ *${conText.prefix}events welcome <message>*\n` +
+            `▸ *${conText.prefix}events goodbye <message>*\n` +
+            `▸ *${conText.prefix}events list*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+            await updateGroupEventsSettings(from, { enabled: true, groupName: groupName });
+            return reply(`✅ Events enabled!`);
+
+        case 'off':
+            await updateGroupEventsSettings(from, { enabled: false });
+            return reply(`❌ Events disabled!`);
+
+        case 'promote':
+            if (!value || !['on', 'off'].includes(value)) return reply("❌ Use: `events promote on/off`");
+            await updateGroupEventsSettings(from, { showPromotions: value === 'on' });
+            return reply(`✅ Promotions ${value === 'on' ? 'enabled' : 'disabled'}.`);
+
+        case 'welcome':
+            if (!value) return reply("❌ Provide a welcome message.");
+            await updateGroupEventsSettings(from, { welcomeMessage: q.substring('welcome'.length).trim() });
+            return reply("✅ Welcome message updated.");
+
+        case 'goodbye':
+            if (!value) return reply("❌ Provide a goodbye message.");
+            await updateGroupEventsSettings(from, { goodbyeMessage: q.substring('goodbye'.length).trim() });
+            return reply("✅ Goodbye message updated.");
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}events on/off*\n` +
+                `▸ *${conText.prefix}events promote on/off*\n` +
+                `▸ *${conText.prefix}events welcome <message>*\n` +
+                `▸ *${conText.prefix}events goodbye <message>*\n` +
+                `▸ *${conText.prefix}events list*`
+            );
+    }
+});
+
+// ==================== ANTI-STATUS-MENTION COMMAND ====================
+keith({
+    pattern: "antistatusmention",
+    aliases: ["antistatus", "statusguard"],
+    category: "Settings",
+    description: "Manage anti-status-mention settings per group"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+    if (!isGroup) return reply("❌ This command can only be used in groups!");
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args[1];
+
+    const settings = await getAntiStatusMentionSettings(from);
+
+    if (subcommand === 'list') {
+        const allGroups = await getAllAntiStatusMentionGroups();
+        if (allGroups.length === 0) return reply("📋 No groups have anti-status-mention enabled.");
+        
+        let listMessage = "*📋 Active Anti-Status-Mention Groups*\n\n";
+        for (let i = 0; i < allGroups.length; i++) {
+            const group = allGroups[i];
+            listMessage += `*${i + 1}.* ${group.groupName || 'Unknown'}\n`;
+            listMessage += `   └ 📍 JID: \`${group.groupJid}\`\n`;
+        }
+        return reply(listMessage);
+    }
+
+    if (!isBotAdmin) return reply("❌ I need to be an admin!");
+    if (!isSuperUser && !conText.isAdmin) return reply("❌ Only group admins can use this command!");
+
+    if (!subcommand) {
+        const statusText = settings?.status === 'on' ? '✅ ENABLED' : '❌ DISABLED';
+        const actionMap = { 'warn': '⚠️ Warn', 'delete': '🗑️ Delete', 'remove': '🚫 Remove' };
+
+        return reply(
+            `*📢 Anti-Status-Mention Settings*\n\n` +
+            `📌 *Group:* ${groupName || 'Unknown'}\n` +
+            `📍 *JID:* \`${from}\`\n\n` +
+            `🔹 *Status:* ${statusText}\n` +
+            `🔹 *Action:* ${actionMap[settings?.action || 'warn']}\n` +
+            `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}antistatusmention on/off*\n` +
+            `▸ *${conText.prefix}antistatusmention warn/delete/remove*\n` +
+            `▸ *${conText.prefix}antistatusmention limit <1-10>*\n` +
+            `▸ *${conText.prefix}antistatusmention resetwarns*\n` +
+            `▸ *${conText.prefix}antistatusmention list*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+        case 'enable':
+            await toggleAntiStatusMention(from, groupName, 'on', settings?.action || 'warn', settings?.warn_limit || 3);
+            return reply(`✅ Anti-status-mention *ENABLED*!`);
+
+        case 'off':
+        case 'disable':
+            await updateAntiStatusMentionSettings(from, { status: 'off' });
+            return reply(`❌ Anti-status-mention *DISABLED*!`);
+
+        case 'warn':
+        case 'delete':
+        case 'remove':
+            await updateAntiStatusMentionSettings(from, { status: 'on', action: subcommand });
+            return reply(`✅ Action set to: *${subcommand.toUpperCase()}*`);
+
+        case 'limit':
+            const limit = parseInt(value);
+            if (isNaN(limit) || limit < 1 || limit > 10) return reply("❌ Limit must be between 1 and 10");
+            await updateAntiStatusMentionSettings(from, { warn_limit: limit });
+            return reply(`✅ Warn limit set to: *${limit}*`);
+
+        case 'resetwarns':
+        case 'reset':
+            clearAllStatusWarns(from);
+            return reply(`✅ All warning counts reset!`);
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}antistatusmention on/off*\n` +
+                `▸ *${conText.prefix}antistatusmention warn/delete/remove*\n` +
+                `▸ *${conText.prefix}antistatusmention limit <1-10>*\n` +
+                `▸ *${conText.prefix}antistatusmention resetwarns*\n` +
+                `▸ *${conText.prefix}antistatusmention list*`
+            );
+    }
+});
+
+// ==================== ANTI-LINK COMMAND ====================
+keith({
+    pattern: "antilink",
+    aliases: ["linkguard"],
+    category: "Settings",
+    description: "Manage anti-link settings per group"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+    if (!isGroup) return reply("❌ This command can only be used in groups!");
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args[1];
+
+    const settings = await getAntiLinkSettings(from);
+
+    if (subcommand === 'list') {
+        const allGroups = await getAllAntiLinkGroups();
+        if (allGroups.length === 0) return reply("📋 No groups have anti-link enabled.");
+        
+        let listMessage = "*📋 Active Anti-Link Groups*\n\n";
+        for (let i = 0; i < allGroups.length; i++) {
+            const group = allGroups[i];
+            listMessage += `*${i + 1}.* ${group.groupName || 'Unknown'}\n`;
+            listMessage += `   └ 📍 JID: \`${group.groupJid}\`\n`;
+        }
+        return reply(listMessage);
+    }
+
+    if (!isBotAdmin) return reply("❌ I need to be an admin!");
+    if (!isSuperUser && !conText.isAdmin) return reply("❌ Only group admins can use this command!");
+
+    if (!subcommand) {
+        const statusText = settings?.status === 'on' ? '✅ ENABLED' : '❌ DISABLED';
+        const actionMap = { 'warn': '⚠️ Warn', 'delete': '🗑️ Delete', 'remove': '🚫 Remove' };
+
+        return reply(
+            `*🔗 Anti-Link Settings*\n\n` +
+            `📌 *Group:* ${groupName || 'Unknown'}\n` +
+            `📍 *JID:* \`${from}\`\n\n` +
+            `🔹 *Status:* ${statusText}\n` +
+            `🔹 *Action:* ${actionMap[settings?.action || 'warn']}\n` +
+            `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}antilink on/off*\n` +
+            `▸ *${conText.prefix}antilink warn/delete/remove*\n` +
+            `▸ *${conText.prefix}antilink limit <1-10>*\n` +
+            `▸ *${conText.prefix}antilink resetwarns*\n` +
+            `▸ *${conText.prefix}antilink list*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+        case 'enable':
+            await toggleAntiLink(from, groupName, 'on', settings?.action || 'warn', settings?.warn_limit || 3);
+            return reply(`✅ Anti-link *ENABLED*!`);
+
+        case 'off':
+        case 'disable':
+            await updateAntiLinkSettings(from, { status: 'off' });
+            return reply(`❌ Anti-link *DISABLED*!`);
+
+        case 'warn':
+        case 'delete':
+        case 'remove':
+            await updateAntiLinkSettings(from, { status: 'on', action: subcommand });
+            return reply(`✅ Action set to: *${subcommand.toUpperCase()}*`);
+
+        case 'limit':
+            const limit = parseInt(value);
+            if (isNaN(limit) || limit < 1 || limit > 10) return reply("❌ Limit must be between 1 and 10");
+            await updateAntiLinkSettings(from, { warn_limit: limit });
+            return reply(`✅ Warn limit set to: *${limit}*`);
+
+        case 'resetwarns':
+        case 'reset':
+            clearAllWarns(from);
+            return reply(`✅ All warning counts reset!`);
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}antilink on/off*\n` +
+                `▸ *${conText.prefix}antilink warn/delete/remove*\n` +
+                `▸ *${conText.prefix}antilink limit <1-10>*\n` +
+                `▸ *${conText.prefix}antilink resetwarns*\n` +
+                `▸ *${conText.prefix}antilink list*`
+            );
+    }
+});
 //========================================================================================================================
 // From Owner.js
 
