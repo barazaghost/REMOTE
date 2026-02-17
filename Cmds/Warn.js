@@ -1,10 +1,9 @@
-
 const { keith } = require('../commandHandler');
 const axios = require('axios');
 const { 
     getGroupEventsSettings, 
     updateGroupEventsSettings,
-    clearAllWarns
+    clearAllWarns: clearAllGroupWarns  // Renamed to avoid conflict
 } = require('../database/groupevents');
 const { 
     getWarnSettings,
@@ -16,11 +15,11 @@ const {
     getUserWarns,
     getAllWarns,
     clearUserWarns,
-    clearAllWarns,
-    initWarnDB  // Make sure to import initWarnDB
+    clearAllWarns: clearAllUserWarns,  // Renamed to avoid conflict
+    initWarnDB
 } = require('../database/warn');
 
-// ✅ Initialize warn table on startup
+// Initialize warn table on startup
 initWarnDB().catch(err => {
   console.error("❌ Failed to initialize warn database:", err);
 });
@@ -165,7 +164,7 @@ async (from, client, conText) => {
     if (!targetUser) {
       // Clear all warns in group
       if (value === 'all' || value === '--all') {
-        await clearAllWarns(from);
+        await clearAllUserWarns(from);  // Using renamed function
         return reply(`✅ All warnings have been cleared in this group.`);
       }
       return reply("❌ Please reply to a user or tag someone to clear warnings!");
@@ -330,22 +329,18 @@ async (from, client, conText) => {
   }
 });
 
-
-
-
 keith({
   pattern: "antidemote",
   aliases: ["antidem", "nodemote"],
   category: "Settings",
   description: "Prevent unauthorized demotions in group"
-  
 },
 async (from, client, conText) => {
   const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
 
   if (!isGroup) return reply("❌ This command can only be used in groups!");
-if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
-    if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-demote!");
+  if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+  if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-demote!");
 
   const args = q?.trim().split(/\s+/) || [];
   const subcommand = args[0]?.toLowerCase();
@@ -451,7 +446,7 @@ if (!isSuperUser) return reply("❌ You need superuser privileges to use this co
 
     case 'reset':
     case 'resetwarns':
-      clearAllWarns(from);
+      await clearAllGroupWarns(from);  // Using renamed function
       return reply(`✅ All anti-demote warning counts reset for this group!`);
 
     default:
@@ -467,22 +462,18 @@ if (!isSuperUser) return reply("❌ You need superuser privileges to use this co
   }
 });
 
-
-
 keith({
   pattern: "antipromote",
   aliases: ["antiprom", "nopromote"],
   category: "Settings",
   description: "Prevent unauthorized promotions in group"
-  
 },
 async (from, client, conText) => {
   const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
 
   if (!isGroup) return reply("❌ This command can only be used in groups!");
-if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
-
-    if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-promote!");
+  if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+  if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-promote!");
 
   const args = q?.trim().split(/\s+/) || [];
   const subcommand = args[0]?.toLowerCase();
@@ -588,7 +579,7 @@ if (!isSuperUser) return reply("❌ You need superuser privileges to use this co
 
     case 'reset':
     case 'resetwarns':
-      clearAllWarns(from);
+      await clearAllGroupWarns(from);  // Using renamed function
       return reply(`✅ All anti-promote warning counts reset for this group!`);
 
     default:
