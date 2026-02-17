@@ -124,7 +124,193 @@ function getTypeIcon(type) {
     return icons[type] || '📝';
 }
 
+// ==================== BOT SETTINGS COMMAND ====================
+keith({
+    pattern: "botsettings",
+    aliases: ["allsettings", "configlist", "settingslist", "settings", "setting"],
+    category: "Settings",
+    description: "List all bot configuration settings",
+    filename: __filename
+}, async (from, client, conText) => {
+    const { reply, isSuperUser, prefix } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+
+    try {
+        // Fetch all settings in parallel
+        const [
+            botSettings,
+            antiDelete,
+            antiSpam,
+            antiCall,
+            autoBlock,
+            antiBad,
+            antiTag,
+            antiSticker,
+            chatbot,
+            groupEvents,
+            antiStatusMention,
+            antiLink,
+            autoBio,
+            autoRead,
+            autoStatus,
+            greet,
+            presence
+        ] = await Promise.all([
+            // Basic settings
+            getSettings(),
+            // Anti features
+            getAntiDeleteSettings(),
+            getAntiSpamSettings(from), // Global spam settings
+            getAntiCallSettings(),
+            getAutoBlockSettings(),
+            getAntiBadSettings(from),
+            getAntiTagSettings(from),
+            getAntiStickerSettings(from),
+            // Chat and events
+            getChatbotSettings(from),
+            getGroupEventsSettings(from),
+            getAntiStatusMentionSettings(from),
+            getAntiLinkSettings(from),
+            // Auto features
+            getAutoBioSettings(),
+            getAutoReadSettings(),
+            getAutoStatusSettings(),
+            getGreetSettings(),
+            getPresenceSettings()
+        ]);
+
+        // Get counts for dynamic data
+        const triggerWords = await getTriggerWords();
+        const badWords = await getBadWords(from);
+        
+        // Format all settings
+        let settingsList = `*🤖 BOT SETTINGS DASHBOARD*\n`;
+        settingsList += `📊 *Complete Configuration Overview*\n\n`;
+
+        // 1. BOT BASIC SETTINGS
+        settingsList += `*📌 BASIC SETTINGS*\n`;
+        settingsList += `├─ Bot Name: ${botSettings.botname}\n`;
+        settingsList += `├─ Author: ${botSettings.author}\n`;
+        settingsList += `├─ Prefix: ${botSettings.prefix}\n`;
+        settingsList += `├─ Mode: ${botSettings.mode.toUpperCase()}\n`;
+        settingsList += `├─ Packname: ${botSettings.packname}\n`;
+        settingsList += `├─ Timezone: ${botSettings.timezone}\n`;
+        settingsList += `├─ Profile URL: ${botSettings.url ? '✅ Set' : '❌ Not Set'}\n`;
+        settingsList += `└─ GitHub URL: ${botSettings.gurl ? '✅ Set' : '❌ Not Set'}\n\n`;
+
+        // 2. PROTECTION SETTINGS
+        settingsList += `*🛡️ PROTECTION SETTINGS*\n`;
+        
+        // Anti-Delete
+        settingsList += `├─ Anti-Delete: ${antiDelete.status ? '✅ ON' : '❌ OFF'}\n`;
+        
+        // Anti-Spam
+        const spamStatus = antiSpam?.status === 'on' ? '✅ ON' : '❌ OFF';
+        settingsList += `├─ Anti-Spam: ${spamStatus} (${antiSpam?.action || 'warn'}, ${antiSpam?.message_limit || 5}msgs/${antiSpam?.time_window || 5}s)\n`;
+        
+        // Anti-Call
+        const callStatus = antiCall?.status ? '✅ ON' : '❌ OFF';
+        settingsList += `├─ Anti-Call: ${callStatus} (${antiCall?.action || 'reject'}, limit:${antiCall?.warn_limit || 3})\n`;
+        
+        // Auto-Block
+        const blockStatus = autoBlock?.status === 'on' ? '✅ ON' : '❌ OFF';
+        settingsList += `├─ Auto-Block: ${blockStatus} (${autoBlock?.action || 'block'}, words:${triggerWords.length})\n`;
+        
+        // Anti-Bad
+        const badStatus = antiBad?.status === 'on' ? '✅ ON' : '❌ OFF';
+        settingsList += `├─ Anti-Bad Words: ${badStatus} (${antiBad?.action || 'delete'}, filter:${antiBad?.filter_type || 'normal'}, words:${badWords.length})\n`;
+        
+        // Anti-Tag
+        const tagStatus = antiTag?.status === 'on' ? '✅ ON' : '❌ OFF';
+        settingsList += `├─ Anti-Tag: ${tagStatus} (${antiTag?.action || 'delete'}, allowed:${antiTag?.allowed_mentions || 0})\n`;
+        
+        // Anti-Sticker
+        const stickerStatus = antiSticker?.status === 'on' ? '✅ ON' : '❌ OFF';
+        settingsList += `├─ Anti-Sticker: ${stickerStatus} (${antiSticker?.action || 'delete'})\n`;
+        
+        // Anti-Status-Mention
+        const statusMentionStatus = antiStatusMention?.status === 'on' ? '✅ ON' : '❌ OFF';
+        settingsList += `├─ Anti-Status-Mention: ${statusMentionStatus} (${antiStatusMention?.action || 'warn'})\n`;
+        
+        // Anti-Link
+        const linkStatus = antiLink?.status === 'on' ? '✅ ON' : '❌ OFF';
+        settingsList += `└─ Anti-Link: ${linkStatus} (${antiLink?.action || 'warn'})\n\n`;
+
+        // 3. AUTO FEATURES
+        settingsList += `*⚡ AUTO FEATURES*\n`;
+        settingsList += `├─ Auto-Read: ${autoRead.status ? '✅ ON' : '❌ OFF'} (${autoRead.chatTypes.join(', ') || 'none'})\n`;
+        settingsList += `├─ Auto-Bio: ${autoBio.status === 'on' ? '✅ ON' : '❌ OFF'}\n`;
+        settingsList += `├─ Auto-Reply Greet: ${greet.enabled ? '✅ ON' : '❌ OFF'}\n`;
+        settingsList += `├─ Auto-View Status: ${autoStatus.autoviewStatus === 'true' ? '✅ ON' : '❌ OFF'}\n`;
+        settingsList += `├─ Auto-Reply Status: ${autoStatus.autoReplyStatus === 'true' ? '✅ ON' : '❌ OFF'}\n`;
+        settingsList += `└─ Auto-Like Status: ${autoStatus.autoLikeStatus === 'true' ? '✅ ON' : '❌ OFF'}\n\n`;
+
+        // 4. CHATBOT SETTINGS
+        const chatbotStatusMap = { 'on': '✅ ON', 'off': '❌ OFF' };
+        const chatbotModeMap = { 'private': '🔒 Private', 'group': '👥 Group', 'both': '🌐 Both' };
+        settingsList += `*🤖 CHATBOT*\n`;
+        settingsList += `├─ Status: ${chatbotStatusMap[chatbot?.status] || '❌ OFF'}\n`;
+        settingsList += `├─ Mode: ${chatbotModeMap[chatbot?.mode] || 'N/A'}\n`;
+        settingsList += `├─ Trigger: ${chatbot?.trigger === 'dm' ? '📨 DM' : chatbot?.trigger === 'mention' ? '🔔 Mention' : '📢 All'}\n`;
+        settingsList += `├─ Response: ${chatbot?.default_response === 'audio' ? '🎵 Audio' : '📝 Text'}\n`;
+        settingsList += `└─ Voice: ${chatbot?.voice || 'Kimberly'}\n\n`;
+
+        // 5. GROUP EVENTS
+        settingsList += `*🎉 GROUP EVENTS*\n`;
+        settingsList += `├─ Welcome/Goodbye: ${groupEvents?.enabled ? '✅ ON' : '❌ OFF'}\n`;
+        settingsList += `├─ Show Promotions: ${groupEvents?.showPromotions ? '✅ ON' : '❌ OFF'}\n`;
+        settingsList += `├─ Anti-Demote: ${groupEvents?.antiDemote === 'on' ? '✅ ON' : '❌ OFF'} (${groupEvents?.antiDemoteAction || 'promote'})\n`;
+        settingsList += `└─ Anti-Promote: ${groupEvents?.antiPromote === 'on' ? '✅ ON' : '❌ OFF'} (${groupEvents?.antiPromoteAction || 'demote'})\n\n`;
+
+        // 6. PRESENCE SETTINGS
+        const presenceMap = {
+            'off': '❌ OFF',
+            'online': '🟢 ONLINE',
+            'typing': '✍️ TYPING',
+            'recording': '🎙️ RECORDING'
+        };
+        settingsList += `*🔄 PRESENCE*\n`;
+        settingsList += `├─ Private: ${presenceMap[presence.privateChat] || '❌ OFF'}\n`;
+        settingsList += `└─ Group: ${presenceMap[presence.groupChat] || '❌ OFF'}\n\n`;
+
+        // 7. QUICK STATS
+        settingsList += `*📊 QUICK STATS*\n`;
+        settingsList += `├─ Warn Limits: Spam(${antiSpam?.warn_limit || 3}), Call(${antiCall?.warn_limit || 3}), Block(${autoBlock?.warn_limit || 3})\n`;
+        settingsList += `├─ Bad Words(${antiBad?.filter_type || 'normal'}): ${badWords.length} words\n`;
+        settingsList += `├─ Trigger Words: ${triggerWords.length} words\n`;
+        settingsList += `├─ Status Like Emojis: ${autoStatus.statusLikeEmojis || 'Default'}\n`;
+        settingsList += `└─ Status Reply: ${autoStatus.statusReplyText || 'Default'}\n\n`;
+
+        // 8. COMMANDS SECTION
+        settingsList += `*🔧 AVAILABLE COMMANDS*\n`;
+        settingsList += `▸ ${prefix}settings - Basic bot settings\n`;
+        settingsList += `▸ ${prefix}antispam - Anti-spam settings\n`;
+        settingsList += `▸ ${prefix}anticall - Anti-call settings\n`;
+        settingsList += `▸ ${prefix}autoblock - Auto-block words\n`;
+        settingsList += `▸ ${prefix}antibad - Bad words filter\n`;
+        settingsList += `▸ ${prefix}antitag - Anti-tag settings\n`;
+        settingsList += `▸ ${prefix}antisticker - Anti-sticker settings\n`;
+        settingsList += `▸ ${prefix}chatbot - Chatbot settings\n`;
+        settingsList += `▸ ${prefix}events - Group events\n`;
+        settingsList += `▸ ${prefix}antistatusmention - Anti-status-mention\n`;
+        settingsList += `▸ ${prefix}antilink - Anti-link settings\n`;
+        settingsList += `▸ ${prefix}autoread - Auto-read settings\n`;
+        settingsList += `▸ ${prefix}autobio - Auto-bio settings\n`;
+        settingsList += `▸ ${prefix}presence - Presence settings\n`;
+        settingsList += `▸ ${prefix}greet - Greeting settings\n`;
+        settingsList += `▸ ${prefix}antidelete - Anti-delete settings\n`;
+
+        // Send the settings list
+        await reply(settingsList);
+
+    } catch (error) {
+        console.error('Error fetching settings:', error);
+        return reply("❌ Error fetching settings. Please check console for details.");
+    }
+});
 // ==================== ANTI-SPAM COMMAND ====================
+
 keith({
     pattern: "antispam",
     aliases: ["spamguard", "nospam"],
@@ -1451,98 +1637,7 @@ keith({
 //========================================================================================================================
       
 //========================================================================================================================
-keith({
-  pattern: "botsettings",
-  aliases: ["allsettings", "configlist", "settingslist", "settings", "setting"],
-  category: "Settings",
-  description: "List all bot configuration settings",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { reply, isSuperUser, prefix } = conText;
 
-  if (!isSuperUser) return reply("❌ Owner Only Command!");
-
-  try {
-    // Fetch all settings in parallel
-    const [
-      botSettings,
-      antiDelete,
-      autoBio,
-      autoRead,
-      autoStatus,
-      greet,
-      presence
-    ] = await Promise.all([
-      getSettings(),
-      getAntiDeleteSettings(),
-      getAutoBioSettings(),
-      getAutoReadSettings(),
-      getAutoStatusSettings(),
-      getGreetSettings(),
-      getPresenceSettings()
-    ]);
-
-    // Format all settings
-    let settingsList = `*🤖 BOT SETTINGS DASHBOARD*\n`;
-    settingsList += `📊 *All Configuration Values*\n\n`;
-
-    // 1. BOT BASIC SETTINGS
-    settingsList += `*📌 BASIC SETTINGS*\n`;
-    settingsList += `├─ Bot Name: ${botSettings.botname}\n`;
-    settingsList += `├─ Author: ${botSettings.author}\n`;
-    settingsList += `├─ Prefix: ${botSettings.prefix}\n`;
-    settingsList += `├─ Mode: ${botSettings.mode.toUpperCase()}\n`;
-    settingsList += `├─ Packname: ${botSettings.packname}\n`;
-    settingsList += `├─ Timezone: ${botSettings.timezone}\n`;
-    settingsList += `├─ Profile URL: ${botSettings.url ? '✅ Set' : '❌ Not Set'}\n`;
-    settingsList += `└─ GitHub URL: ${botSettings.gurl ? '✅ Set' : '❌ Not Set'}\n\n`;
-
-    // 2. AUTO FEATURES
-    settingsList += `*⚡ AUTO FEATURES*\n`;
-    settingsList += `├─ Auto-Read: ${autoRead.status ? '✅ ON' : '❌ OFF'}\n`;
-    settingsList += `├─ Auto-Bio: ${autoBio.status === 'on' ? '✅ ON' : '❌ OFF'}\n`;
-    settingsList += `├─ Auto-Reply Greet: ${greet.enabled ? '✅ ON' : '❌ OFF'}\n`;
-    settingsList += `├─ Auto-View Status: ${autoStatus.autoviewStatus === 'true' ? '✅ ON' : '❌ OFF'}\n`;
-    settingsList += `├─ Auto-Reply Status: ${autoStatus.autoReplyStatus === 'true' ? '✅ ON' : '❌ OFF'}\n`;
-    settingsList += `└─ Auto-Like Status: ${autoStatus.autoLikeStatus === 'true' ? '✅ ON' : '❌ OFF'}\n\n`;
-
-    // 3. PROTECTION SETTINGS
-    settingsList += `*🛡️ PROTECTION SETTINGS*\n`;
-    settingsList += `└─ Anti-Delete: ${antiDelete.status ? '✅ ON' : '❌ OFF'}\n\n`;
-
-    // 4. PRESENCE SETTINGS
-    const presenceMap = {
-      'off': '❌ OFF',
-      'online': '🟢 ONLINE',
-      'typing': '✍️ TYPING',
-      'recording': '🎙️ RECORDING'
-    };
-    settingsList += `*🔄 PRESENCE*\n`;
-    settingsList += `├─ Private: ${presenceMap[presence.privateChat] || '❌ OFF'}\n`;
-    settingsList += `└─ Group: ${presenceMap[presence.groupChat] || '❌ OFF'}\n\n`;
-
-    // 5. ADDITIONAL INFO
-    settingsList += `*📊 QUICK STATS*\n`;
-    settingsList += `├─ Chat Types (Auto-Read): ${autoRead.chatTypes.join(', ') || 'None'}\n`;
-    settingsList += `└─ Status Like Emojis: ${autoStatus.statusLikeEmojis || 'Default'}\n\n`;
-
-    // 6. COMMANDS SECTION
-    settingsList += `*🔧 INDIVIDUAL COMMANDS*\n`;
-    settingsList += `▸ ${prefix}settings - Bot basic settings\n`;
-    settingsList += `▸ ${prefix}autoread - Auto-read settings\n`;
-    settingsList += `▸ ${prefix}antidelete - Anti-delete settings\n`;
-    settingsList += `▸ ${prefix}presence - Presence settings\n`;
-    settingsList += `▸ ${prefix}greet - Greeting settings\n`;
-    settingsList += `▸ ${prefix}autobio - Auto-bio settings\n`;
-
-    // Send the settings list
-    await reply(settingsList);
-
-  } catch (error) {
-    console.error('Error fetching settings:', error);
-    return reply("❌ Error fetching settings. Please try again.");
-  }
-});
 //========================================================================================================================
 keith({
   pattern: "botname",
