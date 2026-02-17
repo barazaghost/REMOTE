@@ -1,4 +1,3 @@
-
 const { keith } = require('../commandHandler');
 
 keith({
@@ -10,7 +9,7 @@ keith({
   const { reply, api } = conText;
 
   try {
-    const videoUrl = "${api}/random/randomvideo";
+    const videoUrl = `${api}/random/randomvideo`;
 
     await client.sendMessage(from, {
       video: { url: videoUrl },
