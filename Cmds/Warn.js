@@ -340,7 +340,7 @@ async (from, client, conText) => {
 
   if (!isGroup) return reply("❌ This command can only be used in groups!");
   if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
-  if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-demote!");
+//  if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-demote!");
 
   const args = q?.trim().split(/\s+/) || [];
   const subcommand = args[0]?.toLowerCase();
@@ -473,7 +473,7 @@ async (from, client, conText) => {
 
   if (!isGroup) return reply("❌ This command can only be used in groups!");
   if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
-  if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-promote!");
+//  if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-promote!");
 
   const args = q?.trim().split(/\s+/) || [];
   const subcommand = args[0]?.toLowerCase();
