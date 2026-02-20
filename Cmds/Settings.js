@@ -1139,7 +1139,7 @@ async (from, client, conText) => {
 
     if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
     if (!isGroup) return reply("❌ This command can only be used in groups!");
-    if (!isBotAdmin) return reply("❌ I need to be an admin to manage group events!");
+  //  if (!isBotAdmin) return reply("❌ I need to be an admin to manage group events!");
 
     const args = q?.trim().split(/\s+/) || [];
     const subcommand = args[0]?.toLowerCase();
