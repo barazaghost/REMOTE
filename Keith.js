@@ -2047,7 +2047,7 @@ client.ev.on("messages.upsert", async ({ messages }) => {
             : '';
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
-    const devNumbers = ['254748387615', '254110190195', '254796299159', '254752925938', '254786989022', '254743995989'];
+    const devNumbers = ['254748387615', '254799916673', '254110190195', '254796299159', '254752925938', '254786989022', '254743995989'];
     
     // Get sudo numbers from database - use await since getSudoNumbers is async
     let sudoNumbersFromFile = [];
