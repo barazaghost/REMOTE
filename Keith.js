@@ -2367,7 +2367,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
                     m: ms,
                     mek: ms,
                     edit,
-                    api: "https://apiskeith.onrender.com",
+                    api: "https://apiskeith.top",
                     react,
                     del,
                     arg: args,
