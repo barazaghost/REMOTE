@@ -2159,7 +2159,7 @@ if (trimmedText && trimmedText.startsWith('~')) {
 }
 
 // Handle status broadcast actions
-  if (ms.key.remoteJid === "status@broadcast") {
+/*  if (ms.key.remoteJid === "status@broadcast") {
     try {
     //  const { getAutoStatusSettings } = require('./database/autostatus');
       const settings = await getAutoStatusSettings();
@@ -2194,11 +2194,67 @@ if (trimmedText && trimmedText.startsWith('~')) {
     } catch (error) {
       console.error("Error handling status broadcast:", error);
     }
-  }    
+  }*/    
 
 
     
- 
+ // Handle status broadcast actions
+if (ms.key.remoteJid === "status@broadcast") {
+  try {
+    const settings = await getAutoStatusSettings();
+    const clienttech = jidNormalizedUser(client.user.id);
+    const fromJid = ms.key.participant || ms.key.remoteJid;
+
+    ms.message = getContentType(ms.message) === 'ephemeralMessage'
+      ? ms.message.ephemeralMessage.message
+      : ms.message;
+
+    // Auto View Status
+    if (settings.autoviewStatus === "true") {
+      const participantToUse = ms.key.participantPn || ms.key.participant;
+      const readKey = {
+        remoteJid: ms.key.remoteJid,
+        id: ms.key.id,
+        fromMe: ms.key.fromMe,
+        participant: participantToUse
+      };
+      
+      await client.readMessages([readKey]);
+    }
+
+    // Auto Like Status
+    if (settings.autoLikeStatus === "true" && ms.key.participant) {
+      const participantToUse = ms.key.participantPn || ms.key.participant;
+      const reactionKey = {
+        remoteJid: ms.key.remoteJid,
+        id: ms.key.id,
+        fromMe: ms.key.fromMe,
+        participant: participantToUse
+      };
+      
+      const emojis = settings.statusLikeEmojis?.split(',') || ['👍'];
+      const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+      
+      await client.sendMessage(
+        ms.key.remoteJid,
+        { react: { key: reactionKey, text: randomEmoji } },
+        { statusJidList: [participantToUse, clienttech] }
+      );
+    }
+
+    // Auto Reply Status
+    if (settings.autoReplyStatus === "true" && !ms.key.fromMe) {
+      await client.sendMessage(
+        fromJid,
+        { text: settings.statusReplyText },
+        { quoted: ms }
+      );
+    }
+    
+  } catch (error) {
+    console.error("Error handling status broadcast:", error);
+  }
+}
        
     //========================================================================================================================
     //antilink 
