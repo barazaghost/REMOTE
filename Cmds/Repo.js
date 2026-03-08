@@ -236,7 +236,7 @@ keith({
   const { mek, pushName, botname, author } = conText;
 
   try {
-    const response = await axios.get("https://api.github.com/repos/laurentsams2/KEITH-MD");
+    const response = await axios.get("https://api.github.com/repos/kkeizza/Keith");
     const repoData = response.data;
 
     const createdDate = new Date(repoData.created_at).toLocaleDateString("en-KE", {
