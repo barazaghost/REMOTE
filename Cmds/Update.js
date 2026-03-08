@@ -86,7 +86,7 @@ keith({
   try {
     await reply("🔍 Checking for updates...");
 
-    const repo = "keithkeizzah/KEITH-MD";
+    const repo = "kkeizza/Keith";
     const { data: commit } = await axios.get(
       `https://api.github.com/repos/${repo}/commits/main`,
       { timeout: 8000 }
