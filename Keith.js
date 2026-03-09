@@ -2018,6 +2018,7 @@ client.ev.on("messages.upsert", async ({ messages }) => {
         (type === 'conversation') ? ms.message.conversation : 
         (type === 'extendedTextMessage') ? ms.message.extendedTextMessage.text : 
         (type == 'imageMessage') && ms.message.imageMessage.caption ? ms.message.imageMessage.caption : 
+        (type === 'documentMessage' && ms.message.documentMessage.caption) ? ms.message.documentMessage.caption :
         (type == 'videoMessage') && ms.message.videoMessage.caption ? ms.message.videoMessage.caption : '';
     
     // Use database prefix instead of hardcoded one
@@ -2428,6 +2429,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
                     del,
                     arg: args,
                     quoted,
+                    body,
                     isCmd: isCommand,
                     command,
                     isAdmin,
