@@ -74,37 +74,44 @@ keith({
 });
 //========================================================================================================================
 
+
 keith({
   pattern: "gitclone",
   aliases: ["zip", "repozip"],
-  description: "Clone GitHub repo and return as zip",
+  description: "Clone GitHub/GitLab repo and return as zip",
   category: "General",
   filename: __filename
 }, async (from, client, conText) => {
   const { mek, q, reply } = conText;
 
   if (!q) {
-    return reply("📌 Provide a GitHub repo URL.\nExample: .gitclone https://github.com/Keithkeizzah/KEITH-MD");
+    return reply("📌 Provide a repo URL.\nExamples:\n.gitclone https://github.com/Keithkeizzah/KEITH-MD\n.gitclone https://gitlab.com/Keithkeizzah/T-BOT");
   }
 
   try {
-    // Normalize repo URL
     let repoUrl = q.trim();
-    if (!repoUrl.startsWith("https://github.com/")) {
-      return reply("❌ Only GitHub repo URLs are supported.");
-    }
+    let zipUrl, fileName;
 
-    // Extract owner/repo
-    const parts = repoUrl.replace("https://github.com/", "").split("/");
-    if (parts.length < 2) {
-      return reply("❌ Invalid GitHub repo URL format.");
+    if (repoUrl.startsWith("https://github.com/")) {
+      // GitHub
+      const parts = repoUrl.replace("https://github.com/", "").split("/");
+      if (parts.length < 2) return reply("❌ Invalid GitHub repo URL format.");
+      const owner = parts[0];
+      const repo = parts[1];
+      zipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/main.zip`;
+      fileName = `${repo}-main.zip`;
+    } else if (repoUrl.startsWith("https://gitlab.com/")) {
+      // GitLab
+      const parts = repoUrl.replace("https://gitlab.com/", "").split("/");
+      if (parts.length < 2) return reply("❌ Invalid GitLab repo URL format.");
+      const owner = parts[0];
+      const repo = parts[1];
+      // Default branch = main
+      zipUrl = `https://gitlab.com/${owner}/${repo}/-/archive/main/${repo}-main.zip?ref_type=heads`;
+      fileName = `${repo}-main.zip`;
+    } else {
+      return reply("❌ Only GitHub or GitLab repo URLs are supported.");
     }
-    const owner = parts[0];
-    const repo = parts[1];
-
-    // Build archive URL (default branch = main)
-    const zipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/main.zip`;
-    const fileName = `${repo}-main.zip`;
 
     // Download zip
     const tmpDir = path.join(__dirname, "..", "tmp");
@@ -129,6 +136,7 @@ keith({
     await reply("❌ Failed to clone repo. Error: " + err.message);
   }
 });
+
 //========================================================================================================================
 
 
