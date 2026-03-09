@@ -15,6 +15,47 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+keith({
+  pattern: "emomix",
+  aliases: ["emojimix", "emix"],
+  description: "Mix two emojis into a custom sticker",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, mek, reply, pushName, author } = conText;
+
+  if (!q) {
+    return reply("📌 Provide two emojis separated by +\nExample: .emomix 😹+😹");
+  }
+
+  try {
+    // Call API
+    const res = await axios.get(`https://levanter.onrender.com/emix?q=${encodeURIComponent(q)}`);
+    const data = res.data;
+
+    if (!data.status || !data.result) {
+      return reply("❌ Failed to generate emoji mix.");
+    }
+
+    // Build sticker with pack/author metadata
+    const sticker = new Sticker(data.result, {
+      pack: pushName || "EmojiMix",
+      type: StickerTypes.FULL,
+      categories: ["✨", "🔥"],
+      id: "emomix-001",
+      quality: 70,
+      background: "transparent"
+    });
+
+    const buffer = await sticker.toBuffer();
+    await client.sendMessage(from, { sticker: buffer }, { quoted: mek });
+
+  } catch (err) {
+    console.error("emomix error:", err);
+    await reply("❌ Error generating emoji mix: " + err.message);
+  }
+});
 //========================================================================================================================
 
 const namedColors = {
