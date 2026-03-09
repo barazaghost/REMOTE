@@ -123,11 +123,11 @@ async (from, client, conText) => {
       videoThumbnail = firstVideo.thumbnail;
     }
 
-    const downloadResponse = await axios.get(`${api}/download/video?url=${encodeURIComponent(videoUrl)}`);
+    const downloadResponse = await axios.get(`${api}/download/mp4?url=${encodeURIComponent(videoUrl)}`);
     const downloadUrl = downloadResponse.data?.result;
     if (!downloadUrl) return;
 
-    const fileName = `${videoTitle}.mp3`.replace(/[^\w\s.-]/gi, '');
+    const fileName = `${videoTitle}.mp4`.replace(/[^\w\s.-]/gi, '');
 
     const contextInfo = {
       externalAdReply: {
