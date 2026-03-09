@@ -60,6 +60,71 @@ async function uploadToLitterbox(filePath) {
   return data.trim(); // returns full URL like https://litter.catbox.moe/xxxx.ext
 }
 
+
+async function uploadToUguu(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+
+  const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+  const form = new FormData();
+  form.append('files[]', fs.createReadStream(filePath), {
+    filename: path.basename(filePath),
+    contentType: mimeType
+  });
+
+  const response = await axios.post('https://uguu.se/upload.php', form, {
+    headers: {
+      ...form.getHeaders(),
+      'origin': 'https://uguu.se',
+      'referer': 'https://uguu.se/',
+      'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
+    }
+  });
+
+  const result = response.data;
+  if (result.success && result.files?.[0]?.url) {
+    return result.files[0].url;
+  } else {
+    throw new Error("Uguu upload failed or malformed response");
+  }
+}
+// ==================== uguu Command ====================
+keith({
+  pattern: "uguu",
+  aliases: ["uguupload", "uguurl"],
+  description: "Upload quoted media/document to Uguu.se",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type === "unknown") return reply("❌ Unsupported media type.");
+
+  const mediaNode =
+    quoted?.imageMessage ||
+    quoted?.videoMessage ||
+    quoted?.audioMessage ||
+    quoted?.stickerMessage ||
+    quoted?.documentMessage;
+
+  if (!mediaNode) return reply("❌ Could not extract media content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type);
+    const link = await uploadToUguu(filePath);
+    await reply(link);
+  } catch (err) {
+    console.error("Uguu upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
 // ==================== Catbox Command ====================
 keith({
   pattern: "url",
