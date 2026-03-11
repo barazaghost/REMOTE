@@ -1953,7 +1953,7 @@ client.ev.on("messages.upsert", async ({ messages }) => {
 }
     // ========================================
 
-    /*function standardizeJid(jid) {
+    function standardizeJid(jid) {
         if (!jid) return '';
         try {
             jid = typeof jid === 'string' ? jid : 
@@ -1969,8 +1969,8 @@ client.ev.on("messages.upsert", async ({ messages }) => {
             KeithLogger.error("JID standardization error:", e);
             return '';
         }
-    }*/
-    function standardizeJid(jid) {
+    }
+    /*function standardizeJid(jid) {
     if (!jid) return '';
     try {
         jid = typeof jid === 'string' ? jid : 
@@ -1991,7 +1991,7 @@ client.ev.on("messages.upsert", async ({ messages }) => {
         KeithLogger.error("JID standardization error:", e);
         return '';
     }
-}
+}*/
 
     const from = standardizeJid(ms.key.remoteJid);
     const botId = standardizeJid(client.user?.id);
