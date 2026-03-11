@@ -18,6 +18,58 @@ const path = require('path');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "vcard",
+  aliases: ["contact", "card"],
+  category: "General",
+  description: "Create and send a vCard contact",
+  filename: __filename
+}, async (from, client, { mek, reply, q }) => {
+  if (!q) {
+    return reply("📌 Usage: .vcard <name> <number>\nExample: .vcard Keith 254796299159");
+  }
+
+  const args = q.trim().split(/\s+/);
+  if (args.length < 2) {
+    return reply("❌ Please provide both a name and a number.\nExample: .vcard Keith 254796299159");
+  }
+
+  // Extract number and name
+  const possibleNumber = args.find(part => /^\d+$/.test(part));
+  if (!possibleNumber || possibleNumber.length < 5) {
+    return reply("❌ Please provide a valid phone number (at least 5 digits).");
+  }
+  const targetNumber = possibleNumber;
+  const targetName = args.filter(part => part !== possibleNumber).join(" ").trim();
+
+  if (!targetName) {
+    return reply("❌ Please provide a name along with the number.");
+  }
+
+  // Build vCard
+  const vcard =
+    'BEGIN:VCARD\n' +
+    'VERSION:3.0\n' +
+    `FN:${targetName}\n` +
+    'ORG:;\n' +
+    `TEL;type=CELL;type=VOICE;waid=${targetNumber}:+${targetNumber}\n` +
+    'END:VCARD';
+
+  // Send contact
+  try {
+    await client.sendMessage(from, {
+      contacts: {
+        displayName: targetName,
+        contacts: [{ vcard }],
+      },
+    }, { quoted: mek });
+  } catch (error) {
+    console.error("Error sending vCard:", error);
+    reply("❌ Failed to send contact card.");
+  }
+});
 //========================================================================================================================
 
 
