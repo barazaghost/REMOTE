@@ -1072,159 +1072,68 @@ async (from, client, conText) => {
 });
 //
 //========================================================================================================================
+
+
 keith({
   pattern: "setsudo",
   aliases: ['sudo', 'sudoadd', 'addsudo'],
- // react: "👑",
   category: "Owner",
   description: "Sets User as Sudo",
+  filename: __filename
 }, async (from, client, conText) => {
-  const { mek, reply, react, isSuperUser, quotedUser, setSudo } = conText;
+  const { mek, reply, isSuperUser, quotedUser, quotedMsg, q, setSudo } = conText;
 
   if (!isSuperUser) {
-    await react("❌");
     return reply("❌ Owner Only Command!");
   }
 
-  if (!quotedUser) {
-    await react("❌");
-    return reply("❌ Please reply to/quote a user!");
+  let targetNumber;
+
+  // Case 1: quoted user
+  if (quotedMsg && quotedUser) {
+    let result = quotedUser;
+    if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
+      result = quotedUser.replace('@', '') + '@lid';
+    }
+    let finalResult = result;
+    if (result.includes('@lid')) {
+      finalResult = await client.getJidFromLid(result);
+    }
+    targetNumber = finalResult.split("@")[0];
+  }
+
+  // Case 2: direct number in args
+  if (!targetNumber && q) {
+    const possibleNumber = q.trim().split(/\s+/).find(part => /^\d+$/.test(part));
+    if (!possibleNumber || possibleNumber.length < 5) {
+      return reply("❌ Please provide a valid phone number (at least 5 digits).");
+    }
+    targetNumber = possibleNumber;
+  }
+
+  if (!targetNumber) {
+    return reply("❌ Please reply to a user or provide a phone number.\nExample: .setsudo 254748387615");
   }
 
   try {
-    let result;
-    
-    if (quotedUser) {
-      if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
-        result = quotedUser.replace('@', '') + '@lid';
-      } else {
-        result = quotedUser;
-      }
-    }
-
-    let finalResult = result;
-    if (result && result.includes('@lid')) {
-      finalResult = await client.getJidFromLid(result);
-    }
-    const userNumber = finalResult.split("@")[0];
-    const added = await setSudo(userNumber);
+    const added = await setSudo(targetNumber);
     const msg = added
-      ? `✅ Added @${userNumber} to sudo list.`
-      : `⚠️ @${userNumber} is already in sudo list.`;
+      ? `✅ Added @${targetNumber} to sudo list.`
+      : `⚠️ @${targetNumber} is already in sudo list.`;
 
     await client.sendMessage(from, {
       text: msg,
-      mentions: [quotedUser]
+      mentions: quotedUser ? [quotedUser] : []
     }, { quoted: mek });
-    await react("✅");
 
   } catch (error) {
     console.error("setsudo error:", error);
-    await react("❌");
     await reply(`❌ Error: ${error.message}`);
   }
 });
+
 //========================================================================================================================
-keith({
-  pattern: "delsudo",
-  aliases: ['removesudo'],
- // react: "👑",
-  category: "Owner",
-  description: "Deletes User as Sudo",
-}, async (from, client, conText) => {
-  const { mek, reply, react, isSuperUser, quotedUser, delSudo } = conText;
 
-  if (!isSuperUser) {
-    await react("❌");
-    return reply("❌ Owner Only Command!");
-  }
-
-  try {
-    let result;
-    
-    if (quotedUser) {
-      if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
-        result = quotedUser.replace('@', '') + '@lid';
-      } else {
-        result = quotedUser;
-      }
-    }
-
-    let finalResult = result;
-    if (result && result.includes('@lid')) {
-      finalResult = await client.getJidFromLid(result);
-    }
-    const userNumber = finalResult.split("@")[0];
-    const removed = await delSudo(userNumber);
-    const msg = removed
-      ? `❌ Removed @${userNumber} from sudo list.`
-      : `⚠️ @${userNumber} is not in the sudo list.`;
-
-    await client.sendMessage(from, {
-      text: msg,
-      mentions: [quotedUser]
-    }, { quoted: mek });
-    await react("✅");
-
-  } catch (error) {
-    console.error("delsudo error:", error);
-    await react("❌");
-    await reply(`❌ Error: ${error.message}`);
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "issudo",
-  aliases: ['checksudo'],
- // react: "👑",
-  category: "Owner",
-  description: "Check if user is sudo",
-}, async (from, client, conText) => {
-  const { mek, reply, react, isSuperUser, quotedUser, isSudo } = conText;
-
-  if (!isSuperUser) {
-    await react("❌");
-    return reply("❌ Owner Only Command!");
-  }
-
-  if (!quotedUser) {
-    await react("❌");
-    return reply("❌ Please reply to/quote a user!");
-  }
-
-  try {
-    let result;
-    
-    if (quotedUser) {
-      if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
-        result = quotedUser.replace('@', '') + '@lid';
-      } else {
-        result = quotedUser;
-      }
-    }
-
-    let finalResult = result;
-    if (result && result.includes('@lid')) {
-      finalResult = await client.getJidFromLid(result);
-    }
-    const userNumber = finalResult.split("@")[0];
-    const isUserSudo = await isSudo(userNumber);
-    const msg = isUserSudo
-      ? `✅ @${userNumber} is a sudo user.`
-      : `❌ @${userNumber} is not a sudo user.`;
-
-    await client.sendMessage(from, {
-      text: msg,
-      mentions: [quotedUser]
-    }, { quoted: mek });
-    await react("✅");
-
-  } catch (error) {
-    console.error("issudo error:", error);
-    await react("❌");
-    await reply(`❌ Error: ${error.message}`);
-  }
-});
 //========================================================================================================================
 keith({
   pattern: "getsudo",
