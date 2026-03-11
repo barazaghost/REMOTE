@@ -857,6 +857,86 @@ keith({
 
 
 
+keith({
+  pattern: "profile",
+  aliases: ["getpp"],
+  category: "Owner",
+  description: "Get someone's full profile info",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { reply, quoted, quotedUser, quotedMsg, q, isGroup, timeZone, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  let target;
+
+  // Case 1: quoted user
+  if (quotedMsg && quotedUser) {
+    target = quotedUser;
+    if (isGroup && !target.endsWith('@s.whatsapp.net')) {
+      try {
+        const jid = await client.getJidFromLid(target);
+        if (jid) target = jid;
+      } catch {}
+    }
+  }
+
+  // Case 2: direct number in args
+  if (!target && q) {
+    const possibleNumber = q.trim().split(/\s+/).find(part => /^\d+$/.test(part));
+    if (!possibleNumber || possibleNumber.length < 5) {
+      return reply("❌ Please provide a valid phone number (at least 5 digits).");
+    }
+    target = `${possibleNumber}@s.whatsapp.net`;
+  }
+
+  if (!target) {
+    return reply("📛 Reply to a user or provide a phone number.\nExample: .profile 254748387615");
+  }
+
+  let statusText = "Not Found";
+  let setAt = "Not Available";
+
+  try {
+    let ppUrl;
+    try {
+      ppUrl = await client.profilePictureUrl(target, 'image');
+    } catch {
+      ppUrl = "https://telegra.ph/file/9521e9ee2fdbd0d6f4f1c.jpg";
+    }
+
+    try {
+      const status = await client.fetchStatus(target);
+      if (status?.length && status[0]?.status) {
+        statusText = status[0].status.status || "Not Found";
+        setAt = status[0].status.setAt || "Not Available";
+      }
+    } catch {}
+
+    let formatted = "Not Available";
+    if (setAt !== "Not Available") {
+      try {
+        formatted = moment(setAt).tz(timeZone).format('dddd, MMMM Do YYYY, h:mm A z');
+      } catch {}
+    }
+
+    const number = target.replace(/@s\.whatsapp\.net$/, "");
+
+    await client.sendMessage(from, {
+      image: { url: ppUrl },
+      caption: `*👤 User Profile*\n\n` +
+               `*• Name:* @${number}\n` +
+               `*• Number:* ${number}\n` +
+               `*• About:* ${statusText}\n` +
+               `*• Last Updated:* ${formatted}`,
+      mentions: [target]
+    }, { quoted: mek });
+
+  } catch (err) {
+    console.error("profile error:", err);
+    reply(`❌ Failed to fetch profile info.\nError: ${err.message}`);
+  }
+});
 //========================================================================================================================
 
 
@@ -902,33 +982,7 @@ async (from, client, conText) => {
 //========================================================================================================================
 
 
-keith({
-  pattern: "block",
-  aliases: ["ban", "blacklist"],
-  category: "Owner",
-  description: "Block a user by tag, mention, or quoted message"
-},
-async (from, client, conText) => {
-  const { reply, q, quotedUser, isSuperUser, mentionedJid } = conText;
 
-  if (!isSuperUser) return reply("❌ Owner Only Command!");
-
-  let target;
-
-  if (quotedUser) {
-    target = quotedUser;
-  } else if (mentionedJid?.length) {
-    target = mentionedJid[0];
-  } else if (q && /^\d+$/.test(q)) {
-    target = q + "@s.whatsapp.net";
-  }
-
-  if (!target) return reply("⚠️ Tag, mention, or quote a user to block.");
-
-  const number = target.split('@')[0];
-  await client.updateBlockStatus(target, 'block');
-  reply(`🚫 ${number} has been blocked.`);
-});
 //========================================================================================================================
 
 keith({
