@@ -2052,81 +2052,6 @@ async (from, client, conText) => {
 //========================================================================================================================
 //const { keith } = require('../commandHandler');
 
-keith({
-  pattern: "autoviewstatus",
-  aliases: ["viewstatus"],
-  category: "Settings",
-  description: "Configure auto-view for incoming statuses"
-},
-async (from, client, conText) => {
-  const { reply, q, isSuperUser } = conText;
-  if (!isSuperUser) return reply("❌ Owner Only Command!");
-
-  const arg = q?.trim().toLowerCase();
-  const settings = await getAutoStatusSettings();
-
-  if (!arg || arg === 'status') {
-    return reply(
-      `*👁️ Auto View Status*\n\n` +
-      `🔹 *Enabled:* ${settings.autoviewStatus}\n\n` +
-      `*🛠 Usage:*\n` +
-      `▸ autoviewstatus true/false\n` +
-      `▸ autoviewstatus status`
-    );
-  }
-
-  if (['true', 'false'].includes(arg)) {
-    await updateAutoStatusSettings({ autoviewStatus: arg });
-    return reply(`✅ Auto-view status set to *${arg}*`);
-  }
-
-  reply("❌ Invalid input. Use `.autoviewstatus status` to view usage.");
-});
-//========================================================================================================================
-
-
-//const { keith } = require('../commandHandler');
-
-keith({
-  pattern: "autoreplystatus",
-  aliases: ["replystatus"],
-  category: "Settings",
-  description: "Configure auto-reply for viewed statuses"
-},
-async (from, client, conText) => {
-  const { reply, q, isSuperUser } = conText;
-  if (!isSuperUser) return reply("❌ Owner Only Command!");
-
-  const args = q?.trim().split(/\s+/) || [];
-  const sub = args[0]?.toLowerCase();
-  const settings = await getAutoStatusSettings();
-
-  if (!sub || sub === 'status') {
-    return reply(
-      `*💬 Auto Reply Status*\n\n` +
-      `🔹 *Enabled:* ${settings.autoReplyStatus}\n` +
-      `🔹 *Reply Text:* ${settings.statusReplyText}\n\n` +
-      `*🛠 Usage:*\n` +
-      `▸ autoreplystatus true/false\n` +
-      `▸ autoreplystatus text [your message]\n` +
-      `▸ autoreplystatus status`
-    );
-  }
-
-  if (sub === 'text') {
-    const newText = args.slice(1).join(' ');
-    if (!newText) return reply("❌ Provide reply text after 'text'");
-    await updateAutoStatusSettings({ statusReplyText: newText });
-    return reply("✅ Auto-reply text updated.");
-  }
-
-  if (['true', 'false'].includes(sub)) {
-    await updateAutoStatusSettings({ autoReplyStatus: sub });
-    return reply(`✅ Auto-reply status set to *${sub}*`);
-  }
-
-  reply("❌ Invalid input. Use `.autoreplystatus status` to view usage.");
-});
 //========================================================================================================================
 //const { keith } = require('../commandHandler');
 
@@ -2215,16 +2140,15 @@ async (from, client, conText) => {
   }
 });
 //========================================================================================================================
-//const { keith } = require('../commandHandler');
 
+    
 keith({
   pattern: "autolikestatus",
-  aliases: ["likestatus"],
+  aliases: ["likestatus", "autolike"],
   category: "Settings",
-  description: "Configure auto-like for viewed statuses"
-},
-async (from, client, conText) => {
-  const { reply, q, isSuperUser } = conText;
+  description: "Configure auto-like for viewed statuses",
+  filename: __filename
+}, async (from, client, { reply, q, isSuperUser }) => {
   if (!isSuperUser) return reply("❌ Owner Only Command!");
 
   const args = q?.trim().split(/\s+/) || [];
@@ -2240,6 +2164,7 @@ async (from, client, conText) => {
       `🔹 *Emojis:* ${currentEmojis}\n\n` +
       `*🛠 Usage:*\n` +
       `▸ autolikestatus true/false\n` +
+      `▸ autolikestatus on/off\n` +
       `▸ autolikestatus emojis 💚 💔 💥\n` +
       `▸ autolikestatus status`
     );
@@ -2248,25 +2173,29 @@ async (from, client, conText) => {
   if (sub === 'emojis') {
     const emojiList = args.slice(1).join(' ').trim();
     if (!emojiList) return reply("❌ Provide emojis after 'emojis'");
-    
-    // Clean and validate emojis - remove any commas and extra spaces
+
     const cleanedEmojis = emojiList
-      .replace(/,/g, ' ') // Replace commas with spaces
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .replace(/,/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim()
-      .split(' ') // Split by space to get individual emojis
-      .filter(emoji => emoji.trim().length > 0) // Remove empty strings
-      .join(','); // Join with commas for storage
-    
+      .split(' ')
+      .filter(emoji => emoji.trim().length > 0)
+      .join(',');
+
     if (!cleanedEmojis) return reply("❌ No valid emojis provided");
-    
+
     await updateAutoStatusSettings({ statusLikeEmojis: cleanedEmojis });
     return reply(`✅ Auto-like emojis updated to: ${cleanedEmojis.split(',').join(' ')}`);
   }
 
-  if (['true', 'false'].includes(sub)) {
-    await updateAutoStatusSettings({ autoLikeStatus: sub });
-    return reply(`✅ Auto-like status set to *${sub}*`);
+  // Normalize on/off to true/false
+  const normalized = (sub === 'on') ? 'true' :
+                     (sub === 'off') ? 'false' :
+                     sub;
+
+  if (['true', 'false'].includes(normalized)) {
+    await updateAutoStatusSettings({ autoLikeStatus: normalized });
+    return reply(`✅ Auto-like status set to *${normalized}*`);
   }
 
   reply("❌ Invalid input. Use `.autolikestatus status` to view usage.");
