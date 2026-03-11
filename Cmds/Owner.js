@@ -10,6 +10,55 @@ const { exec } = require("child_process");
 const axios = require('axios');
 const util = require('util');
 
+const { sendInteractiveMessage } = require('gifted-btns');
+//========================================================================================================================
+
+keith({
+  pattern: "mygroups",
+  aliases: ["groups", "botgroups", "glist"],
+  category: "Owner",
+  description: "List all groups the bot is in (interactive)",
+  filename: __filename
+}, async (sender, client, { reply, isSuperUser }) => {
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  try {
+    const allGroups = await client.groupFetchAllParticipating();
+    const groupList = Object.values(allGroups);
+
+    if (!groupList.length) return reply("⚠️ Bot is not in any groups.");
+
+    // Build interactive rows including JID
+    const rows = groupList.map(g => ({
+      header: "📛",
+      title: g.subject || "Unnamed Group",
+      description: `👥 Members: ${g.participants?.length || 0}\n🆔 JID: ${g.id}`,
+      id: `group_${g.id}`
+    }));
+
+    await sendInteractiveMessage(client, sender, {
+      text: `*📋 My Groups*\n\nBot is in ${groupList.length} groups.\nSelect one to view metadata:`,
+      interactiveButtons: [
+        {
+          name: 'single_select',
+          buttonParamsJson: JSON.stringify({
+            title: 'Groups',
+            sections: [
+              {
+                title: 'Available Groups',
+                rows
+              }
+            ]
+          })
+        }
+      ]
+    });
+
+  } catch (err) {
+    console.error("mygroups error:", err);
+    reply("❌ Error while accessing bot groups.\n\n" + err.message);
+  }
+});
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -1148,44 +1197,7 @@ async (from, client, conText) => {
 //========================================================================================================================
 
 
-keith({
-  pattern: "mygroups",
-  aliases: ["groups", "botgroups", "glist"],
-  category: "Owner",
-  description: "List all groups the bot is in"
-},
-async (from, client, conText) => {
-  const { reply, isSuperUser } = conText;
 
-  if (!isSuperUser) return reply("❌ Owner Only Command!");
-
-  try {
-    const allGroups = await client.groupFetchAllParticipating();
-    const groupList = Object.values(allGroups);
-    const groupIds = groupList.map(g => g.id);
-
-    reply(`📦 Bot is in ${groupIds.length} groups. Fetching details...`);
-
-    let output = `*📋 My Groups*\n\n`;
-
-    for (const id of groupIds) {
-      try {
-        const meta = await client.groupMetadata(id);
-        output += `📛 *Subject:* ${meta.subject}\n`;
-        output += `👥 *Members:* ${meta.participants.length}\n`;
-        output += `🆔 *JID:* ${id}\n\n`;
-      } catch {
-        output += `⚠️ Failed to fetch metadata for ${id}\n\n`;
-      }
-    }
-
-    reply(output);
-
-  } catch (err) {
-    reply("❌ Error while accessing bot groups.\n\n" + err);
-  }
-});
-//
 //========================================================================================================================
 
 
