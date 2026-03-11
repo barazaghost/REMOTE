@@ -982,6 +982,46 @@ async (from, client, conText) => {
 //========================================================================================================================
 
 
+keith({
+  pattern: "block",
+  aliases: ["ban", "blacklist"],
+  category: "Owner",
+  description: "Block a user by tag, mention, quoted message, or phone number",
+  filename: __filename
+}, async (from, client, { reply, q, quotedUser, quotedMsg, mentionedJid, isSuperUser }) => {
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  let target;
+
+  // Case 1: quoted user
+  if (quotedMsg && quotedUser) {
+    target = quotedUser;
+  }
+  // Case 2: mentioned user
+  else if (mentionedJid?.length) {
+    target = mentionedJid[0];
+  }
+  // Case 3: direct number in args
+  else if (q) {
+    const possibleNumber = q.trim().split(/\s+/).find(part => /^\d+$/.test(part));
+    if (possibleNumber && possibleNumber.length >= 5) {
+      target = `${possibleNumber}@s.whatsapp.net`;
+    }
+  }
+
+  if (!target) {
+    return reply("⚠️ Reply, tag, mention, or provide a phone number to block.\nExample: .block 254748387615");
+  }
+
+  try {
+    const number = target.split('@')[0];
+    await client.updateBlockStatus(target, 'block');
+    reply(`🚫 @${number} has been blocked.`);
+  } catch (err) {
+    console.error("block error:", err);
+    reply(`❌ Failed to block user.\nError: ${err.message}`);
+  }
+});
 
 //========================================================================================================================
 
