@@ -2050,8 +2050,90 @@ async (from, client, conText) => {
   }
 });
 //========================================================================================================================
-//const { keith } = require('../commandHandler');
 
+
+// Auto View Status
+keith({
+  pattern: "autoviewstatus",
+  aliases: ["viewstatus", "autoview"],
+  category: "Settings",
+  description: "Configure auto-view for incoming statuses",
+  filename: __filename
+}, async (from, client, { reply, q, isSuperUser }) => {
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  const arg = q?.trim().toLowerCase();
+  const settings = await getAutoStatusSettings();
+
+  if (!arg || arg === 'status') {
+    return reply(
+      `*👁️ Auto View Status*\n\n` +
+      `🔹 *Enabled:* ${settings.autoviewStatus}\n\n` +
+      `*🛠 Usage:*\n` +
+      `▸ autoviewstatus true/false\n` +
+      `▸ autoviewstatus on/off\n` +
+      `▸ autoviewstatus status`
+    );
+  }
+
+  const normalized = (arg === 'on') ? 'true' :
+                     (arg === 'off') ? 'false' :
+                     arg;
+
+  if (['true', 'false'].includes(normalized)) {
+    await updateAutoStatusSettings({ autoviewStatus: normalized });
+    return reply(`✅ Auto-view status set to *${normalized}*`);
+  }
+
+  reply("❌ Invalid input. Use `.autoviewstatus status` to view usage.");
+});
+//========================================================================================================================
+//
+// Auto Reply Status
+keith({
+  pattern: "autoreplystatus",
+  aliases: ["replystatus"],
+  category: "Settings",
+  description: "Configure auto-reply for viewed statuses",
+  filename: __filename
+}, async (from, client, { reply, q, isSuperUser }) => {
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  const args = q?.trim().split(/\s+/) || [];
+  const sub = args[0]?.toLowerCase();
+  const settings = await getAutoStatusSettings();
+
+  if (!sub || sub === 'status') {
+    return reply(
+      `*💬 Auto Reply Status*\n\n` +
+      `🔹 *Enabled:* ${settings.autoReplyStatus}\n` +
+      `🔹 *Reply Text:* ${settings.statusReplyText}\n\n` +
+      `*🛠 Usage:*\n` +
+      `▸ autoreplystatus true/false\n` +
+      `▸ autoreplystatus on/off\n` +
+      `▸ autoreplystatus text [your message]\n` +
+      `▸ autoreplystatus status`
+    );
+  }
+
+  if (sub === 'text') {
+    const newText = args.slice(1).join(' ');
+    if (!newText) return reply("❌ Provide reply text after 'text'");
+    await updateAutoStatusSettings({ statusReplyText: newText });
+    return reply("✅ Auto-reply text updated.");
+  }
+
+  const normalized = (sub === 'on') ? 'true' :
+                     (sub === 'off') ? 'false' :
+                     sub;
+
+  if (['true', 'false'].includes(normalized)) {
+    await updateAutoStatusSettings({ autoReplyStatus: normalized });
+    return reply(`✅ Auto-reply status set to *${normalized}*`);
+  }
+
+  reply("❌ Invalid input. Use `.autoreplystatus status` to view usage.");
+});
 //========================================================================================================================
 //const { keith } = require('../commandHandler');
 
