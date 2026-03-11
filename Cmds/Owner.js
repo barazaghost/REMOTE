@@ -856,69 +856,7 @@ keith({
 //========================================================================================================================
 
 
-keith({
-  pattern: "profile",
-  aliases: ["getpp"],
-  category: "Owner",
-  description: "Get someone's full profile info"
-},
-async (from, client, conText) => {
-  const { reply, quoted, quotedUser, isGroup, timeZone, mek, isSuperUser } = conText;
 
-  if (!isSuperUser) return reply("❌ Owner Only Command!");
-  if (!quotedUser) return reply("📛 Quote a user to fetch their profile.");
-
-  let target = quotedUser;
-  let statusText = "Not Found";
-  let setAt = "Not Available";
-
-  try {
-    if (isGroup && !target.endsWith('@s.whatsapp.net')) {
-      try {
-        const jid = await client.getJidFromLid(target);
-        if (jid) target = jid;
-      } catch {}
-    }
-
-    let ppUrl;
-    try {
-      ppUrl = await client.profilePictureUrl(target, 'image');
-    } catch {
-      ppUrl = "https://telegra.ph/file/9521e9ee2fdbd0d6f4f1c.jpg";
-    }
-
-    try {
-      const status = await client.fetchStatus(target);
-      if (status?.length && status[0]?.status) {
-        statusText = status[0].status.status || "Not Found";
-        setAt = status[0].status.setAt || "Not Available";
-      }
-    } catch {}
-
-    let formatted = "Not Available";
-    if (setAt !== "Not Available") {
-      try {
-        formatted = moment(setAt).tz(timeZone).format('dddd, MMMM Do YYYY, h:mm A z');
-      } catch {}
-    }
-
-    const number = target.replace(/@s\.whatsapp\.net$/, "");
-
-    await client.sendMessage(from, {
-      image: { url: ppUrl },
-      caption: `*👤 User Profile*\n\n` +
-               `*• Name:* @${number}\n` +
-               `*• Number:* ${number}\n` +
-               `*• About:* ${statusText}\n` +
-               `*• Last Updated:* ${formatted}`,
-      mentions: [target]
-    }, { quoted: mek });
-
-  } catch (err) {
-    console.error("whois error:", err);
-    reply(`❌ Failed to fetch profile info.\nError: ${err.message}`);
-  }
-});
 //========================================================================================================================
 
 
@@ -1134,6 +1072,121 @@ keith({
 
 //========================================================================================================================
 
+
+// Delete sudo
+keith({
+  pattern: "delsudo",
+  aliases: ['removesudo'],
+  category: "Owner",
+  description: "Deletes User as Sudo",
+  filename: __filename
+}, async (from, client, { mek, reply, isSuperUser, quotedUser, quotedMsg, q, delSudo }) => {
+  if (!isSuperUser) {
+    return reply("❌ Owner Only Command!");
+  }
+
+  let targetNumber;
+
+  // Case 1: quoted user
+  if (quotedMsg && quotedUser) {
+    let result = quotedUser;
+    if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
+      result = quotedUser.replace('@', '') + '@lid';
+    }
+    let finalResult = result;
+    if (result.includes('@lid')) {
+      finalResult = await client.getJidFromLid(result);
+    }
+    targetNumber = finalResult.split("@")[0];
+  }
+
+  // Case 2: direct number in args
+  if (!targetNumber && q) {
+    const possibleNumber = q.trim().split(/\s+/).find(part => /^\d+$/.test(part));
+    if (!possibleNumber || possibleNumber.length < 5) {
+      return reply("❌ Please provide a valid phone number (at least 5 digits).");
+    }
+    targetNumber = possibleNumber;
+  }
+
+  if (!targetNumber) {
+    return reply("❌ Please reply to a user or provide a phone number.\nExample: .delsudo 254748387615");
+  }
+
+  try {
+    const removed = await delSudo(targetNumber);
+    const msg = removed
+      ? `❌ Removed @${targetNumber} from sudo list.`
+      : `⚠️ @${targetNumber} is not in the sudo list.`;
+
+    await client.sendMessage(from, {
+      text: msg,
+      mentions: quotedUser ? [quotedUser] : []
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("delsudo error:", error);
+    await reply(`❌ Error: ${error.message}`);
+  }
+});
+//========================================================================================================================
+
+// Check sudo
+keith({
+  pattern: "issudo",
+  aliases: ['checksudo'],
+  category: "Owner",
+  description: "Check if user is sudo",
+  filename: __filename
+}, async (from, client, { mek, reply, isSuperUser, quotedUser, quotedMsg, q, isSudo }) => {
+  if (!isSuperUser) {
+    return reply("❌ Owner Only Command!");
+  }
+
+  let targetNumber;
+
+  // Case 1: quoted user
+  if (quotedMsg && quotedUser) {
+    let result = quotedUser;
+    if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
+      result = quotedUser.replace('@', '') + '@lid';
+    }
+    let finalResult = result;
+    if (result.includes('@lid')) {
+      finalResult = await client.getJidFromLid(result);
+    }
+    targetNumber = finalResult.split("@")[0];
+  }
+
+  // Case 2: direct number in args
+  if (!targetNumber && q) {
+    const possibleNumber = q.trim().split(/\s+/).find(part => /^\d+$/.test(part));
+    if (!possibleNumber || possibleNumber.length < 5) {
+      return reply("❌ Please provide a valid phone number (at least 5 digits).");
+    }
+    targetNumber = possibleNumber;
+  }
+
+  if (!targetNumber) {
+    return reply("❌ Please reply to a user or provide a phone number.\nExample: .issudo 254748387615");
+  }
+
+  try {
+    const isUserSudo = await isSudo(targetNumber);
+    const msg = isUserSudo
+      ? `✅ @${targetNumber} is a sudo user.`
+      : `❌ @${targetNumber} is not a sudo user.`;
+
+    await client.sendMessage(from, {
+      text: msg,
+      mentions: quotedUser ? [quotedUser] : []
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("issudo error:", error);
+    await reply(`❌ Error: ${error.message}`);
+  }
+});
 //========================================================================================================================
 keith({
   pattern: "getsudo",
