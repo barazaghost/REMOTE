@@ -525,7 +525,7 @@ keith({
     user, keithBuffer, keithJson, formatAudio, formatVideo,
     keithRandom, groupMember, dev, groupAdmins, participants,
     repliedMessage, quotedMsg, quotedKey, quotedSender, quotedUser,
-    isSuperUser, botMode, botPic, packname, author, botVersion,
+    isSuperUser, api, botMode, botPic, packname, author, botVersion,
     ownerNumber, ownerName, botname, sourceUrl, isSuperAdmin,
     prefix, timeZone, updateSettings, getSettings, botSettings
   } = conText;
