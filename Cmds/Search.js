@@ -1,6 +1,8 @@
 const axios = require('axios');
 const { generateWAMessageContent, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 const { keith } = require('../commandHandler');
+const more = String.fromCharCode(8206);
+const readmore = more.repeat(4001);
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -10,6 +12,41 @@ const { keith } = require('../commandHandler');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+
+keith({
+  pattern: "surahlist",
+  aliases: ["listsurah", "quranlist", "surahs"],
+  category: "Religion",
+  description: "Get list of all Surahs from the Qur'an",
+  filename: __filename
+}, async (from, client, { mek, reply, api }) => {
+  try {
+    const res = await axios.get(`${api}/surahlist`);
+    if (!res.data?.status || !res.data?.result?.data?.length) {
+      return reply("❌ No Surah data found.");
+    }
+
+    const surahs = res.data.result.data;
+
+    let output = `*📖 Surah List*\n\n`;
+    surahs.forEach(s => {
+      output += `🔢 *${s.number}. ${s.name.english}* (${s.name.arabic})\n`;
+      output += `📚 Translation: ${s.name.translation}\n`;
+      output += `📊 Verses: ${s.verses} | Revelation: ${s.revelation}\n`;
+      output += `📝 Tafsir: ${s.tafsir.slice(0, 120)}...\n\n`;
+    });
+
+    // Collapse long output
+    output += `${readmore}\nTotal Surahs: ${surahs.length}`;
+
+    await client.sendMessage(from, { text: output.trim() }, { quoted: mek });
+  } catch (err) {
+    console.error("Surah list error:", err);
+    reply("❌ Failed to fetch Surah list: " + err.message);
+  }
+});
 //========================================================================================================================
 keith({
   pattern: "hymnal",
