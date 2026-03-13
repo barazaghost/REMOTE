@@ -416,7 +416,7 @@ async (from, client, conText) => {
 keith({
   pattern: "bible",
   description: "Fetch Bible verses (e.g., john3:16-18,20)",
-  category: "Search",
+  category: "Religion",
   filename: __filename
 }, async (from, client, conText) => {
   const { q, reply, api } = conText;
