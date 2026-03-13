@@ -12,7 +12,6 @@ const { keith } = require('../commandHandler');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
-//========================================================================================================================
 
 
 keith({
@@ -21,7 +20,7 @@ keith({
   category: "Religion",
   description: "Search Bible verses by keyword",
   filename: __filename
-}, async (sender, client, { q, mek, reply, api }) => {
+}, async (from, client, { q, mek, reply, api }) => {
   if (!q) {
     return reply("📌 Usage:\n• .biblesearch <keyword>\nExample: .biblesearch God");
   }
@@ -40,12 +39,15 @@ keith({
       output += `📍 *${v.reference}*\n${v.preview}\n\n`;
     });
 
-    await client.sendMessage(sender, { text: output.trim() }, { quoted: mek });
+    await client.sendMessage(from, { text: output.trim() }, { quoted: mek });
   } catch (err) {
     console.error("Bible search error:", err);
     reply("❌ Failed to search Bible: " + err.message);
   }
 });
+//========================================================================================================================
+
+
 //========================================================================================================================
 
 keith({
