@@ -11,6 +11,110 @@ const readmore = more.repeat(4001);
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "quranaudio",
+  aliases: ["quranmp3", "surahaudio", "audioquran"],
+  category: "Religion",
+  description: "List Qur'an Surah audios or fetch by number",
+  filename: __filename
+}, async (from, client, { q, mek, reply, api }) => {
+  try {
+    const res = await axios.get(`${api}/quran/audio`);
+    if (!res.data?.status || !res.data?.result) {
+      return reply("❌ No audio data found.");
+    }
+
+    const audios = res.data.result;
+    const keys = Object.keys(audios);
+
+    // If user provides a number directly, send audio
+    if (q && !isNaN(q)) {
+      const idx = parseInt(q);
+      const key = keys.find(k => k.startsWith(idx + " "));
+      if (!key) return reply("❌ Surah number not found.");
+
+      const surah = audios[key];
+      return await client.sendMessage(
+        from,
+        {
+          audio: { url: surah.download },
+          mimetype: surah.type,
+          fileName: surah.title,
+          ptt: false,
+          contextInfo: {
+            externalAdReply: {
+              title: surah.title,
+              body: surah.last_edited_date_str,
+              thumbnailUrl: surah.thumb,
+              mediaType: 2,
+              mediaUrl: surah.download,
+              sourceUrl: surah.download
+            }
+          }
+        },
+        { quoted: mek }
+      );
+    }
+
+    // Otherwise list all Surahs
+    const caption = `📖 *Qur'an Audio List*\n\n` +
+      keys.map((k, i) => {
+        const surah = audios[k];
+        return `${i + 1}. 🎶 ${surah.title}\n   📅 ${surah.last_edited_date_str}\n   📍 ${surah.name}`;
+      }).join("\n\n") +
+      `\n\n📌 Reply with a number or use .quranaudio <number> to get audio + thumbnail`;
+
+    const sent = await client.sendMessage(from, { text: caption }, { quoted: mek });
+    const messageId = sent.key.id;
+
+    // Listen for replies
+    client.ev.on("messages.upsert", async (update) => {
+      const msg = update.messages[0];
+      if (!msg.message) return;
+
+      const responseText = msg.message.conversation || msg.message.extendedTextMessage?.text;
+      const isReply = msg.message.extendedTextMessage?.contextInfo?.stanzaId === messageId;
+      const chatId = msg.key.remoteJid;
+
+      if (!isReply) return;
+
+      const index = parseInt(responseText.trim()) - 1;
+      const key = keys[index];
+      const surah = audios[key];
+
+      if (!surah) {
+        return client.sendMessage(chatId, {
+          text: "❌ Invalid number. Reply with a valid Surah number.",
+          quoted: msg
+        });
+      }
+
+      await client.sendMessage(chatId, { react: { text: "🎶", key: msg.key } });
+
+      await client.sendMessage(chatId, {
+        audio: { url: surah.download },
+        mimetype: surah.type,
+        fileName: surah.title,
+        ptt: false,
+        contextInfo: {
+          externalAdReply: {
+            title: surah.title,
+            body: surah.last_edited_date_str,
+            thumbnailUrl: surah.thumb,
+            mediaType: 2,
+            mediaUrl: surah.download,
+            sourceUrl: surah.download
+          }
+        }
+      }, { quoted: msg });
+    });
+  } catch (err) {
+    console.error("Qur'an audio error:", err);
+    reply("❌ Failed to fetch Qur'an audio: " + err.message);
+  }
+});
 //========================================================================================================================
 
 
