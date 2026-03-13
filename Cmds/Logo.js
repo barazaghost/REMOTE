@@ -27,7 +27,7 @@ const loadStyles = async () => {
         description: `Generate logo using Ephoto style: ${pattern}`,
         filename: __filename
       },
-      async (sender, client, { q, mek, reply, api }) => {
+      async (from, client, { q, mek, reply, api }) => {
         if (!q) {
           return reply(`_Please provide text(s) to create logo_\nUsage: .${pattern} <text1>|<text2>|<text3> or just single text`);
         }
@@ -41,7 +41,7 @@ const loadStyles = async () => {
         try {
           const logoUrl = await fetchLogoUrl(url, texts, api);
           if (logoUrl) {
-            await client.sendMessage(sender, { image: { url: logoUrl } }, { quoted: mek });
+            await client.sendMessage(from, { image: { url: logoUrl } }, { quoted: mek });
           } else {
             reply("_Unable to fetch logo. Please try again later._");
           }
