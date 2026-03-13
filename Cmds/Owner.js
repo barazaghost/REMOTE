@@ -19,7 +19,7 @@ keith({
   category: "Owner",
   description: "List all groups the bot is in (interactive)",
   filename: __filename
-}, async (sender, client, { reply, isSuperUser }) => {
+}, async (from, client, { reply, isSuperUser }) => {
   if (!isSuperUser) return reply("❌ Owner Only Command!");
 
   try {
@@ -36,7 +36,7 @@ keith({
       id: `group_${g.id}`
     }));
 
-    await sendInteractiveMessage(client, sender, {
+    await sendInteractiveMessage(client, from, {
       text: `*📋 My Groups*\n\nBot is in ${groupList.length} groups.\nSelect one to view metadata:`,
       interactiveButtons: [
         {
