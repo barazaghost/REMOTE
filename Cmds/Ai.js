@@ -66,7 +66,7 @@ async function getNonce() {
 keith({
   pattern: "aiphoto",
   aliases: ["flatai", "generate", "aimage"],
-  category: "Aiphoto",
+  category: "Ai",
   description: "Generate AI images with various styles"
 },
 async (from, client, conText) => {
@@ -886,7 +886,7 @@ async (from, client, conText) => {
 keith({
   pattern: "speechwriter",
   aliases: ["speech", "writer"],
-  category: "ai",
+  category: "education",
   description: "Generate a speech using the Speechwriter API"
 },
 async (from, client, conText) => {
@@ -927,7 +927,7 @@ async (from, client, conText) => {
 keith({
   pattern: "muslimai",
   aliases: ["muslim", "quranai"],
-  category: "ai",
+  category: "Religion",
   description: "Query MuslimAI API for Qur'anic references"
 },
 async (from, client, conText) => {
@@ -997,7 +997,7 @@ keith({
   pattern: "bibleai",
   aliases: ["aibible", "scripture"],
   description: "Ask Bible-based questions and get answers with references",
-  category: "ai",
+  category: "Religion",
   filename: __filename
 }, async (from, client, conText) => {
   const { q, reply, mek, api } = conText;
