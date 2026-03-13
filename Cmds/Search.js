@@ -11,6 +11,38 @@ const { keith } = require('../commandHandler');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+keith({
+  pattern: "hymnal",
+  aliases: ["wendenyasaye", "nyimboza", "ukristo", "hym", "hymn"],
+  category: "Religion",
+  description: "Search hymns and display lyrics",
+  filename: __filename
+}, async (from, client, { q, mek, reply, api }) => {
+  if (!q) {
+    return reply("📌 Usage:\n• .hym <keyword>\nExample: .hym kidich nyasaye");
+  }
+
+  try {
+    const res = await axios.get(`${api}/hymn/wendenyasaye?q=${encodeURIComponent(q)}`);
+
+    if (!res.data?.status || !res.data?.result?.songs?.length) {
+      return reply("❌ No hymns found for your query.");
+    }
+
+    const songs = res.data.result.songs;
+
+    let output = `*🎶 Hymn Search*\n\n`;
+    songs.slice(0, 1).forEach(song => {
+      output += `📖 *${song.title}*\n📚 Book: ${song.book}\n\n`;
+      output += `${song.lyrics}\n\n`;
+    });
+
+    await client.sendMessage(from, { text: output.trim() }, { quoted: mek });
+  } catch (err) {
+    console.error("hymn search error:", err);
+    reply("❌ Failed to search hymn: " + err.message);
+  }
+});
 //========================================================================================================================
 
 
