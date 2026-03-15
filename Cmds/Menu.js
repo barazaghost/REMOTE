@@ -29,7 +29,7 @@ function getCategoryCommands(categories, selectedNumber) {
 
   return {
     text:
-      `╭────「 ${selectedCategory} 」──┈⊷\n` +
+      `╭────「 ${selectedCategory} 」──┈⊷𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭\n` +
       `│◦➛╭───────────────\n` +
       commandsInCategory.map((cmd, idx) => `│◦➛ ${idx + 1}. ${cmd}`).join("\n") +
       `\n│◦➛╰─────────────\n` +
@@ -42,7 +42,7 @@ function getCategoryCommands(categories, selectedNumber) {
 //========================================================================================================================
 // MENU (full list)
 keith({
-  pattern: "menu",
+  pattern: "menu2",
   category: "general",
   description: "Show all commands grouped by category"
 }, async (from, client, conText) => {
@@ -75,7 +75,7 @@ keith({
 //========================================================================================================================
 // MENU2 (interactive)
 keith({
-  pattern: "menu2",
+  pattern: "menu",
   category: "general",
   description: "Interactive category-based menu"
 }, async (from, client, conText) => {
@@ -94,7 +94,7 @@ keith({
   const categories = Object.keys(commandList);
 
   const menuText = `╰►Hey, @${username}
-╭───〔  *${botname}* 〕──────┈⊷
+╭───〔  *${botname}* 〕──────┈⊷𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭
 ├──────────────
 │✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}
 ╰──────────────────────⊷
