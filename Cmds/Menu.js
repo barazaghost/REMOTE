@@ -29,7 +29,7 @@ function getCategoryCommands(categories, selectedNumber) {
 
   return {
     text:
-      `╭────「 ${selectedCategory} 」──┈⊷𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭\n` +
+      `╭────「 ${selectedCategory} 」──┈⊷\n` +
       `│◦➛╭───────────────\n` +
       commandsInCategory.map((cmd, idx) => `│◦➛ ${idx + 1}. ${cmd}`).join("\n") +
       `\n│◦➛╰─────────────\n` +
@@ -38,26 +38,22 @@ function getCategoryCommands(categories, selectedNumber) {
     category: selectedCategory
   };
 }
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
 
-
+//========================================================================================================================
+// MENU (full list)
 keith({
-  pattern: "menu2",
+  pattern: "menu",
   category: "general",
   description: "Show all commands grouped by category"
 }, async (from, client, conText) => {
-  const { mek, pushName, botname, botPic, sourceUrl } = conText;
+  const { mek, sender, botname, botPic } = conText;
+  const username = sender.split('@')[0];
 
   initializeCommands();
 
   const categories = Object.keys(commandList);
 
-  let menuText = `╰►Hey, ${pushName}
+  let menuText = `╰►Hey, @${username}
 ╭───〔 *${botname}* 〕──────┈
 ├──────────────
 │✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}
@@ -70,29 +66,22 @@ keith({
   });
 
   await client.sendMessage(from, {
-    text: menuText.trim(),
-    contextInfo: {
-      mentionedJid: [mek.sender],
-      externalAdReply: {
-        title: `${botname} Menu`,
-        body: `Category-based command list`,
-        thumbnailUrl: botPic,
-        sourceUrl: sourceUrl,
-        mediaType: 1,
-        renderLargerThumbnail: true
-      }
-    }
+    image: { url: botPic },
+    caption: menuText.trim(),
+    mentions: [sender]
   });
 });
+
 //========================================================================================================================
-//
+// MENU2 (interactive)
 keith({
-  pattern: "menu",
+  pattern: "menu2",
   category: "general",
   description: "Interactive category-based menu"
 }, async (from, client, conText) => {
-  const { mek, pushName, botname, botPic, sourceUrl } = conText;
+  const { mek, sender, botname, botPic } = conText;
   const userId = mek.sender;
+  const username = sender.split('@')[0];
 
   if (activeMenus.has(userId)) {
     const { handler } = activeMenus.get(userId);
@@ -104,8 +93,8 @@ keith({
 
   const categories = Object.keys(commandList);
 
-  const menuText = `╰►Hey, ${pushName}
-╭───〔  *${botname}* 〕──────┈⊷𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭
+  const menuText = `╰►Hey, @${username}
+╭───〔  *${botname}* 〕──────┈⊷
 ├──────────────
 │✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}
 ╰──────────────────────⊷
@@ -117,18 +106,9 @@ ${categories.map((cat, i) => `> │◦➛ ${i + 1}. ${cat}`).join("\n")}
 `.trim();
 
   const sentMessage = await client.sendMessage(from, {
-    text: menuText,
-    contextInfo: {
-      mentionedJid: [mek.sender],
-      externalAdReply: {
-        title: `${botname} Menu2`,
-        body: `Category-based command explorer`,
-        thumbnailUrl: botPic,
-        sourceUrl: sourceUrl,
-        mediaType: 1,
-        renderLargerThumbnail: true
-      }
-    }
+    image: { url: botPic },
+    caption: menuText,
+    mentions: [sender]
   });
 
   const replyHandler = async (update) => {
@@ -144,7 +124,11 @@ ${categories.map((cat, i) => `> │◦➛ ${i + 1}. ${cat}`).join("\n")}
     const selectedNumber = parseInt(userInput);
 
     if (userInput === "0") {
-      await client.sendMessage(from, { text: menuText });
+      await client.sendMessage(from, {
+        image: { url: botPic },
+        caption: menuText,
+        mentions: [sender]
+      });
       activeMenus.set(userId, {
         sentMessage,
         handler: replyHandler,
@@ -165,18 +149,9 @@ ${categories.map((cat, i) => `> │◦➛ ${i + 1}. ${cat}`).join("\n")}
     }
 
     const categoryMessage = await client.sendMessage(from, {
-      text: commandsText,
-      contextInfo: {
-        mentionedJid: [mek.sender],
-        externalAdReply: {
-          title: `${categories[selectedNumber - 1]} Commands`,
-          body: `Total: ${commandList[categories[selectedNumber - 1]]?.length || 0} commands`,
-          thumbnailUrl: botPic,
-          sourceUrl: sourceUrl,
-          mediaType: 1,
-          renderLargerThumbnail: true
-        }
-      }
+      image: { url: botPic },
+      caption: commandsText,
+      mentions: [sender]
     });
 
     activeMenus.set(userId, {
