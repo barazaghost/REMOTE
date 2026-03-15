@@ -226,6 +226,12 @@ keith({
     await reply("❌ Failed to fetch repository information.");
   }
 });
+
+//========================================================================================================================
+
+
+
+
 keith({
   pattern: "repo",
   aliases: ["script", "sc"],
@@ -233,7 +239,7 @@ keith({
   category: "General",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, pushName, botname, author } = conText;
+  const { mek, pushName, botname, author, botPic } = conText;
 
   try {
     const response = await axios.get("https://api.github.com/repos/kkeizza/Keith");
@@ -248,7 +254,7 @@ keith({
     });
 
     const messageText =
-      `Hello ${pushName},👋 This is *${botname}*\n` +
+      `Hello @${pushName},👋 This is *${botname}*\n` +
       `The best bot in the universe developed by ${author}. Fork and give a star 🌟 to my repo\n\n` +
       `╭───────────────────\n` +
       `│✞ *Stars:* ${repoData.stargazers_count}\n` +
@@ -262,24 +268,40 @@ keith({
       title: '',
       text: messageText,
       footer: 'tinu.be/walink',
+      image: { url: botPic },
       buttons: [
         {
           name: "cta_url",
           buttonParamsJson: JSON.stringify({
-            display_text: "🌐 Visit Repository",
+            display_text: "Visit Repository",
             url: repoData.html_url
+          })
+        },
+        {
+          name: "cta_url",
+          buttonParamsJson: JSON.stringify({
+            display_text: "Fork Repository",
+            url: "https://github.com/kkeizza/Keith/fork"
           })
         },
         {
           name: "cta_copy",
           buttonParamsJson: JSON.stringify({
-            display_text: "📋 Copy Session URL",
+            display_text: "Copy Session URL",
             id: "copy_session",
             copy_code: "https://keithsite.top/keithpair"
           })
+        },
+        {
+          name: "cta_url",
+          buttonParamsJson: JSON.stringify({
+            display_text: "Download Zip",
+            id: `repo_dl_${Date.now()}`,
+            url: "https://github.com/kkeizza/Keith/archive/refs/heads/main.zip"
+          })
         }
       ]
-    }, { quoted: mek });
+    }, { quoted: mek, mentions: [mek.sender] });
 
   } catch (err) {
     console.error("❌ Repo fetch failed:", err);
@@ -288,3 +310,5 @@ keith({
     }, { quoted: mek });
   }
 });
+
+
