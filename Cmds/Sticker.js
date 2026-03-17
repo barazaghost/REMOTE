@@ -354,7 +354,6 @@ keith({
 
     const sticker = new Sticker(result, {
       pack: pushName,
-      author: pushName,
       type: StickerTypes.FULL,
       categories: ["🤩", "🎉"],
       id: "restick-123",
