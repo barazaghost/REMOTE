@@ -20,6 +20,71 @@ const fs = require('fs');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "hidetag",
+  aliases: ["htag", "hidden", "hidtag"],
+  category: "group",
+  description: "Send a message that secretly tags everyone",
+  filename: __filename
+}, async (from, client, conText) => {
+  const {
+    reply,
+    isGroup,
+    mek,
+    q,
+    participants,
+    quotedMsg
+  } = conText;
+
+  if (!isGroup) {
+    return reply("can only be used in groups!");
+  }
+
+  let text = q;
+  if (!text && quotedMsg) {
+    text =
+      quotedMsg.conversation ||
+      quotedMsg.extendedTextMessage?.text ||
+      quotedMsg.imageMessage?.caption ||
+      quotedMsg.videoMessage?.caption ||
+      "";
+  }
+
+  if (!text) {
+    return reply(
+      " Please provide a message or reply to one.\n\n*Usage:* .hidetag Your message here",
+    );
+  }
+
+  const mentionedJids = participants
+    .map((p) => {
+      const jid =
+        typeof p === "string"
+          ? p
+          : p.id || p.jid || p.pn || p.phoneNumber || "";
+      if (!jid) return null;
+      return jid.includes("@") ? jid : `${jid}@s.whatsapp.net`;
+    })
+    .filter(Boolean);
+
+  try {
+    await client.sendMessage(
+      from,
+      {
+        text: text,
+        contextInfo: {
+          mentionedJid: mentionedJids
+        },
+      },
+      { quoted: mek },
+    );
+  } catch (error) {
+    console.error("Hidetag error:", error);
+    return reply(`❌ Failed to send hidden tag: ${error.message}`);
+  }
+});
 //========================================================================================================================
 
 
