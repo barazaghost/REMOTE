@@ -21,6 +21,66 @@ const fs = require('fs');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "all",
+  aliases: ["tag", "everyone", "mention"],
+  category: "group",
+  description: "Tag everyone in the group with custom message",
+  filename: __filename
+}, async (from, client, conText) => {
+  const {
+    reply,
+    isGroup,
+    mek,
+    q,
+    participants
+  } = conText;
+
+  if (!isGroup) {
+    return reply("❌ This command can only be used in groups!");
+  }
+
+  if (!participants || participants.length === 0) {
+    return reply(" No members found in this group.");
+  }
+
+  const subject = q && q.trim().length > 0 ? q : "everyone";
+
+  const mentionedJids = participants
+    .map((p) => {
+      const jid =
+        typeof p === "string"
+          ? p
+          : p.id || p.jid || p.pn || p.phoneNumber || "";
+      if (!jid) return null;
+      return jid.includes("@") ? jid : `${jid}@s.whatsapp.net`;
+    })
+    .filter(Boolean);
+
+  try {
+    await client.sendMessage(
+      from,
+      {
+        text: `@${from}`,
+        contextInfo: {
+          mentionedJid: mentionedJids,
+          groupMentions: [
+            {
+              groupJid: from,
+              groupSubject: subject,
+            },
+          ]
+        },
+      },
+      { quoted: mek },
+    );
+  } catch (error) {
+    console.error("Tag everyone error:", error);
+    return reply(`❌ Failed to tag everyone: ${error.message}`);
+  }
+});
 //========================================================================================================================
 
 
@@ -872,26 +932,7 @@ async (from, client, conText) => {
 //========================================================================================================================
 //const { keith } = require('../commandHandler');
 
-keith({
-  pattern: "hidetag",
-  aliases: ["silenttag", "ghosttag"],
-  description: "Send a message tagging all members without visible mentions",
-  category: "group",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, mek, isGroup, reply, participants } = conText;
 
-  if (!isGroup) return reply("⚠️ This command can only be used in groups.");
-
-  if (!participants || participants.length === 0) {
-    return reply("⚠️ No members found in this group.");
-  }
-
-  await client.sendMessage(from, {
-    text: q || "",
-    mentions: participants.map(p => p.id)
-  }, { quoted: mek });
-});
 //========================================================================================================================
 
 keith({
