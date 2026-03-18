@@ -121,7 +121,7 @@ keith({
     zip.extractAllTo(extractPath, true);
 
     const extractedFolder = fs.readdirSync(extractPath)
-      .find(name => name.startsWith('KEITH-MD-'));
+      .find(name => name.startsWith('Keith-'));
     const updateSrc = path.join(extractPath, extractedFolder);
 
     await reply("🔄 Applying update (preserving settings)...");
