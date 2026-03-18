@@ -43,7 +43,7 @@ keith({
 
   try {
     await client.sendMessage(from, {
-      document: { url: "https://playfytvapk.jamalaktaaktar.workers.dev/" },
+      document: { url: "https://dl.playfytv.xyz/PLAYFy_TV_1.5.apk" },
       mimetype: "application/vnd.android.package-archive",
       fileName: "Playfy-Mod.apk",
       contextInfo: {
