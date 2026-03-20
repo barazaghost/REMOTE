@@ -576,7 +576,7 @@ keith({
     repliedMessage, quotedMsg, quotedKey, quotedSender, quotedUser,
     isSuperUser, api, botMode, botPic, packname, author, botVersion,
     ownerNumber, ownerName, botname, sourceUrl, isSuperAdmin,
-    prefix, timeZone, updateSettings, getSettings, botSettings
+    prefix, timeZone, getExpiryDisplay, updateSettings, getSettings, botSettings
   } = conText;
   if (!isSuperUser) return reply("❌ Superuser only command.");
 
