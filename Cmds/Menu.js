@@ -46,7 +46,7 @@ keith({
   category: "general",
   description: "Show all commands grouped by category"
 }, async (from, client, conText) => {
-  const { mek, sender, botname, botPic } = conText;
+  const { mek, sender, botname, expiryDisplay, botPic } = conText;
   const username = sender.split('@')[0];
 
   initializeCommands();
@@ -57,6 +57,7 @@ keith({
 ╭───〔 *${botname}* 〕──────┈
 ├──────────────
 │✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}
+│✵│▸ BOT EXPIRATION: ${expiryDisplay}
 ╰──────────────────────⊷\n\n`;
 
   categories.forEach(cat => {
@@ -79,7 +80,7 @@ keith({
   category: "general",
   description: "Interactive category-based menu"
 }, async (from, client, conText) => {
-  const { mek, sender, botname, botPic } = conText;
+  const { mek, sender, botname, botPic, expiryDisplay } = conText;
   const userId = mek.sender;
   const username = sender.split('@')[0];
 
@@ -97,6 +98,7 @@ keith({
 ╭───〔  *${botname}* 〕──────┈⊷𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭
 ├──────────────
 │✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}
+│✵│▸ BOT EXPIRATION: ${expiryDisplay}
 ╰──────────────────────⊷
 
 ╭───◇ *𝗖𝗔𝗧𝗘𝗚𝗢𝗥𝗜𝗘𝗦* ◇──────┈⊷
