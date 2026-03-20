@@ -42,6 +42,10 @@ keith({
 //========================================================================================================================
 
 
+
+
+
+
 keith({
   pattern: "screenshot",
   aliases: ["ss", "webshot"],
@@ -49,19 +53,19 @@ keith({
   category: "General",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, q, reply, api } = conText;
+  const { mek, q, reply } = conText;
 
   if (!q) {
-    return reply("📌 Provide a URL to screenshot.\nExample: .screenshot https://apiskeith.top/");
+    return reply("📌 Provide a URL to screenshot.\nExample: .screenshot https://keithmightbeluhyaorluobutidontknow.eu.cc");
   }
 
   try {
-    // Build screenshot API URL
-    const apiUrl = `${api}/tool/screenshot?url=${encodeURIComponent(q)}`;
+    // Build screenshot URL using Thum.io
+    const shotUrl = `https://image.thum.io/get/fullpage/${encodeURIComponent(q)}`;
 
-    // Send screenshot image with simplified caption
+    // Send screenshot image with caption
     await client.sendMessage(from, {
-      image: { url: apiUrl },
+      image: { url: shotUrl },
       caption: `Screenshot of ${q}`
     }, { quoted: mek });
 
