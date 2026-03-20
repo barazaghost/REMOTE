@@ -25,9 +25,10 @@ const {
     verifyJidState
 } = require("./lib/botFunctions");
 
+
 const { getSudoNumbers, setSudo, delSudo, isSudo } = require("./database/sudo");
 
-const { session, dev } = require("./settings");
+const { session, dev, botexpiration } = require("./settings");
 
 const { keith, commands, evt } = require("./commandHandler");
 const { 
@@ -68,6 +69,15 @@ const {
     resetSpamWarnCount,
     clearAllSpamWarns
 } = require('./database/antispam');
+
+const { 
+    initAntiBotDB,
+    getAntiBotSettings,
+    getBotWarnCount,
+    incrementBotWarnCount,
+    resetBotWarnCount,
+    clearAllBotWarns
+} = require('./database/antibots'); // Add this line
 const { 
     initAntiCallDB,
     getAntiCallSettings,
@@ -147,6 +157,7 @@ async function initializeDatabases() {
         await initAntiBadDB();
         await initAntiSpamDB();
         await initAutoBlockDB();
+        await initAntiBotDB();
         await initAntiStatusMentionDB();
       //  await initAntiSpamDB();
         await initAntiStickerDB(); 
@@ -240,6 +251,204 @@ https://keithsite.vercel.app/xmas`
         console.log('❌ Target date 2 has already passed!');
     }
 };
+//========================================================================================================================
+//========================================================================================================================
+// Simple Bot Expiration Date with Time Support
+//========================================================================================================================
+// Bot Expiration Date - Uses timezone from settings.js
+//========================================================================================================================
+const botExpirationDate = () => {
+    const expiryDateTimeStr = botexpiration;
+    const timezone = getSetting.timezone || 'Africa/Nairobi'; // Fallback if not set
+    
+    if (!expiryDateTimeStr) {
+        console.log('⚠️ No expiry date set - bot will run indefinitely');
+        return;
+    }
+
+    // Parse date and optional time
+    const parts = expiryDateTimeStr.split(' ');
+    const datePart = parts[0];
+    
+    if (!datePart) {
+        console.log('⚠️ Invalid expiry date format - use DD/MM/YYYY or DD/MM/YYYY HH:MM AM/PM');
+        return;
+    }
+
+    const [day, month, year] = datePart.split('/').map(Number);
+    
+    let hours = 0, minutes = 40; // DEFAULT: 12:40 AM
+    
+    // Parse time if provided
+    if (parts.length >= 3) {
+        const [hourStr, minuteStr] = parts[1].split(':');
+        hours = parseInt(hourStr);
+        minutes = parseInt(minuteStr);
+        
+        if (parts[2].toUpperCase() === 'PM' && hours !== 12) hours += 12;
+        else if (parts[2].toUpperCase() === 'AM' && hours === 12) hours = 0;
+    }
+
+    // Create date string with timezone offset
+    // Get timezone offset in hours (e.g., +03:00 for Nairobi)
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'short' });
+    const parts2 = formatter.formatToParts(now);
+    const tzPart = parts2.find(p => p.type === 'timeZoneName')?.value || '';
+    
+    // Get offset from timezone name (simplified - assumes format like "GMT+3")
+    let offset = '+03:00'; // Default
+    if (tzPart.includes('GMT+')) {
+        const hours = tzPart.replace('GMT+', '').split(':')[0];
+        offset = `+${hours.padStart(2, '0')}:00`;
+    } else if (tzPart.includes('GMT-')) {
+        const hours = tzPart.replace('GMT-', '').split(':')[0];
+        offset = `-${hours.padStart(2, '0')}:00`;
+    }
+
+    const paddedMonth = month.toString().padStart(2, '0');
+    const paddedDay = day.toString().padStart(2, '0');
+    const paddedHours = hours.toString().padStart(2, '0');
+    const paddedMinutes = minutes.toString().padStart(2, '0');
+    
+    const dateString = `${year}-${paddedMonth}-${paddedDay}T${paddedHours}:${paddedMinutes}:59${offset}`;
+    const expiryDate = new Date(dateString);
+    
+    // Get current time in specified timezone
+    const nowInTz = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+    
+    const timeUntilExpiry = expiryDate.getTime() - nowInTz.getTime();
+    
+    // Format date ONLY for display (no time)
+    const expiryDay = expiryDate.getDate().toString().padStart(2, '0');
+    const expiryMonth = (expiryDate.getMonth() + 1).toString().padStart(2, '0');
+    const expiryYear = expiryDate.getFullYear();
+    const formattedExpiryDate = `${expiryDay}/${expiryMonth}/${expiryYear}`;
+    
+    if (timeUntilExpiry <= 0) {
+        console.log(`❌ Bot expired on ${formattedExpiryDate} - logging out NOW...`);
+        setTimeout(async () => {
+            try {
+                await client.logout();
+                console.log('✅ Bot logged out due to expiration');
+                process.exit(0);
+            } catch (error) {
+                console.error('Error logging out:', error);
+                process.exit(1);
+            }
+        }, 5000);
+        return;
+    }
+
+    const daysRemaining = Math.floor(timeUntilExpiry / (1000 * 60 * 60 * 24));
+    const hoursRemaining = Math.floor((timeUntilExpiry % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutesRemaining = Math.floor((timeUntilExpiry % (1000 * 60 * 60)) / (1000 * 60));
+    
+    console.log(`⏰ Bot will expire on: ${formattedExpiryDate} (${timezone})`);
+    console.log(`⏳ Time remaining: ${daysRemaining} days, ${hoursRemaining} hours, ${minutesRemaining} minutes`);
+    
+    // Check every 6 hours
+    if (global.botExpiryInterval) {
+        clearInterval(global.botExpiryInterval);
+    }
+    
+    global.botExpiryInterval = setInterval(async () => {
+        try {
+            const now = new Date();
+            const nowInTz = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+            const remaining = expiryDate.getTime() - nowInTz.getTime();
+            
+            if (remaining <= 0) {
+                console.log(`🔴 Expiry date reached - logging out...`);
+                clearInterval(global.botExpiryInterval);
+                await client.logout();
+                process.exit(0);
+            }
+        } catch (err) {
+            console.error('Error in expiry check:', err);
+        }
+    }, 6 * 60 * 60 * 1000);
+};
+//========================================================================================================================
+//========================================================================================================================
+// Helper function to format expiry for startup message (DATE ONLY - no time)
+//========================================================================================================================
+const getExpiryDisplay = () => {
+    const expiryDateTimeStr = botexpiration;
+    const timezone = getSetting.timezone || 'Africa/Nairobi';
+    
+    if (!expiryDateTimeStr) return 'Not set';
+    
+    try {
+        const parts = expiryDateTimeStr.split(' ');
+        const [day, month, year] = parts[0].split('/').map(Number);
+        
+        let hours = 0, minutes = 40; // DEFAULT: 12:40 AM for calculation
+        
+        // Parse time if provided
+        if (parts.length >= 3) {
+            const [hourStr, minuteStr] = parts[1].split(':');
+            hours = parseInt(hourStr);
+            minutes = parseInt(minuteStr);
+            
+            if (parts[2].toUpperCase() === 'PM' && hours !== 12) hours += 12;
+            else if (parts[2].toUpperCase() === 'AM' && hours === 12) hours = 0;
+        }
+        
+        // Get timezone offset
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'short' });
+        const parts2 = formatter.formatToParts(now);
+        const tzPart = parts2.find(p => p.type === 'timeZoneName')?.value || '';
+        
+        let offset = '+03:00'; // Default
+        if (tzPart.includes('GMT+')) {
+            const hours = tzPart.replace('GMT+', '').split(':')[0];
+            offset = `+${hours.padStart(2, '0')}:00`;
+        } else if (tzPart.includes('GMT-')) {
+            const hours = tzPart.replace('GMT-', '').split(':')[0];
+            offset = `-${hours.padStart(2, '0')}:00`;
+        }
+        
+        // Create date for calculation
+        const dateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:59${offset}`;
+        const expiryDate = new Date(dateString);
+        
+        const nowInTz = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+        const timeUntilExpiry = expiryDate.getTime() - nowInTz.getTime();
+        
+        if (timeUntilExpiry > 0) {
+            const daysRemaining = Math.floor(timeUntilExpiry / (1000 * 60 * 60 * 24));
+            const hoursRemaining = Math.floor((timeUntilExpiry % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutesRemaining = Math.floor((timeUntilExpiry % (1000 * 60 * 60)) / (1000 * 60));
+            
+            // DATE ONLY - no time
+            const formattedDate = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+            
+            let timeLeftParts = [];
+            if (daysRemaining > 0) timeLeftParts.push(`${daysRemaining}d`);
+            if (hoursRemaining > 0) timeLeftParts.push(`${hoursRemaining}h`);
+            if (minutesRemaining > 0) timeLeftParts.push(`${minutesRemaining}m`);
+            
+            const timeLeftStr = timeLeftParts.join(' ');
+            
+            return `${formattedDate}, (${timeLeftStr} left)`;
+        } else {
+            return `${expiryDateTimeStr} (EXPIRED)`;
+        }
+    } catch (e) {
+        return expiryDateTimeStr;
+    }
+};
+const expiryDisplay = getExpiryDisplay();
+//========================================================================================================================
+//========================================================================================================================
+// Bot Expiration Date - Works for ANY date (years in the future)
+//========================================================================================================================
+
+//========================================================================================================================
+//========================================================================================================================
+
 //========================================================================================================================
 
 // API call to Keith AI Text
@@ -743,7 +952,96 @@ async function detectAndHandleAutoBlock(client, message, isSuperUser) {
     }
 }
 //========================================================================================================================
+
+
+
+// Anti-Bot detection function
+async function detectAndHandleBot(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
+    try {
+        if (!message?.message || message.key.fromMe) return;
+        
+        const from = message.key.remoteJid; 
+        const sender = message.key.participant || message.key.remoteJid;
+        const isGroup = from.endsWith('@g.us');
+
+        // Only process if it's a group
+        if (!isGroup) return;
+
+        // Get settings for this specific group
+        const settings = await getAntiBotSettings(from);
+        
+        // If settings don't exist or status is off, return
+        if (!settings || settings.status === 'off') return;
+
+        // Check if admins are exempt and user is admin
+        if (settings.exempt_admins && (isAdmin || isSuperAdmin)) return;
+
+        // Skip if user is super user
+        if (isSuperUser) return;
+
+        // Check if it's a bot message (3EB0 message ID pattern)
+        const msgId = message.key?.id;
+        if (!msgId) return;
+        
+        // Bot detection logic: 3EB0 prefix OR message ID length not 32
+        const isBot = msgId.startsWith('3EB0') || msgId.length !== 32;
+        if (!isBot) return;
+
+        // If bot not admin
+        if (!isBotAdmin) {
+            await client.sendMessage(from, { 
+                text: `⚠️ Bot message detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
+                mentions: [sender]
+            });
+            return;
+        }
+
+        // Delete the message first
+        await client.sendMessage(from, { delete: message.key });
+
+        // Handle actions based on group settings
+        if (settings.action === 'remove') {
+            await client.groupParticipantsUpdate(from, [sender], 'remove');
+            await client.sendMessage(from, { 
+                text: `🚫 @${sender.split('@')[0]} removed for sending bot messages!`,
+                mentions: [sender]
+            });
+            resetBotWarnCount(from, sender);
+        } 
+        else if (settings.action === 'delete') {
+            await client.sendMessage(from, { 
+                text: `🗑️ @${sender.split('@')[0]} - Bot message deleted! No bots allowed!`,
+                mentions: [sender]
+            });
+        } 
+        else if (settings.action === 'warn') {
+            const warnCount = incrementBotWarnCount(from, sender);
+            
+            if (warnCount >= settings.warn_limit) {
+                await client.groupParticipantsUpdate(from, [sender], 'remove');
+                await client.sendMessage(from, { 
+                    text: `🚫 @${sender.split('@')[0]} removed after ${warnCount} warnings for sending bot messages!`,
+                    mentions: [sender]
+                });
+                resetBotWarnCount(from, sender);
+            } else {
+                await client.sendMessage(from, { 
+                    text: `⚠️ Warning ${warnCount}/${settings.warn_limit} @${sender.split('@')[0]}! No bot messages allowed in this group!`,
+                    mentions: [sender]
+                });
+            }
+        }
+
+    } catch (error) {
+        console.error('Anti-bot error:', error);
+    }
+}
+
 // Anti-Bad Words detection function
+
+
+
+
 //========================================================================================================================
 async function detectAndHandleBadWords(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
     try {
@@ -2292,6 +2590,7 @@ await detectAndHandleAutoBlock(client, ms, isSuperUser);
 
 
 await detectAndHandleTag(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
+await detectAndHandleBot(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
 
 await detectAndHandleBadWords(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
 
@@ -2475,7 +2774,8 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
                     user: user || '',
                     keithBuffer, 
                     keithJson, 
-                    formatAudio, 
+                    formatAudio,
+                    expiryDisplay,
                     formatVideo,
                     keithRandom,
                     groupMember: isGroup ? messageAuthor : '',
@@ -2574,6 +2874,7 @@ if (connection === "open") {
     KeithLogger.success("✅ keith md is active , enjoy 😀");
     reconnectAttempts = 0;
     startAutoBio();
+    botExpirationDate(); 
     scheduleMessage(); 
     
         
@@ -2585,11 +2886,13 @@ if (connection === "open") {
                 const currentBotName = botSettings.botname || botname;
                 const currentMode = botSettings.mode || mode;
                 const currentPrefix = botSettings.prefix || prefix;
+                const expiryDisplay = getExpiryDisplay();
                 
                 const connectionMsg = `  
     ╭═『 ${currentBotName}══⊷ 
     ║ ᴍᴏᴅᴇ ${currentMode}
     ║ ᴘʀᴇғɪx [ ${currentPrefix} ] 
+    ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
     ║ join here👇
     ║ t.me/keithmd
     ╰═════════════⊷
