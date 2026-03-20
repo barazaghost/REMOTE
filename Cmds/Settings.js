@@ -105,6 +105,118 @@ const {
     
 
 
+const { 
+    getAntiBotSettings, 
+    updateAntiBotSettings, 
+    getAllAntiBotGroups,
+    clearAllBotWarns,
+    toggleAntiBot 
+} = require('../database/antibots');
+
+// ==================== ANTI-BOT COMMAND ====================
+keith({
+    pattern: "antibot",
+    aliases: ["antib", "antibots", "nobot"],
+    category: "Settings",
+    description: "Prevent bots from sending messages in group"
+},
+async (from, client, conText) => {
+    const { reply, q, isSuperUser, isBotAdmin, isGroup, groupName } = conText;
+
+    if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
+    if (!isGroup) return reply("❌ This command can only be used in groups!");
+    if (!isBotAdmin) return reply("❌ I need to be an admin to manage anti-bot!");
+
+    const args = q?.trim().split(/\s+/) || [];
+    const subcommand = args[0]?.toLowerCase();
+    const value = args[1];
+
+    const settings = await getAntiBotSettings(from);
+
+    if (subcommand === 'list') {
+        const allGroups = await getAllAntiBotGroups();
+        if (allGroups.length === 0) return reply("📋 No groups have anti-bot enabled.");
+        
+        let listMessage = "*🤖 Anti-Bot Active Groups*\n\n";
+        for (let i = 0; i < allGroups.length; i++) {
+            const group = allGroups[i];
+            listMessage += `*${i + 1}.* ${group.groupName || 'Unknown'}\n`;
+            listMessage += `   └ 📍 JID: \`${group.groupJid}\`\n`;
+            listMessage += `   └ ⚙️ Action: *${group.action?.toUpperCase() || 'DELETE'}*\n\n`;
+        }
+        return reply(listMessage);
+    }
+
+    if (!isSuperUser && !conText.isAdmin) return reply("❌ Only group admins can use this command!");
+
+    if (!subcommand) {
+        const statusText = settings?.status === 'on' ? '✅ ENABLED' : '❌ DISABLED';
+        const actionMap = { 'delete': '🗑️ Delete Only', 'remove': '🚫 Remove User', 'warn': '⚠️ Warn + Delete' };
+        const adminExempt = settings?.exempt_admins ? '✅ Yes' : '❌ No';
+
+        return reply(
+            `*🤖 Anti-Bot Settings*\n\n` +
+            `📌 *Group:* ${groupName || 'Unknown'}\n` +
+            `📍 *JID:* \`${from}\`\n\n` +
+            `🔹 *Status:* ${statusText}\n` +
+            `🔹 *Action:* ${actionMap[settings?.action || 'delete']}\n` +
+            `🔹 *Exempt Admins:* ${adminExempt}\n` +
+            `🔹 *Warn Limit:* ${settings?.warn_limit || 3}\n\n` +
+            `*Commands:*\n` +
+            `▸ *${conText.prefix}antibots on/off*\n` +
+            `▸ *${conText.prefix}antibots delete/remove/warn*\n` +
+            `▸ *${conText.prefix}antibots adminexempt on/off*\n` +
+            `▸ *${conText.prefix}antibots limit <1-10>*\n` +
+            `▸ *${conText.prefix}antibots reset*\n` +
+            `▸ *${conText.prefix}antibots list*`
+        );
+    }
+
+    switch (subcommand) {
+        case 'on':
+        case 'enable':
+            await toggleAntiBot(from, groupName, 'on', settings?.action || 'delete', settings?.warn_limit || 3, settings?.exempt_admins !== false);
+            return reply(`✅ Anti-Bot has been *ENABLED*!`);
+
+        case 'off':
+        case 'disable':
+            await updateAntiBotSettings(from, { status: 'off' });
+            return reply(`❌ Anti-Bot has been *DISABLED*!`);
+
+        case 'delete':
+        case 'remove':
+        case 'warn':
+            await updateAntiBotSettings(from, { status: 'on', action: subcommand });
+            return reply(`✅ Anti-Bot action set to: *${subcommand.toUpperCase()}*`);
+
+        case 'adminexempt':
+            if (!value || !['on', 'off'].includes(value)) return reply("❌ Use: `antibots adminexempt on/off`");
+            await updateAntiBotSettings(from, { exempt_admins: value === 'on' });
+            return reply(`✅ Admin exemption ${value === 'on' ? 'enabled' : 'disabled'}.`);
+
+        case 'limit':
+            const limit = parseInt(value);
+            if (isNaN(limit) || limit < 1 || limit > 10) return reply("❌ Limit must be between 1 and 10");
+            await updateAntiBotSettings(from, { warn_limit: limit });
+            return reply(`✅ Warn limit set to: *${limit}*`);
+
+        case 'reset':
+        case 'resetwarns':
+            clearAllBotWarns(from);
+            return reply(`✅ All warning counts reset!`);
+
+        default:
+            return reply(
+                "❌ Invalid command!\n\n" +
+                `▸ *${conText.prefix}antibots on/off*\n` +
+                `▸ *${conText.prefix}antibots delete/remove/warn*\n` +
+                `▸ *${conText.prefix}antibots adminexempt on/off*\n` +
+                `▸ *${conText.prefix}antibots limit <1-10>*\n` +
+                `▸ *${conText.prefix}antibots reset*\n` +
+                `▸ *${conText.prefix}antibots list*`
+            );
+    }
+});
 
 // ==================== HELPER FUNCTIONS ====================
 async function downloadMedia(mediaUrl) {
