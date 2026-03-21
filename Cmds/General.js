@@ -2,7 +2,8 @@ const { keith, commands } = require('../commandHandler');
 const fs = require("fs");
 const axios = require('axios');
 const path = require('path');
-//========================================================================================================================
+const more = String.fromCharCode(8206);
+const readmore = more.repeat(4001);
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -11,8 +12,64 @@ const path = require('path');
 //========================================================================================================================
 //========================================================================================================================
 
-const more = String.fromCharCode(8206);
-const readmore = more.repeat(4001);
+
+keith({
+  pattern: "ip",
+  aliases: ["ipinfo", "iplookup"],
+  category: "Tools",
+  description: "Get IP address information and location",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, q, reply } = conText;
+
+  if (!q) {
+    return reply("📌 Usage: `.ip <ip_address>`\nExample: `.ip 8.8.8.8`");
+  }
+
+  try {
+    const response = await axios.get(`http://ip-api.com/json/${encodeURIComponent(q)}`, { timeout: 15000 });
+    const data = response.data;
+
+    if (data.status === "fail") {
+      return reply(`❌ Invalid IP: ${data.message || "Unknown error"}`);
+    }
+
+    let text = `╭━━━━━━━━━━━━━━━━━━╮\n`;
+    text += `┃  *IP INFO*  ┃\n`;
+    text += `╰━━━━━━━━━━━━━━━━━━╯\n\n`;
+    text += ` *IP:* ${data.query}\n`;
+    text += ` *Location:*\n`;
+    text += ` • Country: ${data.country} (${data.countryCode})\n`;
+    text += ` • Region: ${data.regionName}\n`;
+    text += ` • City: ${data.city}\n`;
+    text += ` • ZIP: ${data.zip || "N/A"}\n`;
+    text += ` • Coordinates: ${data.lat}, ${data.lon}\n\n`;
+    text += ` *Network:*\n`;
+    text += ` • ISP: ${data.isp}\n`;
+    text += ` • Org: ${data.org}\n`;
+    text += ` • AS: ${data.as}\n\n`;
+    text += ` *Timezone:* ${data.timezone}`;
+
+    // Send info text
+    await client.sendMessage(from, { text }, { quoted: mek });
+
+    // Send location pin
+    await client.sendMessage(from, {
+      location: {
+        degreesLatitude: data.lat,
+        degreesLongitude: data.lon,
+        name: `${data.city}, ${data.country}`
+      }
+    }, { quoted: mek });
+
+  } catch (err) {
+    console.error("IP lookup error:", err);
+    await reply(`❌ Failed to fetch IP info: ${err.message}`);
+  }
+});
+//========================================================================================================================
+
+
 
 keith({
   pattern: "readmore",
