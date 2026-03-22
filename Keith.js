@@ -2598,7 +2598,204 @@ await detectAndHandleSticker(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSu
     
 await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); // Add this line
     await handleChatbot(client, ms.message, from, sender, isGroup, isSuperUser, ms); //
-  //await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);  //========================================================================================================================//========================================================================================================================
+  //await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
+   // Add this function after the other handler functions (around line 1400-1500 area)
+// Sticker Forward Handler - When user replies to a message with a sticker, forward the replied message to bot's own account
+async function handleStickerForward(client, message, from, sender, isGroup, isSuperUser, quotedMsg, repliedMessage) {
+    try {
+        // Check if it's a sticker message
+        const isSticker = !!message?.stickerMessage;
+        if (!isSticker) return;
+        
+        // Check if it's a reply to a message
+        const contextInfo = message?.extendedTextMessage?.contextInfo;
+        if (!contextInfo || !contextInfo.quotedMessage) return;
+        
+        // Skip if user is super user (owner) to avoid forwarding their own messages
+        if (isSuperUser) return;
+        
+        // Get the replied message
+        const quotedMsgObj = contextInfo.quotedMessage;
+        if (!quotedMsgObj) return;
+        
+        // Get the original message key
+        const quotedMsgKey = contextInfo.stanzaId;
+        const quotedMsgParticipant = contextInfo.participant;
+        
+        // Determine the type of the replied message
+        let mediaType = null;
+        let mediaBuffer = null;
+        let caption = '';
+        let fileName = '';
+        
+        // Check different message types
+        if (quotedMsgObj.conversation) {
+            // Text message
+            mediaType = 'text';
+            caption = quotedMsgObj.conversation;
+        } 
+        else if (quotedMsgObj.extendedTextMessage) {
+            // Extended text message
+            mediaType = 'text';
+            caption = quotedMsgObj.extendedTextMessage.text;
+        }
+        else if (quotedMsgObj.imageMessage) {
+            // Image message
+            mediaType = 'image';
+            caption = quotedMsgObj.imageMessage.caption || '';
+            try {
+                const stream = await downloadContentFromMessage(quotedMsgObj.imageMessage, 'image');
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) {
+                    buffer = Buffer.concat([buffer, chunk]);
+                }
+                mediaBuffer = buffer;
+            } catch (err) {
+                console.error('Error downloading image:', err);
+            }
+        }
+        else if (quotedMsgObj.videoMessage) {
+            // Video message
+            mediaType = 'video';
+            caption = quotedMsgObj.videoMessage.caption || '';
+            try {
+                const stream = await downloadContentFromMessage(quotedMsgObj.videoMessage, 'video');
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) {
+                    buffer = Buffer.concat([buffer, chunk]);
+                }
+                mediaBuffer = buffer;
+            } catch (err) {
+                console.error('Error downloading video:', err);
+            }
+        }
+        else if (quotedMsgObj.audioMessage) {
+            // Audio message
+            mediaType = 'audio';
+            try {
+                const stream = await downloadContentFromMessage(quotedMsgObj.audioMessage, 'audio');
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) {
+                    buffer = Buffer.concat([buffer, chunk]);
+                }
+                mediaBuffer = buffer;
+            } catch (err) {
+                console.error('Error downloading audio:', err);
+            }
+        }
+        else if (quotedMsgObj.documentMessage) {
+            // Document message
+            mediaType = 'document';
+            caption = quotedMsgObj.documentMessage.caption || '';
+            fileName = quotedMsgObj.documentMessage.fileName || 'document';
+            try {
+                const stream = await downloadContentFromMessage(quotedMsgObj.documentMessage, 'document');
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) {
+                    buffer = Buffer.concat([buffer, chunk]);
+                }
+                mediaBuffer = buffer;
+            } catch (err) {
+                console.error('Error downloading document:', err);
+            }
+        }
+        else if (quotedMsgObj.stickerMessage) {
+            // Sticker message
+            mediaType = 'sticker';
+            try {
+                const stream = await downloadContentFromMessage(quotedMsgObj.stickerMessage, 'sticker');
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) {
+                    buffer = Buffer.concat([buffer, chunk]);
+                }
+                mediaBuffer = buffer;
+            } catch (err) {
+                console.error('Error downloading sticker:', err);
+            }
+        }
+        else {
+            // Unknown message type
+            return;
+        }
+        
+        // Send to bot's own account (client.user.id)
+        const botAccountJid = client.user.id;
+        const senderInfo = isGroup ? `Group: ${groupName || from}\nSender: @${sender.split('@')[0]}` : `Private chat from: @${sender.split('@')[0]}`;
+        
+        const forwardText = `📨 *FORWARDED MESSAGE*\n\n${senderInfo}\n\n${mediaType === 'text' ? '📝 *Message:*' : '📎 *Media Message*'}\n${caption ? `\n*Caption:* ${caption}` : ''}\n\n_Forwarded via sticker reply_`;
+        
+        // Send based on media type to bot's own account
+        if (mediaType === 'text') {
+            await client.sendMessage(botAccountJid, {
+                text: `${forwardText}\n\n${caption}`,
+                mentions: [sender]
+            });
+        }
+        else if (mediaType === 'image' && mediaBuffer) {
+            await client.sendMessage(botAccountJid, {
+                image: mediaBuffer,
+                caption: forwardText,
+                mentions: [sender]
+            });
+        }
+        else if (mediaType === 'video' && mediaBuffer) {
+            await client.sendMessage(botAccountJid, {
+                video: mediaBuffer,
+                caption: forwardText,
+                mentions: [sender]
+            });
+        }
+        else if (mediaType === 'audio' && mediaBuffer) {
+            await client.sendMessage(botAccountJid, {
+                audio: mediaBuffer,
+                mimetype: 'audio/mpeg',
+                ptt: false
+            });
+            // Send caption separately for audio
+            await client.sendMessage(botAccountJid, {
+                text: forwardText,
+                mentions: [sender]
+            });
+        }
+        else if (mediaType === 'document' && mediaBuffer) {
+            await client.sendMessage(botAccountJid, {
+                document: mediaBuffer,
+                fileName: fileName,
+                caption: forwardText,
+                mentions: [sender]
+            });
+        }
+        else if (mediaType === 'sticker' && mediaBuffer) {
+            await client.sendMessage(botAccountJid, {
+                sticker: mediaBuffer
+            });
+            // Send info separately for sticker
+            await client.sendMessage(botAccountJid, {
+                text: forwardText,
+                mentions: [sender]
+            });
+        }
+        
+        // React to confirm
+        await client.sendMessage(from, {
+            react: { key: message.key, text: '📨' }
+        });
+        
+        console.log(`✅ Forwarded ${mediaType} message from ${sender} to bot account via sticker`);
+        
+    } catch (error) {
+        console.error('Sticker forward handler error:', error);
+        // Try to send error reaction
+        try {
+            await client.sendMessage(from, {
+                react: { key: message.key, text: '❌' }
+            });
+        } catch (err) {
+            // Ignore
+        }
+    }
+} 
+    //========================================================================================================================//========================================================================================================================
 
 
 
