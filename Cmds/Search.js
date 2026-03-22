@@ -10,6 +10,63 @@ const readmore = more.repeat(4001);
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+keith({
+  pattern: "weather",
+  aliases: ["forecast", "wthr"],
+  category: "Search",
+  description: "Get current weather for a city",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, q, reply } = conText;
+
+  if (!q) {
+    return reply("📌 Usage: `.weather <city>`\nExample: `.weather Migori`");
+  }
+
+  try {
+    const apiKey = "1ad47ec6172f19dfaf89eb3307f74785"; // your OpenWeatherMap key
+    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(q)}&units=metric&appid=${apiKey}`;
+    const { data } = await axios.get(url, { timeout: 15000 });
+
+    if (data.cod !== 200) {
+      return reply(`❌ Could not fetch weather for: ${q}`);
+    }
+
+    const weather = data.weather[0];
+    const main = data.main;
+    const wind = data.wind;
+
+    let text = `╭━━━━━━━━━━━━━━━━━━╮\n`;
+    text += `┃  *WEATHER REPORT*  ┃\n`;
+    text += `╰━━━━━━━━━━━━━━━━━━╯\n\n`;
+    text += ` *City:* ${data.name}, ${data.sys.country}\n`;
+    text += ` *Condition:* ${weather.main} (${weather.description})\n`;
+    text += ` *Temperature:* ${main.temp}°C (feels like ${main.feels_like}°C)\n`;
+    text += ` *Humidity:* ${main.humidity}%\n`;
+    text += ` *Pressure:* ${main.pressure} hPa\n`;
+    text += ` *Wind:* ${wind.speed} m/s, ${wind.deg}°\n`;
+    text += ` *Clouds:* ${data.clouds.all}%\n`;
+    if (data.rain?.["1h"]) text += ` *Rain (1h):* ${data.rain["1h"]} mm\n`;
+    text += ` *Coordinates:* ${data.coord.lat}, ${data.coord.lon}\n`;
+
+    // Send info text
+    await client.sendMessage(from, { text }, { quoted: mek });
+
+    // Send location pin
+    await client.sendMessage(from, {
+      location: {
+        degreesLatitude: data.coord.lat,
+        degreesLongitude: data.coord.lon,
+        name: `${data.name}, ${data.sys.country}`
+      }
+    }, { quoted: mek });
+
+  } catch (err) {
+    console.error("Weather error:", err);
+    await reply(`❌ Failed to fetch weather: ${err.message}`);
+  }
+});
 //========================================================================================================================
 
 
