@@ -9,6 +9,32 @@ const readmore = more.repeat(4001);
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+keith({
+  pattern: "owner",
+  aliases: ["master", "creator"],
+  category: "General",
+  description: "Send owner contact card",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, reply, dev, author } = conText;
+
+  
+  const vcard =
+    'BEGIN:VCARD\n' +
+    'VERSION:3.0\n' +
+    `FN:${author}\n` +
+    'ORG:Owner;\n' +
+    `TEL;type=CELL;type=VOICE;waid=${dev}:${dev}\n` +
+    'END:VCARD';
+
+  await client.sendMessage(from, {
+    contacts: {
+      displayName: author,
+      contacts: [{ vcard }]
+    }
+  }, { quoted: mek });
+});
 //========================================================================================================================
 
 
