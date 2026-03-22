@@ -10,6 +10,49 @@ const readmore = more.repeat(4001);
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "developer",
+  aliases: ["devs", "dev"],
+  category: "General",
+  description: "Send developer contact cards",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, reply } = conText;
+
+  const devContacts = [
+    { name: 'Keith', number: '254786989022' },
+    { name: 'Keith 2', number: '254140480956' },
+    { name: 'Keith 3', number: '254748387615' },
+    { name: 'Keith 4', number: '254796299159' },
+    { name: 'Keith 5', number: '254110190196' }
+  ];
+
+//  await reply("📌 Below are the developer contacts:");
+
+  const sendVCard = async (contact) => {
+    const vcard =
+      'BEGIN:VCARD\n' +
+      'VERSION:3.0\n' +
+      `FN:${contact.name}\n` +
+      'ORG:Developer;\n' +
+      `TEL;type=CELL;type=VOICE;waid=${contact.number}:${contact.number}\n` +
+      'END:VCARD';
+
+    await client.sendMessage(from, {
+      contacts: {
+        displayName: contact.name,
+        contacts: [{ vcard }]
+      }
+    }, { quoted: mek });
+  };
+
+  for (const contact of devContacts) {
+    await sendVCard(contact);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // small delay
+  }
+});
 //========================================================================================================================
 
 
