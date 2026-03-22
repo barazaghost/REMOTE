@@ -19,6 +19,54 @@ const fs = require('fs');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "ckick",
+  aliases: ["countrykick"],
+  category: "group",
+  description: "Kick all members with numbers starting with given country code",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { reply, q, isGroup, isBotAdmin, isSuperUser, mek } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+  if (!isGroup) return reply("❌ This command only works in groups!");
+  if (!isBotAdmin) return reply("❌ Bot must be admin to perform kicks!");
+
+  if (!q || !/^\d+$/.test(q)) {
+    return reply("📌 Usage: `.ckick <country_code>`\nExample: `.ckick 254`");
+  }
+
+  try {
+    const metadata = await client.groupMetadata(from);
+    const targets = [];
+
+    for (const p of metadata.participants) {
+      let jid = p.id || "";
+      // Convert @lid to proper JID if needed
+      if (jid.includes("@lid")) {
+        jid = await client.getJidFromLid(jid);
+      }
+      const num = jid.split("@")[0];
+      if (num.startsWith(q)) {
+        targets.push(jid);
+      }
+    }
+
+    if (targets.length === 0) {
+      return reply(`✅ No members found with country code ${q}`);
+    }
+
+    await client.groupParticipantsUpdate(from, targets, "remove");
+
+    await reply(`🚫 Removed total ${targets.length} members with code ${q}`);
+
+  } catch (error) {
+    console.error("CountryKick Error:", error);
+    await reply(`❌ Failed to perform country kick: ${error.message}`);
+  }
+});
 //========================================================================================================================
 
 
