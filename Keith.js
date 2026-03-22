@@ -2605,6 +2605,57 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
 
   
     if (isCommandMessage && cmd) {
+        
+    
+    // ===== EVAL COMMAND FIRST (BEFORE command lookup) =====
+    const trimmedText = text?.trim() || '';
+    if (trimmedText.startsWith('~')) {
+        if (!isSuperUser) {
+            await client.sendMessage(from, { 
+                text: "🚫 Only my owner can execute eval commands!" 
+            }, { quoted: ms });
+            return;
+        }
+        
+        try {
+            const evalCode = trimmedText.slice(trimmedText.startsWith('~ ') ? 2 : 1).trim();
+            
+            if (!evalCode) {
+                await client.sendMessage(from, { 
+                    text: "⚠️ Example: `~ prefix` or `~ conText.prefix` or `~ client.user.id`" 
+                }, { quoted: ms });
+                return;
+            }
+            
+            // Direct eval - everything is already in scope
+            let evaled = await eval(`(async () => { return ${evalCode} })()`);
+            
+            if (typeof evaled !== 'string') {
+                const util = require('util');
+                evaled = util.inspect(evaled, { depth: 2 });
+            }
+            
+            const result = String(evaled);
+            
+            if (result.length > 4000) {
+                const chunks = result.match(/.{1,4000}/g);
+                for (const chunk of chunks) {
+                    await client.sendMessage(from, { text: chunk }, { quoted: ms });
+                }
+            } else {
+                await client.sendMessage(from, { text: result }, { quoted: ms });
+            }
+            
+        } catch (err) {
+            await client.sendMessage(from, { 
+                text: `❌ Error: ${err.message}` 
+            }, { quoted: ms });
+        }
+        return;
+    }
+    // ===== END OF EVAL COMMAND =====
+
+    
     
       
         const keithCmd = Array.isArray(evt.commands) 
@@ -2807,48 +2858,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
                     getSettings,
                     botSettings
                 };
-                   // ===== EVAL COMMAND (after conText) =====
-            const trimmedText = text?.trim() || '';
-            if (trimmedText.startsWith('~')) {
-                if (!isSuperUser) {
-                    await reply("🚫 Only my owner can execute eval commands!");
-                    return;
-                }
-                
-                try {
-                    const evalCode = trimmedText.slice(trimmedText.startsWith('~ ') ? 2 : 1).trim();
-                    
-                    if (!evalCode) {
-                        await reply("⚠️ Example: `~ prefix` or `~ conText.prefix` or `~ client.user.id`");
-                        return;
-                    }
-                    
-                    // Direct eval - everything is already in scope
-                    let evaled = await eval(`(async () => { return ${evalCode} })()`);
-                    
-                    if (typeof evaled !== 'string') {
-                        const util = require('util');
-                        evaled = util.inspect(evaled, { depth: 2 });
-                    }
-                    
-                    const result = String(evaled);
-                    
-                    if (result.length > 4000) {
-                        const chunks = result.match(/.{1,4000}/g);
-                        for (const chunk of chunks) {
-                            await client.sendMessage(from, { text: chunk }, { quoted: ms });
-                        }
-                    } else {
-                        await reply(result);
-                    }
-                    
-                } catch (err) {
-                    await reply(`❌ Error: ${err.message}`);
-                }
-                return;
-            }
-            // ===== END OF EVAL COMMAND =====
-
+                   
 
                 await keithCmd.function(from, client, conText);
                 KeithLogger.success(`Command ${cmd} executed successfully`);
