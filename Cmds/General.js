@@ -12,11 +12,13 @@ const readmore = more.repeat(4001);
 //========================================================================================================================
 
 
+
+
 keith({
   pattern: "developer",
-  aliases: ["devs", "dev"],
+  aliases: ["developers", "dev", "devs"],
   category: "General",
-  description: "Send developer contact cards",
+  description: "Send all developer contacts in one card",
   filename: __filename
 }, async (from, client, conText) => {
   const { mek, reply } = conText;
@@ -29,30 +31,27 @@ keith({
     { name: 'Keith 5', number: '254110190196' }
   ];
 
-//  await reply("📌 Below are the developer contacts:");
+  
 
-  const sendVCard = async (contact) => {
-    const vcard =
-      'BEGIN:VCARD\n' +
-      'VERSION:3.0\n' +
-      `FN:${contact.name}\n` +
-      'ORG:Developer;\n' +
-      `TEL;type=CELL;type=VOICE;waid=${contact.number}:${contact.number}\n` +
-      'END:VCARD';
+  // Build vCards for all developers
+  const vcards = devContacts.map(contact =>
+    'BEGIN:VCARD\n' +
+    'VERSION:3.0\n' +
+    `FN:${contact.name}\n` +
+    'ORG:Developer;\n' +
+    `TEL;type=CELL;type=VOICE;waid=${contact.number}:${contact.number}\n` +
+    'END:VCARD'
+  );
 
-    await client.sendMessage(from, {
-      contacts: {
-        displayName: contact.name,
-        contacts: [{ vcard }]
-      }
-    }, { quoted: mek });
-  };
-
-  for (const contact of devContacts) {
-    await sendVCard(contact);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // small delay
-  }
+  // Send them all in one message
+  await client.sendMessage(from, {
+    contacts: {
+      displayName: 'Developers',
+      contacts: vcards.map(vcard => ({ vcard }))
+    }
+  }, { quoted: mek });
 });
+
 //========================================================================================================================
 
 
