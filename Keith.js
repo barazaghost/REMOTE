@@ -1214,7 +1214,7 @@ async function detectAndHandleSticker(client, message, isBotAdmin, isAdmin, isSu
 //========================================================================================================================
 // Anti-Tag detection function
 //========================================================================================================================
-async function detectAndHandleTag(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
+async function detectAndHandleTag(client, message, isSuperUser) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -1258,9 +1258,7 @@ async function detectAndHandleTag(client, message, isBotAdmin, isAdmin, isSuperA
         // If settings don't exist or status is off, return
         if (!settings || settings.status === 'off') return;
 
-        // Check if admins are exempt and user is admin
-        if (settings.exempt_admins && (isAdmin || isSuperAdmin)) return;
-
+        
         // Skip if user is super user
         if (isSuperUser) return;
 
@@ -1269,14 +1267,7 @@ async function detectAndHandleTag(client, message, isBotAdmin, isAdmin, isSuperA
         if (mentionedCount <= allowedMentions) return; // Within allowed limit
 
         // If bot not admin
-        if (!isBotAdmin) {
-            await client.sendMessage(from, { 
-                text: `⚠️ Tagging detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
-                mentions: [sender]
-            });
-            return;
-        }
-
+        
         // Delete the message first
         await client.sendMessage(from, { delete: message.key });
 
@@ -2709,8 +2700,12 @@ await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuper
 await detectAndHandleAutoBlock(client, ms, isSuperUser);
 
 
-await detectAndHandleTag(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
-await detectAndHandleBot(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
+//await detectAndHandleTag(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
+
+  await detectAndHandleTag(client, ms, isSuperUser);
+  
+    
+    await detectAndHandleBot(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
 
 await detectAndHandleBadWords(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
 
