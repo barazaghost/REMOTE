@@ -14,6 +14,125 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "qc",
+  aliases: ["quotemaker", "quotesticker"],
+  category: "Sticker",
+  description: "Generate a quote sticker (reply to a message or provide text)",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, q, sender, reply, author, pushName, quoted, quotedUser, quotedMsg, isGroup } = conText;
+
+  let quoteText = q;
+  let targetUser = sender;
+  let displayName = pushName || sender.split('@')[0];
+
+  // Case 1: If replying to a message, get the quoted user's info and quoted message text
+  if (quotedMsg && quotedUser) {
+    targetUser = quotedUser;
+    displayName = pushName; // Use pushName from the quoted user context
+    
+    // Get the quoted user's name if possible
+    try {
+      const contact = await client.getContact(targetUser);
+      displayName = contact.pushname || contact.verifiedName || contact.name || targetUser.split('@')[0];
+    } catch {
+      displayName = targetUser.split('@')[0];
+    }
+    
+    // If no text provided in command, use the quoted message text
+    if (!quoteText && quotedMsg.text) {
+      quoteText = quotedMsg.text;
+    } else if (!quoteText && quotedMsg.caption) {
+      quoteText = quotedMsg.caption;
+    }
+    
+    // If still no text, use the quoted message content
+    if (!quoteText) {
+      quoteText = "✨ Quote Sticker ✨";
+    }
+  }
+
+  // Case 2: If text is provided in command (not replying)
+  if (!quoteText && q) {
+    quoteText = q;
+  }
+
+  // Validate if we have text to generate quote
+  if (!quoteText) {
+    return reply("📌 *Usage:*\n• `.qc <text>` - Create quote with your profile\n• *Reply* to a message with `.qc` - Create quote with that user's profile and message\n• *Reply* with `.qc <text>` - Create quote with that user's profile and custom text");
+  }
+
+  // Get profile picture URL (without fallback)
+  let ppUrl;
+  try {
+    ppUrl = await client.profilePictureUrl(targetUser, 'image');
+  } catch (err) {
+    return reply(`❌ Could not fetch profile picture. Make sure they have a profile picture set.`);
+  }
+
+  // WhatsApp style configuration
+  const obj = {
+    type: 'quote',
+    format: 'png',
+    backgroundColor: '#0B141A', // WhatsApp dark mode background
+    width: 512,
+    height: 768,
+    scale: 2,
+    messages: [{
+      entities: [],
+      avatar: true,
+      from: {
+        id: 1,
+        name: pushName,
+        photo: { url: ppUrl }
+      },
+      text: quoteText,
+      replyMessage: {}
+    }],
+    
+    style: {
+      backgroundColor: '#0B141A',
+      textColor: '#E9EDEF', 
+      nameColor: '#00A884', 
+      messageColor: '#E9EDEF',
+      linkColor: '#53BDEB',
+      replyColor: '#8696A0',
+      bubble: {
+        backgroundColor: '#202C33', 
+        borderRadius: 16,
+        padding: 12
+      }
+    }
+  };
+
+  try {
+    // Generate quote
+    const response = await axios.post('https://bot.lyo.su/quote/generate', obj, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const buffer = Buffer.from(response.data.result.image, 'base64');
+
+    // Create sticker with pushName for pack name
+    const sticker = new Sticker(buffer, {
+      pack: pushName || "Quote Maker",
+      type: StickerTypes.FULL,
+      categories: ["💬", "✨"],
+      quality: 70,
+      background: "transparent"
+    });
+
+    const stickerBuffer = await sticker.toBuffer();
+    await client.sendMessage(from, { sticker: stickerBuffer }, { quoted: mek });
+
+  } catch (err) {
+    console.error("QC Sticker error:", err);
+    await reply("❌ Failed to generate quote sticker. Please try again later.");
+  }
+});
 //========================================================================================================================
 
 keith({
