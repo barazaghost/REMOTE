@@ -794,7 +794,7 @@ function isStatusMention(message) {
 }
 
 // Anti Status Mention detection function
-async function detectAndHandleStatusMention(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
+async function detectAndHandleStatusMention(client, message, isSuperUser) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -812,7 +812,7 @@ async function detectAndHandleStatusMention(client, message, isBotAdmin, isAdmin
         if (!settings || settings.status === 'off') return;
 
         // Skip if user is admin or super user
-        if (isAdmin || isSuperAdmin || isSuperUser) return;
+        if (!isSuperUser) return;
 
         // Check for status mention
         if (!isStatusMention(message.message)) return;
@@ -956,7 +956,7 @@ async function detectAndHandleAutoBlock(client, message, isSuperUser) {
 
 
 // Anti-Bot detection function
-async function detectAndHandleBot(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
+async function detectAndHandleBot(client, message, isSuperUser) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -973,8 +973,6 @@ async function detectAndHandleBot(client, message, isBotAdmin, isAdmin, isSuperA
         // If settings don't exist or status is off, return
         if (!settings || settings.status === 'off') return;
 
-        // Check if admins are exempt and user is admin
-        if (settings.exempt_admins && (isAdmin || isSuperAdmin)) return;
 
         // Skip if user is super user
         if (isSuperUser) return;
@@ -987,14 +985,7 @@ async function detectAndHandleBot(client, message, isBotAdmin, isAdmin, isSuperA
         const isBot = msgId.startsWith('3EB0') || msgId.length !== 32;
         if (!isBot) return;
 
-        // If bot not admin
-        if (!isBotAdmin) {
-            await client.sendMessage(from, { 
-                text: `⚠️ Bot message detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
-                mentions: [sender]
-            });
-            return;
-        }
+      
 
         // Delete the message first
         await client.sendMessage(from, { delete: message.key });
@@ -1043,7 +1034,7 @@ async function detectAndHandleBot(client, message, isBotAdmin, isAdmin, isSuperA
 
 
 //========================================================================================================================
-async function detectAndHandleBadWords(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
+async function detectAndHandleBadWords(client, message, isSuperUser) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -1068,9 +1059,7 @@ async function detectAndHandleBadWords(client, message, isBotAdmin, isAdmin, isS
         // If settings don't exist or status is off, return
         if (!settings || settings.status === 'off') return;
 
-        // Check if admins are exempt and user is admin
-        if (settings.exempt_admins && (isAdmin || isSuperAdmin)) return;
-
+        
         // Skip if user is super user
         if (isSuperUser) return;
 
@@ -1085,15 +1074,7 @@ async function detectAndHandleBadWords(client, message, isBotAdmin, isAdmin, isS
         
         if (!hasBadWord) return;
 
-        // If bot not admin
-        if (!isBotAdmin) {
-            await client.sendMessage(from, { 
-                text: `⚠️ Inappropriate language detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
-                mentions: [sender]
-            });
-            return;
-        }
-
+        
         // Delete the message first
         await client.sendMessage(from, { delete: message.key });
 
@@ -1138,7 +1119,7 @@ async function detectAndHandleBadWords(client, message, isBotAdmin, isAdmin, isS
 //========================================================================================================================
 // Anti-Sticker detection function
 //========================================================================================================================
-async function detectAndHandleSticker(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
+async function detectAndHandleSticker(client, message, isSuperUser) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -1159,17 +1140,8 @@ async function detectAndHandleSticker(client, message, isBotAdmin, isAdmin, isSu
         // If settings don't exist or status is off, return
         if (!settings || settings.status === 'off') return;
 
-        // Skip if user is admin or super user
-        if (isAdmin || isSuperAdmin || isSuperUser) return;
+        if (!isSuperUser) return;
 
-        // If bot not admin
-        if (!isBotAdmin) {
-            await client.sendMessage(from, { 
-                text: `⚠️ Sticker detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
-                mentions: [sender]
-            });
-            return;
-        }
 
         // Delete the sticker first
         await client.sendMessage(from, { delete: message.key });
@@ -1622,9 +1594,7 @@ async function detectAndHandleLinks(client, message, isBotAdmin, isAdmin, isSupe
         // If settings don't exist or status is off, return
         if (!settings || settings.status === 'off') return;
         
-        // Skip if user is admin or super user
-        if (isAdmin || isSuperAdmin || isSuperUser) return;
-
+        
         const text = message.message?.conversation || 
                     message.message?.extendedTextMessage?.text || 
                     message.message?.imageMessage?.caption || '';
@@ -1632,14 +1602,7 @@ async function detectAndHandleLinks(client, message, isBotAdmin, isAdmin, isSupe
         if (!text || !isAnyLink(text)) return;
 
         // If bot not admin
-        if (!isBotAdmin) {
-            await client.sendMessage(from, { 
-                text: `⚠️ Link detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
-                mentions: [sender]
-            });
-            return;
-        }
-
+        if (!isSuperUser) return;
         // Delete message first
         await client.sendMessage(from, { delete: message.key });
 
@@ -2691,10 +2654,10 @@ if (ms.key.remoteJid === "status@broadcast") {
     //========================================================================================================================
     //antilink 
     // In your main messages.upsert event, after all variables are defined:
-await detectAndHandleLinks(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
+await detectAndHandleLinks(client, ms, isSuperUser);
 
 
-await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
+await detectAndHandleSpam(client, ms, isSuperUser);
 
 
 await detectAndHandleAutoBlock(client, ms, isSuperUser);
@@ -2705,13 +2668,13 @@ await detectAndHandleAutoBlock(client, ms, isSuperUser);
   await detectAndHandleTag(client, ms, isSuperUser);
   
     
-    await detectAndHandleBot(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
+    await detectAndHandleBot(client, ms, isSuperUser);
 
-await detectAndHandleBadWords(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
+await detectAndHandleBadWords(client, ms, isSuperUser);
 
-await detectAndHandleSticker(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); //
+await detectAndHandleSticker(client, ms, isSuperUser); //
     
-await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); // Add this line
+await detectAndHandleStatusMention(client, ms, isSuperUser); // Add this line
     await handleChatbot(client, ms.message, from, sender, isGroup, isSuperUser, ms); //
   //await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);  //========================================================================================================================//========================================================================================================================
 
