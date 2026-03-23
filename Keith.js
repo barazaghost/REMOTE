@@ -1227,6 +1227,126 @@ async function detectAndHandleTag(client, message, isBotAdmin, isAdmin, isSuperA
 
         // Get mentioned JIDs from the message
         const mentionedJid = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        let mentionedCount = mentionedJid.length;
+        
+        // Check for @all tag
+        const text = message.message?.extendedTextMessage?.text || message.message?.conversation || '';
+        const hasAllTag = text.toLowerCase().includes('@all');
+        
+        // If @all is present and it's not in the mentionedJid (which is common), we need to count it
+        if (hasAllTag) {
+            // Get all group participants to count how many would be affected by @all
+            try {
+                const groupMetadata = await client.groupMetadata(from);
+                const participants = groupMetadata.participants;
+                // Exclude the sender and maybe bot from count
+                const allCount = participants.filter(p => p.id !== sender).length;
+                mentionedCount = Math.max(mentionedCount, allCount);
+            } catch (err) {
+                console.error('Error getting group metadata:', err);
+                // If we can't get participant count, treat @all as a single mention
+                if (mentionedCount === 0) mentionedCount = 1;
+            }
+        }
+        
+        // If no mentions, return
+        if (mentionedCount === 0) return;
+
+        // Get settings for this specific group
+        const settings = await getAntiTagSettings(from);
+        
+        // If settings don't exist or status is off, return
+        if (!settings || settings.status === 'off') return;
+
+        // Check if admins are exempt and user is admin
+        if (settings.exempt_admins && (isAdmin || isSuperAdmin)) return;
+
+        // Skip if user is super user
+        if (isSuperUser) return;
+
+        // Check if mentions exceed allowed limit
+        const allowedMentions = settings.allowed_mentions || 0;
+        if (mentionedCount <= allowedMentions) return; // Within allowed limit
+
+        // If bot not admin
+        if (!isBotAdmin) {
+            await client.sendMessage(from, { 
+                text: `⚠️ Tagging detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
+                mentions: [sender]
+            });
+            return;
+        }
+
+        // Delete the message first
+        await client.sendMessage(from, { delete: message.key });
+
+        // Prepare mention list for warning message
+        let mentionList = '';
+        let allMentions = [sender];
+        
+        if (hasAllTag && mentionedJid.length === 0) {
+            mentionList = '@all';
+        } else {
+            mentionList = mentionedJid.map(jid => `@${jid.split('@')[0]}`).join(', ');
+            allMentions = [sender, ...mentionedJid];
+        }
+
+        // Handle actions based on group settings
+        if (settings.action === 'remove') {
+            await client.groupParticipantsUpdate(from, [sender], 'remove');
+            await client.sendMessage(from, { 
+                text: `🚫 @${sender.split('@')[0]} removed for ${hasAllTag ? 'using @all' : `tagging ${mentionedCount} people`}! (Limit: ${allowedMentions})`,
+                mentions: [sender]
+            });
+            resetTagWarnCount(from, sender);
+        } 
+        else if (settings.action === 'delete') {
+            await client.sendMessage(from, { 
+                text: `🗑️ @${sender.split('@')[0]} - Message deleted! ${hasAllTag ? '@all is not allowed' : `Tagging limited to ${allowedMentions} mention(s) per message.`}`,
+                mentions: [sender]
+            });
+        } 
+        else if (settings.action === 'warn') {
+            const warnCount = incrementTagWarnCount(from, sender);
+            
+            if (warnCount >= settings.warn_limit) {
+                await client.groupParticipantsUpdate(from, [sender], 'remove');
+                await client.sendMessage(from, { 
+                    text: `🚫 @${sender.split('@')[0]} removed after ${warnCount} warnings for ${hasAllTag ? 'using @all' : 'excessive tagging'}!`,
+                    mentions: [sender]
+                });
+                resetTagWarnCount(from, sender);
+            } else {
+                const warningText = hasAllTag 
+                    ? `⚠️ Warning ${warnCount}/${settings.warn_limit} @${sender.split('@')[0]}! @all is not allowed.`
+                    : `⚠️ Warning ${warnCount}/${settings.warn_limit} @${sender.split('@')[0]}! Tagging limited to ${allowedMentions} mention(s) per message.\nYou tagged: ${mentionList}`;
+                
+                await client.sendMessage(from, { 
+                    text: warningText,
+                    mentions: allMentions
+                });
+            }
+        }
+
+    } catch (error) {
+        console.error('Anti-tag error:', error);
+    }
+}
+
+
+/*async function detectAndHandleTag(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
+    try {
+        if (!message?.message || message.key.fromMe) return;
+        
+        const from = message.key.remoteJid; 
+        const sender = message.key.participant || message.key.remoteJid;
+        const isGroup = from.endsWith('@g.us');
+
+        // Only process if it's a group
+        if (!isGroup) return;
+
+        // Get mentioned JIDs from the message
+        const mentionedJid = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const mentionedCount = mentionedJid.length;
         
         // If no mentions, return
@@ -1298,7 +1418,7 @@ async function detectAndHandleTag(client, message, isBotAdmin, isAdmin, isSuperA
     } catch (error) {
         console.error('Anti-tag error:', error);
     }
-}
+}*/
 //========================================================================================================================
 // Anti-Spam detection function
 //========================================================================================================================
