@@ -786,15 +786,12 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
             
 // Anti Status Mention Functions
 //========================================================================================================================
-
-// Check for status mention messages
-// Check for status mention messages
 function isStatusMention(message) {
     return !!message?.groupStatusMentionMessage;
 }
 
 // Anti Status Mention detection function
-async function detectAndHandleStatusMention(client, message, isSuperUser) {
+async function detectAndHandleStatusMention(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -812,7 +809,7 @@ async function detectAndHandleStatusMention(client, message, isSuperUser) {
         if (!settings || settings.status === 'off') return;
 
         // Skip if user is admin or super user
-        if (!isSuperUser) return;
+        if (isAdmin || isSuperAdmin || isSuperUser) return;
 
         // Check for status mention
         if (!isStatusMention(message.message)) return;
@@ -866,6 +863,9 @@ async function detectAndHandleStatusMention(client, message, isSuperUser) {
         console.error('Anti-status-mention error:', error);
     }
 }
+// Check for status mention messages
+// Check for status mention messages
+
 //========================================================================================================================
 // Auto-Block detection function (DM only)
 //========================================================================================================================
