@@ -2594,7 +2594,9 @@ if (ms.key.remoteJid === "status@broadcast") {
     //========================================================================================================================
     //antilink 
     // In your main messages.upsert event, after all variables are defined:
-await detectAndHandleLinks(client, ms, isSuperUser);
+//await detectAndHandleLinks(client, ms, isSuperUser);
+await detectAndHandleLinks(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
+
 
 
 await detectAndHandleSpam(client, ms, isSuperUser);
@@ -2612,9 +2614,12 @@ await detectAndHandleAutoBlock(client, ms, isSuperUser);
 
 await detectAndHandleBadWords(client, ms, isSuperUser);
 
-await detectAndHandleSticker(client, ms, isSuperUser); //
+
+await detectAndHandleSticker(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); //
     
-await detectAndHandleStatusMention(client, ms, isSuperUser); // Add this line
+await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); // Add this
+    
+    // Add this line
     await handleChatbot(client, ms.message, from, sender, isGroup, isSuperUser, ms); //
   //await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);  //========================================================================================================================//========================================================================================================================
 
