@@ -1119,7 +1119,7 @@ async function detectAndHandleBadWords(client, message, isSuperUser) {
 //========================================================================================================================
 // Anti-Sticker detection function
 //========================================================================================================================
-async function detectAndHandleSticker(client, message, isSuperUser) {
+async function detectAndHandleSticker(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -1140,8 +1140,17 @@ async function detectAndHandleSticker(client, message, isSuperUser) {
         // If settings don't exist or status is off, return
         if (!settings || settings.status === 'off') return;
 
-        if (!isSuperUser) return;
+        // Skip if user is admin or super user
+        if (isAdmin || isSuperAdmin || isSuperUser) return;
 
+        // If bot not admin
+        if (!isBotAdmin) {
+            await client.sendMessage(from, { 
+                text: `⚠️ Sticker detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
+                mentions: [sender]
+            });
+            return;
+        }
 
         // Delete the sticker first
         await client.sendMessage(from, { delete: message.key });
@@ -1183,6 +1192,9 @@ async function detectAndHandleSticker(client, message, isSuperUser) {
         console.error('Anti-sticker error:', error);
     }
 }
+
+
+
 //========================================================================================================================
 // Anti-Tag detection function
 //========================================================================================================================
@@ -1297,91 +1309,7 @@ async function detectAndHandleTag(client, message, isSuperUser) {
 }
 
 
-/*async function detectAndHandleTag(client, message, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser) {
-    try {
-        if (!message?.message || message.key.fromMe) return;
-        
-        const from = message.key.remoteJid; 
-        const sender = message.key.participant || message.key.remoteJid;
-        const isGroup = from.endsWith('@g.us');
 
-        // Only process if it's a group
-        if (!isGroup) return;
-
-        // Get mentioned JIDs from the message
-        const mentionedJid = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-        const mentionedCount = mentionedJid.length;
-        
-        // If no mentions, return
-        if (mentionedCount === 0) return;
-
-        // Get settings for this specific group
-        const settings = await getAntiTagSettings(from);
-        
-        // If settings don't exist or status is off, return
-        if (!settings || settings.status === 'off') return;
-
-        // Check if admins are exempt and user is admin
-        if (settings.exempt_admins && (isAdmin || isSuperAdmin)) return;
-
-        // Skip if user is super user
-        if (isSuperUser) return;
-
-        // Check if mentions exceed allowed limit
-        const allowedMentions = settings.allowed_mentions || 0;
-        if (mentionedCount <= allowedMentions) return; // Within allowed limit
-
-        // If bot not admin
-        if (!isBotAdmin) {
-            await client.sendMessage(from, { 
-                text: `⚠️ Tagging detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
-                mentions: [sender]
-            });
-            return;
-        }
-
-        // Delete the message first
-        await client.sendMessage(from, { delete: message.key });
-
-        const mentionList = mentionedJid.map(jid => `@${jid.split('@')[0]}`).join(', ');
-
-        // Handle actions based on group settings
-        if (settings.action === 'remove') {
-            await client.groupParticipantsUpdate(from, [sender], 'remove');
-            await client.sendMessage(from, { 
-                text: `🚫 @${sender.split('@')[0]} removed for tagging ${mentionedCount} people! (Limit: ${allowedMentions})`,
-                mentions: [sender]
-            });
-            resetTagWarnCount(from, sender);
-        } 
-        else if (settings.action === 'delete') {
-            await client.sendMessage(from, { 
-                text: `🗑️ @${sender.split('@')[0]} - Message deleted! Tagging limited to ${allowedMentions} mention(s) per message.`,
-                mentions: [sender]
-            });
-        } 
-        else if (settings.action === 'warn') {
-            const warnCount = incrementTagWarnCount(from, sender);
-            
-            if (warnCount >= settings.warn_limit) {
-                await client.groupParticipantsUpdate(from, [sender], 'remove');
-                await client.sendMessage(from, { 
-                    text: `🚫 @${sender.split('@')[0]} removed after ${warnCount} warnings for excessive tagging!`,
-                    mentions: [sender]
-                });
-                resetTagWarnCount(from, sender);
-            } else {
-                await client.sendMessage(from, { 
-                    text: `⚠️ Warning ${warnCount}/${settings.warn_limit} @${sender.split('@')[0]}! Tagging limited to ${allowedMentions} mention(s) per message.\nYou tagged: ${mentionList}`,
-                    mentions: [sender, ...mentionedJid]
-                });
-            }
-        }
-
-    } catch (error) {
-        console.error('Anti-tag error:', error);
-    }
-}*/
 //========================================================================================================================
 // Anti-Spam detection function
 //========================================================================================================================
