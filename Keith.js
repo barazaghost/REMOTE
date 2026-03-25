@@ -2251,7 +2251,7 @@ client.ev.on("messages.upsert", async ({ messages }) => {
        // ====== AUTOMATICALLY SAVE USER JID ======
     try {
     // Get the sender JID
-    const senderJid = ms.key.participant || ms.key.remoteJid;
+    const senderJid = ms.key.participant || ms.key.participantPn || ms.key.remoteJid;
     
     // Don't save if: group chat OR from bot OR no sender JID
     if (!ms.key.remoteJid.endsWith('@g.us') && !ms.key.fromMe && senderJid) {
@@ -2334,7 +2334,8 @@ client.ev.on("messages.upsert", async ({ messages }) => {
         groupSuperAdmins = groupInfo.participants.filter(p => p.admin === 'superadmin').map(p => p.pn || p.id);
         const senderLid = standardizeJid(sendr);
         const founds = groupInfo.participants.find(p => p.id === senderLid || p.pn === senderLid);
-        sender = founds?.pn || founds?.id || sendr;
+      //  sender = founds?.pn || founds?.id || sendr;
+        sender = sendr;
         isBotAdmin = groupAdmins.includes(standardizeJid(botId)) || groupSuperAdmins.includes(standardizeJid(botId));
         isAdmin = groupAdmins.includes(sender);
         isSuperAdmin = groupSuperAdmins.includes(sender);
