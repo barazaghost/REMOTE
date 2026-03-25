@@ -12,7 +12,7 @@ const readmore = more.repeat(4001);
 keith({
   pattern: "checkbotexpiry",
   aliases: ["expirydate", "botexpiry"],
-  category: "Owner",
+  category: "General",
   description: "Check bot expiry date",
   filename: __filename
 }, async (from, client, conText) => {
