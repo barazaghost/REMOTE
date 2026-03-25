@@ -2323,7 +2323,9 @@ client.ev.on("messages.upsert", async ({ messages }) => {
     let participants = [];
     let groupAdmins = [];
     let groupSuperAdmins = [];
-    let sender = sendr;
+   // let sender = sendr;
+    let sender = ms.key.senderPn;
+    
     let isBotAdmin = false;
     let isAdmin = false;
     let isSuperAdmin = false;
@@ -2335,7 +2337,8 @@ client.ev.on("messages.upsert", async ({ messages }) => {
         const senderLid = standardizeJid(sendr);
         const founds = groupInfo.participants.find(p => p.id === senderLid || p.pn === senderLid);
       //  sender = founds?.pn || founds?.id || sendr;
-        sender = sendr;
+     //   sender = sendr;
+       sender = ms.key.senderPn; 
         isBotAdmin = groupAdmins.includes(standardizeJid(botId)) || groupSuperAdmins.includes(standardizeJid(botId));
         isAdmin = groupAdmins.includes(sender);
         isSuperAdmin = groupSuperAdmins.includes(sender);
