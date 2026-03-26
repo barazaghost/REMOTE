@@ -471,11 +471,11 @@ async function getAIResponse(message, userJid) {
             return response.data.result;
         } else {
             console.error('Chatbot API returned invalid response:', response.data);
-            return "I'm sorry, I couldn't process your message right now.";
+            return null;
         }
     } catch (error) {
         console.error('Chatbot API error:', error);
-        return "I'm having trouble connecting right now. Please try again later.";
+        return null;
     }
 }
 
@@ -522,7 +522,7 @@ async function getAIVideoResponse(message) {
 // API call to Keith AI Image Generation (Flux)
 async function getAIImageResponse(message) {
     try {
-        const response = await axios.get(`https://apiskeith.top/ai/flux?q=${encodeURIComponent(message)}`);
+        const response = await axios.get(`https://apiskeith.top/ai/magicstudio?prompt=${encodeURIComponent(message)}`);
         
         // Since Flux returns image directly, we use the API URL as image source
         return {
