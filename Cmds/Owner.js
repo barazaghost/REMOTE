@@ -836,78 +836,34 @@ keith({
 
 keith({
   pattern: "vv2",
-  aliases: ["amazing", "lovely"],
-  description: "Retrieve quoted media (image, video, audio, view-once)",
+  aliases: ["amazing", "lovely", "beautiful", "😍", "😘"],
+  description: "Retrieve quoted media and send privately to sender",
   category: "Owner",
   filename: __filename
-}, async (sender, client, { mek, quoted, quotedMsg, reply }) => {
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply, sender } = conText;
   if (!quotedMsg) return reply("📌 Reply to a media message to retrieve it.");
-
   try {
-    // Handle normal media
     if (quoted?.imageMessage) {
       const caption = quoted.imageMessage.caption || "";
       const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
       await client.sendMessage(sender, { image: { url: filePath }, caption }, { quoted: mek });
     }
-
     if (quoted?.videoMessage) {
       const caption = quoted.videoMessage.caption || "";
       const filePath = await client.downloadAndSaveMediaMessage(quoted.videoMessage);
       await client.sendMessage(sender, { video: { url: filePath }, caption }, { quoted: mek });
     }
-
     if (quoted?.audioMessage) {
       const filePath = await client.downloadAndSaveMediaMessage(quoted.audioMessage);
       await client.sendMessage(sender, { audio: { url: filePath }, mimetype: 'audio/mpeg' }, { quoted: mek });
     }
-
-    // Handle view-once media
-    let viewOnceContent, mediaType;
-    if (
-      quoted.imageMessage?.viewOnce ||
-      quoted.videoMessage?.viewOnce ||
-      quoted.audioMessage?.viewOnce
-    ) {
-      mediaType = Object.keys(quoted).find(
-        (key) =>
-          key.endsWith("Message") &&
-          ["image", "video", "audio"].some((t) => key.includes(t))
-      );
-      viewOnceContent = { [mediaType]: quoted[mediaType] };
-    } else if (quoted.viewOnceMessage) {
-      viewOnceContent = quoted.viewOnceMessage.message;
-      mediaType = Object.keys(viewOnceContent).find(
-        (key) =>
-          key.endsWith("Message") &&
-          ["image", "video", "audio"].some((t) => key.includes(t))
-      );
-    }
-
-    if (viewOnceContent && mediaType) {
-      const mediaMessage = {
-        ...viewOnceContent[mediaType],
-        viewOnce: false, // disable view-once flag
-      };
-
-      const filePath = await client.downloadAndSaveMediaMessage(mediaMessage);
-
-      if (mediaType === "imageMessage") {
-        const caption = mediaMessage.caption || "";
-        await client.sendMessage(sender, { image: { url: filePath }, caption }, { quoted: mek });
-      } else if (mediaType === "videoMessage") {
-        const caption = mediaMessage.caption || "";
-        await client.sendMessage(sender, { video: { url: filePath }, caption }, { quoted: mek });
-      } else if (mediaType === "audioMessage") {
-        await client.sendMessage(sender, { audio: { url: filePath }, mimetype: 'audio/mpeg' }, { quoted: mek });
-      }
-    }
-
   } catch (err) {
     console.error("vv2 command error:", err);
     reply("❌ Failed to retrieve media. Try again.");
   }
 });
+
 
 //========================================================================================================================
 
