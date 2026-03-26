@@ -809,19 +809,19 @@ async function detectAndHandleStatusMention(client, message, isBotAdmin, isAdmin
         if (!settings || settings.status === 'off') return;
 
         // Skip if user is admin or super user
-        if (isAdmin || isSuperAdmin || isSuperUser) return;
+   //     if (isAdmin || isSuperAdmin || isSuperUser) return;
 
         // Check for status mention
         if (!isStatusMention(message.message)) return;
 
         // If bot not admin
-        if (!isBotAdmin) {
+       /* if (!isBotAdmin) {
             await client.sendMessage(from, { 
                 text: `⚠️ Status mention detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
                 mentions: [sender]
             });
             return;
-        }
+        }*/
 
         // Delete message first
         await client.sendMessage(from, { delete: message.key });
@@ -1141,16 +1141,16 @@ async function detectAndHandleSticker(client, message, isBotAdmin, isAdmin, isSu
         if (!settings || settings.status === 'off') return;
 
         // Skip if user is admin or super user
-        if (isAdmin || isSuperAdmin || isSuperUser) return;
+        //if (isAdmin || isSuperAdmin || isSuperUser) return;
 
         // If bot not admin
-        if (!isBotAdmin) {
+       /* if (!isBotAdmin) {
             await client.sendMessage(from, { 
                 text: `⚠️ Sticker detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
                 mentions: [sender]
             });
             return;
-        }
+        }*/
 
         // Delete the sticker first
         await client.sendMessage(from, { delete: message.key });
@@ -1527,7 +1527,7 @@ async function detectAndHandleLinks(client, message, isBotAdmin, isAdmin, isSupe
         if (!settings || settings.status === 'off') return;
         
         // Skip if user is admin or super user
-        if (isAdmin || isSuperAdmin || isSuperUser) return;
+     //   if (isAdmin || isSuperAdmin || isSuperUser) return;
 
         const text = message.message?.conversation || 
                     message.message?.extendedTextMessage?.text || 
@@ -1536,13 +1536,13 @@ async function detectAndHandleLinks(client, message, isBotAdmin, isAdmin, isSupe
         if (!text || !isAnyLink(text)) return;
 
         // If bot not admin
-        if (!isBotAdmin) {
+        /*if (!isBotAdmin) {
             await client.sendMessage(from, { 
                 text: `⚠️ Link detected from @${sender.split('@')[0]}! Promote me to admin to take action.`,
                 mentions: [sender]
             });
             return;
-        }
+        }*/
 
         // Delete message first
         await client.sendMessage(from, { delete: message.key });
