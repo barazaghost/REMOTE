@@ -809,7 +809,9 @@ async function detectAndHandleStatusMention(client, message, isBotAdmin, isAdmin
         if (!settings || settings.status === 'off') return;
 
         // Skip if user is admin or super user
+        if (isSuperUser) return;
    //     if (isAdmin || isSuperAdmin || isSuperUser) return;
+        
 
         // Check for status mention
         if (!isStatusMention(message.message)) return;
@@ -1142,6 +1144,7 @@ async function detectAndHandleSticker(client, message, isBotAdmin, isAdmin, isSu
 
         // Skip if user is admin or super user
         //if (isAdmin || isSuperAdmin || isSuperUser) return;
+        if (isSuperUser) return;
 
         // If bot not admin
        /* if (!isBotAdmin) {
@@ -1528,6 +1531,7 @@ async function detectAndHandleLinks(client, message, isBotAdmin, isAdmin, isSupe
         
         // Skip if user is admin or super user
      //   if (isAdmin || isSuperAdmin || isSuperUser) return;
+        if (isSuperUser) return;
 
         const text = message.message?.conversation || 
                     message.message?.extendedTextMessage?.text || 
