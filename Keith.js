@@ -2026,7 +2026,7 @@ client.ev.on('messages.upsert', async ({ messages }) => {
         if (!settings.status) return;
 
         const message = messages[0];
-      //  if (!message.message || message.key.remoteJid === 'status@broadcast') return;
+       if (!message.message || message.key.remoteJid === 'status@broadcast') return;
 
         const remoteJid = message.key.remoteJid;
         const chatData = loadChatData(remoteJid);
