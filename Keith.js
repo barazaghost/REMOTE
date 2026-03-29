@@ -2928,8 +2928,10 @@ if (connection === "open") {
     ║ ᴍᴏᴅᴇ ${currentMode}
     ║ ᴘʀᴇғɪx [ ${currentPrefix} ] 
     ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
-    ║ join here👇
-    ║ t.me/keithmd
+    ║ in need of vcf??
+    ║verify your bot number here 
+    ║ (status views boost)
+    ║ vcf.keithsite.top 
     ╰═════════════⊷
 `;
 
