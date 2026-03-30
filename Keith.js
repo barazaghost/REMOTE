@@ -211,7 +211,7 @@ https://keithsite.vercel.app/xmas`
     }
 
     // SECOND MESSAGE: Example - send on January 1, 2025 at 12:00 PM
-    const targetDate2 = new Date('2026-01-25T12:00:00+03:00'); // Change date/time as needed
+    const targetDate2 = new Date('2026-04-02T12:00:00+03:00'); // Change date/time as needed
     
     const delay2 = targetDate2.getTime() - now.getTime();
     
@@ -222,23 +222,16 @@ https://keithsite.vercel.app/xmas`
                 await client.sendMessage(client.user.id, {
                     text: `‼️UPDATES ALERT‼️
                     ─────────────────────
-                    ○ added creatgroup command
-                    ○ togroupstatus 
-                    ○ fixed all downloads 
-                    ○ fixed all group commands no more errors
-                    ○ added aiphoto/flatai -to generate ai image in different styles
-                    ○ fixed vision - you can use vision or vision2 to analyze an image
-                    ○ added trailer command - to check on movie/series trailers
-                    ○ added logout command - ⛔️🚫this is very dangerous since it will logout your bot 
-                    ○ fixed removebg - use removebg / removebg2 to remove background image
-                    ○ fixed ephoto and photofunia logo generator 
-                        ─────────────────────
-                        join our channel for more
-                        https://whatsapp.com/channel/0029VbC0HmuBfxoFk5KPcS33
-                        
-                        if you experienced any error share with the developer for bot efficiency 
-                        +254748387615
-                        regards Keith`
+                    if you did verify vcf 
+                    this is the link 
+                    make sure you import 
+                    https://keithsite.top/legit.vcf
+                    after downloading tap the file and open with phone app
+                    then import 
+                    wait for 24 hours before posting anythingto give room for 
+                    everyone who verified to import 
+                    after that post a status and you will see magic 😊🥵
+                    `
                 });
                 console.log(`✅ Scheduled message 2 sent to bot (${client.user.id}) at ${new Date().toLocaleString()}`);
             } catch (error) {
