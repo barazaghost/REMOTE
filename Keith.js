@@ -2921,13 +2921,8 @@ if (connection === "open") {
     ║ ᴍᴏᴅᴇ ${currentMode}
     ║ ᴘʀᴇғɪx [ ${currentPrefix} ] 
     ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
-    ║ in need of vcf??
-    ║verify your bot number here 
-    ║ (status views boost)
-    ║ vcf.keithsite.top
-    ║don't be left out 
-    ║releasing date is 02/04/2026
-    ║ (Thursday)
+    ║ join here
+    ║ t.me/keithmd
     ╰═════════════⊷
 `;
 
