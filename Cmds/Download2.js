@@ -7,7 +7,7 @@ const { keith } = require('../commandHandler');
 keith({
   pattern: "hentaivid",
   aliases: ["nsfwvideo", "nsfwvid"],
-  category: "Downloader",
+  category: "18+",
   description: "Download a random video from the list"
 },
 async (from, client, conText) => {
