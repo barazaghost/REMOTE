@@ -42,7 +42,7 @@ function getCategoryCommands(categories, selectedNumber) {
 //========================================================================================================================
 // MENU (full list)
 keith({
-  pattern: "menu",
+  pattern: "menu2",
   category: "general",
   description: "Show all commands grouped by category"
 }, async (from, client, conText) => {
@@ -76,7 +76,7 @@ keith({
 //========================================================================================================================
 // MENU2 (interactive)
 keith({
-  pattern: "menu2",
+  pattern: "menu",
   category: "general",
   description: "Interactive category-based menu"
 }, async (from, client, conText) => {
