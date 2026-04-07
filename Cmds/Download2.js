@@ -2,6 +2,103 @@ const axios = require('axios');
 const { keith } = require('../commandHandler');
 //========================================================================================================================
 
+keith({
+  pattern: "xxx",
+  aliases: ["xnxxvideo", "xnxx"],
+  category: "18+",
+  description: "Download video from nxx.com (High Quality)"
+},
+async (from, client, conText) => {
+  const { q, mek, reply, api } = conText;
+
+  if (!q) {
+    return reply("❌ Provide a video URL or search term.\n\nExample: .nxxvideo https://www.xnxx.com/video-xxx\n.nxxvideo babe");
+  }
+
+  try {
+    let videoUrl, videoTitle, videoThumbnail, duration, videoInfo;
+
+    // Check if input is URL or search term
+    if (q.startsWith("http")) {
+      // Direct URL
+      const apiUrl = `${api}/download/xnxx?url=${encodeURIComponent(q)}`;
+      const response = await axios.get(apiUrl);
+      
+      const result = response.data?.result;
+      if (!result || !result.files) {
+        return reply("❌ Failed to get video data.");
+      }
+      
+      // Use HIGH quality video
+      videoUrl = result.files.high;
+      videoTitle = result.title;
+      videoThumbnail = result.image;
+      duration = result.duration;
+      videoInfo = result.info;
+    } else {
+      // Search term - get first result
+      const searchUrl = `${api}/search/xnxx?q=${encodeURIComponent(q)}`;
+      const searchRes = await axios.get(searchUrl);
+      
+      const firstResult = searchRes.data?.result?.[0];
+      if (!firstResult) {
+        return reply("❌ No videos found for your search.");
+      }
+      
+      // Get download URL for first result
+      const downloadApi = `${api}/download/xnxx?url=${encodeURIComponent(firstResult.link)}`;
+      const downloadRes = await axios.get(downloadApi);
+      
+      const result = downloadRes.data?.result;
+      if (!result || !result.files) {
+        return reply("❌ Failed to get video data.");
+      }
+      
+      // Use HIGH quality video
+      videoUrl = result.files.high;
+      videoTitle = result.title;
+      videoThumbnail = result.image;
+      duration = result.duration;
+      videoInfo = result.info;
+    }
+
+    if (!videoUrl) {
+      return reply("❌ Failed to get video download link.");
+    }
+
+    // Convert duration from seconds to readable format
+    const durationMin = Math.floor(duration / 60);
+    const durationSec = duration % 60;
+    const durationReadable = `${durationMin}:${durationSec.toString().padStart(2, '0')}`;
+
+    // Context info for external ad reply
+    const contextInfo = {
+      externalAdReply: {
+        title: videoTitle || "NXX Video",
+        body: `Duration: ${durationReadable} | ${videoInfo || "HD Quality"}`,
+        mediaType: 1,
+        sourceUrl: videoUrl,
+        thumbnailUrl: videoThumbnail,
+        renderLargerThumbnail: false
+      }
+    };
+
+    // Send video directly from URL
+    await client.sendMessage(from, {
+      video: { url: videoUrl },
+      mimetype: "video/mp4",
+      fileName: `${videoTitle || "nxx_video"}.mp4`,
+      contextInfo
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("NXX video error:", error);
+    reply("❌ Failed to process video request.");
+  }
+});
+
+
+//========================================================================================================================
 
 keith({
   pattern: "xvideo",
