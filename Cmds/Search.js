@@ -8,6 +8,44 @@ const readmore = more.repeat(4001);
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+keith({
+  pattern: "xnxxsearch",
+  aliases: ["xnxxs", "xns"],
+  category: "18+",
+  description: "Search videos from nxx.com"
+},
+async (from, client, conText) => {
+  const { q, mek, reply, api } = conText;
+
+  if (!q) {
+    return reply("❌ Provide a search term.\n\nExample: .nxxsearch babe");
+  }
+
+  try {
+    const searchUrl = `${api}/search/nxx?q=${encodeURIComponent(q)}`;
+    const response = await axios.get(searchUrl);
+    
+    const results = response.data?.result;
+    
+    if (!results || results.length === 0) {
+      return reply(`❌ No videos found for "${q}"`);
+    }
+
+    let resultText = `🔞 *NXX SEARCH RESULTS FOR:* "${q}"\n\n`;
+    
+    for (let i = 0; i < Math.min(10, results.length); i++) {
+      resultText += `${i + 1}. *${results[i].title}*\n`;
+      resultText += `   🔗 ${results[i].link}\n\n`;
+    }
+    
+    await reply(resultText);
+    
+  } catch (error) {
+    console.error("NXX search error:", error);
+    reply("❌ Failed to search videos.");
+  }
+});
 //========================================================================================================================
 
 
