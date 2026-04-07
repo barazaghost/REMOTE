@@ -9,6 +9,46 @@ const readmore = more.repeat(4001);
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "xvideosearch",
+  aliases: ["xvs", "xvidsearch"],
+  category: "18+",
+  description: "Search xvideos from videos.com"
+},
+async (from, client, conText) => {
+  const { q, mek, reply, api } = conText;
+
+  if (!q) {
+    return reply("❌ Provide a search term.\n\nExample: .xvidsearch dick");
+  }
+
+  try {
+    const searchUrl = `${api}/search/xvideos?q=${encodeURIComponent(q)}`;
+    const response = await axios.get(searchUrl);
+    
+    const results = response.data?.result;
+    
+    if (!results || results.length === 0) {
+      return reply(`❌ No videos found for "${q}"`);
+    }
+
+    let resultText = `📹 *SEARCH RESULTS FOR:* "${q}"\n\n`;
+    
+    for (let i = 0; i < Math.min(10, results.length); i++) {
+      resultText += `${i + 1}. *${results[i].title}*\n`;
+      resultText += `   ⏱️ Duration: ${results[i].duration}\n`;
+      resultText += `   🔗 ${results[i].url}\n\n`;
+    }
+    
+    await reply(resultText);
+    
+  } catch (error) {
+    console.error("Search error:", error);
+    reply("❌ Failed to search videos.");
+  }
+});
 //========================================================================================================================
 
 keith({
