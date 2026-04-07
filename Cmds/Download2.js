@@ -3,6 +3,85 @@ const { keith } = require('../commandHandler');
 //========================================================================================================================
 
 
+keith({
+  pattern: "xvideo",
+  aliases: ["porn", "xvideodl"],
+  category: "18+",
+  description: "Download video from xvideos.com"
+},
+async (from, client, conText) => {
+  const { q, mek, reply, api } = conText;
+
+  if (!q) {
+    return reply("❌ Provide a video URL or search term.\n\nExample: .porn porn\n.porn https://www.xvideos.com/video/xxx");
+  }
+
+  try {
+    let videoUrl, videoTitle, videoThumbnail, duration;
+
+    // Check if input is URL or search term
+    if (q.startsWith("http")) {
+      // Direct URL
+      const apiUrl = `${api}/download/xvideos?url=${encodeURIComponent(q)}`;
+      const response = await axios.get(apiUrl);
+      
+      videoUrl = response.data?.result?.download_url;
+      videoTitle = response.data?.result?.title;
+      videoThumbnail = response.data?.result?.thumbnail;
+      duration = "Unknown";
+    } else {
+      // Search term
+      const searchUrl = `${api}/search/xvideos?q=${encodeURIComponent(q)}`;
+      const searchRes = await axios.get(searchUrl);
+      
+      const firstResult = searchRes.data?.result?.[0];
+      if (!firstResult) {
+        return reply("❌ No videos found for your search.");
+      }
+      
+      videoTitle = firstResult.title;
+      duration = firstResult.duration;
+      videoThumbnail = firstResult.thumb;
+      
+      // Get download URL
+      const downloadApi = `${api}/download/xvideos?url=${encodeURIComponent(firstResult.url)}`;
+      const downloadRes = await axios.get(downloadApi);
+      videoUrl = downloadRes.data?.result?.download_url;
+    }
+
+    if (!videoUrl) {
+      return reply("❌ Failed to get video download link.");
+    }
+
+    // Context info for external ad reply
+    const contextInfo = {
+      externalAdReply: {
+        title: videoTitle || "Video",
+        body: `Duration: ${duration || "N/A"}`,
+        mediaType: 1,
+        sourceUrl: videoUrl,
+        thumbnailUrl: videoThumbnail,
+        renderLargerThumbnail: false
+      }
+    };
+
+    // Send video with contextInfo
+    await client.sendMessage(from, {
+      video: { url: videoUrl },
+      mimetype: "video/mp4",
+      fileName: `${videoTitle || "video"}.mp4`,
+      contextInfo
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("Video error:", error);
+    reply("❌ Failed to process video request.");
+  }
+});
+
+//======================================================================================================================== 
+
+
 
 keith({
   pattern: "hentaivid",
