@@ -23,7 +23,7 @@ async (from, client, conText) => {
   }
 
   try {
-    const searchUrl = `${api}/search/nxx?q=${encodeURIComponent(q)}`;
+    const searchUrl = `${api}/search/xnxx?q=${encodeURIComponent(q)}`;
     const response = await axios.get(searchUrl);
     
     const results = response.data?.result;
