@@ -126,7 +126,7 @@ keith({
           mentionedJid: mentionedJids
         },
       },
-      { quoted: mek },
+    //  { quoted: mek },
     );
   } catch (error) {
     console.error("Hidetag error:", error);
