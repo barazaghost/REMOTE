@@ -1,7 +1,12 @@
 const { keith } = require('../commandHandler');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const axios = require('axios');
+//const { keith } = require('../commandHandler');
+//const fs = require('fs');
+//const { exec } = require('child_process');
+//const { execFile } = require('child_process');
+const path = require('path');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -9,6 +14,85 @@ const axios = require('axios');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+async function toPtt(buffer) {
+  const tempDir = path.join(__dirname, 'temp');
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+  const timestamp = Date.now();
+  const inputPath = path.join(tempDir, `ptt_in_${timestamp}.tmp`);
+  const outputPath = path.join(tempDir, `ptt_out_${timestamp}.ogg`);
+
+  fs.writeFileSync(inputPath, buffer);
+
+  const cleanup = () => {
+    try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath); } catch {}
+    try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch {}
+  };
+
+  return new Promise((resolve, reject) => {
+    execFile('ffmpeg', [
+      '-y', '-i', inputPath,
+      '-c:a', 'libopus',
+      '-b:a', '64k',
+      '-ar', '48000',
+      '-ac', '1',
+      '-f', 'ogg',
+      outputPath
+    ], { timeout: 120000 }, (err) => {
+      if (err) {
+        cleanup();
+        return reject(err);
+      }
+      try {
+        const out = fs.readFileSync(outputPath);
+        cleanup();
+        resolve(out);
+      } catch (e) { cleanup(); reject(e); }
+    });
+  });
+}
+
+keith({
+    pattern: "toptt",
+    aliases: ['tovoice', 'tovn', 'tovoicenote'],
+    category: "Converter",
+    description: "Convert audio to WhatsApp voice note"
+  },
+  async (from, client, conText) => {
+    const { mek, reply, botPic, quoted, quotedMsg } = conText;
+
+    if (!quotedMsg) {
+      return reply("Please reply to an audio message");
+    }
+
+    const quotedAudio = quoted?.audioMessage || quoted?.message?.audioMessage;
+    
+    if (!quotedAudio) {
+      return reply("The quoted message doesn't contain any audio");
+    }
+
+    let tempFilePath;
+    try {
+      tempFilePath = await client.downloadAndSaveMediaMessage(quotedAudio, 'temp_media');
+      const buffer = await fs.promises.readFile(tempFilePath);
+      const convertedBuffer = await toPtt(buffer);
+      
+      await client.sendMessage(from, {
+        audio: convertedBuffer,
+        mimetype: "audio/ogg; codecs=opus",
+        ptt: true
+      });
+      
+    } catch (e) {
+      console.error("Error in toptt command:", e);
+      await reply("Failed to convert to voice note");
+    } finally {
+      if (tempFilePath) await fs.promises.unlink(tempFilePath).catch(console.error);
+    }
+  }
+);
 //========================================================================================================================
 
 keith({
