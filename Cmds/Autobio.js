@@ -87,6 +87,20 @@ async function uploadToUguu(filePath) {
     throw new Error("Uguu upload failed or malformed response");
   }
 }
+
+
+async function uploadToImgBB(filePath) {
+  const buffer = await fs.readFile(filePath);
+  const form = new FormData();
+  form.append('image', buffer.toString('base64'));
+  
+  const { data } = await axios.post('https://api.imgbb.com/1/upload?key=8b468bac6311f8b2fd23d20e90186ac8', form, {
+    headers: form.getHeaders()
+  });
+
+  return data.data.url;
+}
+
 // ==================== uguu Command ====================
 keith({
   pattern: "uguu",
@@ -125,9 +139,47 @@ keith({
     }
   }
 });
-// ==================== Catbox Command ====================
+
+// ==================== imgbb Command ====================
 keith({
   pattern: "url",
+  aliases: ["upload", "urlconvert"],
+  description: "Convert quoted media to Catbox URL",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image.");
+
+  const type = getMediaType(quotedMsg);
+  if (type === "unknown") return reply("❌ Unsupported media type.");
+
+  const mediaNode =
+    quoted?.imageMessage ||
+    quoted?.videoMessage ||
+    quoted?.audioMessage ||
+    quoted?.stickerMessage;
+
+  if (!mediaNode) return reply("❌ Could not extract media content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type);
+    const link = await uploadToImgBB(filePath);
+    await client.sendMessage(from, { text: link }, { quoted: mek });
+  } catch (err) {
+    console.error("Catbox upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
+// ==================== Catbox Command ====================
+keith({
+  pattern: "catbox",
   aliases: ["upload", "urlconvert"],
   description: "Convert quoted media to Catbox URL",
   category: "Uploader",
