@@ -293,7 +293,7 @@ async (from, client, conText) => {
   const { reply } = conText;
 
   try {
-    const url = "https://raw.githubusercontent.com/Keithkeizzah/INFO/refs/heads/main/langcode.json";
+    const url = "https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/langcode.json";
     const { data } = await axios.get(url, { timeout: 100000 });
 
     const langs = Array.isArray(data?.languages) ? data.languages : [];
