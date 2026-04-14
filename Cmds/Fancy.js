@@ -281,49 +281,6 @@ async (from, client, conText) => {
     
 //========================================================================================================================
 
-
-keith({
-  pattern: "tts",
-  aliases: ["say"],
-  category: "tools",
-  description: "Convert text or quoted message to PTT audio"
-},
-async (from, client, conText) => {
-  const { q, mek, quotedMsg, reply, api } = conText;
-
-  let text;
-  if (q) {
-    text = q;
-  } else if (quotedMsg) {
-  
-    text = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text;
-    if (!text) {
-      return reply("❌ Could not extract quoted text.");
-    }
-  } else {
-    return reply("📌 Reply to a message with text or provide text directly.");
-  }
-
-  try {
-    const apiUrl = `${api}/ai/text2speech?q=${encodeURIComponent(text)}`;
-    const { data } = await axios.get(apiUrl, { timeout: 60000 });
-    const result = data?.result;
-
-    if (!result || result.Error !== 0 || !result.URL) {
-      return reply("❌ Failed to generate speech.");
-    }
-
-    await client.sendMessage(from, {
-      audio: { url: result.URL },
-      mimetype: "audio/mpeg",
-      ptt: false
-    }, { quoted: mek });
-
-  } catch (error) {
-    console.error("TTS error:", error);
-    reply("⚠️ An error occurred while generating speech.");
-  }
-});
 //========================================================================================================================
 //
 keith({
