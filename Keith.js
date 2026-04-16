@@ -179,54 +179,75 @@ const plugins = commands.filter(cmd => !cmd.dontAddCommandList).length;
 
 //=======================================================================================================================
 
+//========================================================================================================================
 const scheduleMessage = () => {
-    // Fetch text from URL and send every Thursday
+    // Fetch text from URL
     async function sendScheduledMessage() {
         try {
-            // Fetch text from URL
             const response = await axios.get('https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/Text.txt');
             const messageText = response.data;
             
-            // Send to bot's own account
             await client.sendMessage(client.user.id, {
                 text: messageText
             });
-            console.log(`✅ Scheduled message sent on Thursday at ${new Date().toLocaleString()}`);
+            console.log(`✅ Message sent at ${new Date().toLocaleString()}`);
         } catch (error) {
-            console.error('❌ Failed to send scheduled message:', error);
+            console.error('❌ Failed to send message:', error);
         }
     }
     
-    // Calculate when next Thursday is
-    function getNextThursday() {
+    // Get next Thursday or Sunday
+    function getNextDay(targetDay) {
         const now = new Date();
-        const dayOfWeek = now.getDay(); // 0 = Sunday, 4 = Thursday
-        const daysUntilThursday = (4 - dayOfWeek + 7) % 7;
+        const currentDay = now.getDay(); // 0 Sunday, 4 Thursday
+        let daysUntilTarget = targetDay - currentDay;
         
-        const nextThursday = new Date(now);
-        nextThursday.setDate(now.getDate() + daysUntilThursday);
-        nextThursday.setHours(12, 0, 0, 0); // Send at 12:00 PM
+        if (daysUntilTarget <= 0) {
+            daysUntilTarget += 7;
+        }
         
-        return nextThursday;
+        const targetDate = new Date(now);
+        targetDate.setDate(now.getDate() + daysUntilTarget);
+        // Format with +03:00 timezone
+        targetDate.setHours(12, 0, 0, 0);
+        
+        return targetDate;
     }
     
-    // Schedule for every Thursday
+    // Schedule next message
     function scheduleNext() {
-        const nextThursday = getNextThursday();
-        const delay = nextThursday.getTime() - Date.now();
+        const now = new Date();
+        const currentDay = now.getDay();
+        const currentHour = now.getHours();
+        
+        let nextDate;
+        
+        // If today is Thursday (4) or Sunday (0) and before 12 PM, send today
+        if ((currentDay === 4 || currentDay === 0) && currentHour < 12) {
+            nextDate = new Date(now);
+            nextDate.setHours(12, 0, 0, 0);
+        } 
+        // Otherwise get next Thursday or Sunday (whichever comes first)
+        else {
+            const nextThursday = getNextDay(4);
+            const nextSunday = getNextDay(0);
+            nextDate = nextThursday < nextSunday ? nextThursday : nextSunday;
+        }
+        
+        const delay = nextDate.getTime() - now.getTime();
         
         setTimeout(async () => {
             await sendScheduledMessage();
-            scheduleNext(); // Schedule the next Thursday after sending
+            scheduleNext(); // Schedule next after sending
         }, delay);
         
-        console.log(`⏰ Next message scheduled for: ${nextThursday.toLocaleString()}`);
+        console.log(`⏰ Next message scheduled for: ${nextDate.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' })}`);
     }
     
     // Start scheduling
     scheduleNext();
 };
-//========================================================================================================================
+
 //========================================================================================================================
 // Simple Bot Expiration Date with Time Support
 //========================================================================================================================
