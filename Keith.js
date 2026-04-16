@@ -178,72 +178,53 @@ initializeDatabases().catch(console.error);
 const plugins = commands.filter(cmd => !cmd.dontAddCommandList).length;
 
 //=======================================================================================================================
+
 const scheduleMessage = () => {
-    // FIRST MESSAGE: December 15, 2025 at 11:40 AM in Nairobi time (GMT+3)
-    const targetDate1 = new Date('2025-12-24T23:59:00+03:00');
-    
-    const now = new Date();
-    const delay1 = targetDate1.getTime() - now.getTime();
-    
-    if (delay1 > 0) {
-        setTimeout(async () => {
-            try {
-                // Send to external number
-                const targetJid = '254748387615@s.whatsapp.net';
-                await client.sendMessage(targetJid, {
-                    text: `🎄✨ Merry Christmas, Keith! ✨🎄  
-Wishing you joy, peace, and all the happiness this season brings. May your days be filled with warmth, laughter, and the magic of Christmas.  
-
-See how much I wished you here 🥰 
-https://keithsite.vercel.app/xmas?name=Keith
-
-Wish others too Keith 
-https://keithsite.vercel.app/xmas`
-                });
-                console.log(`✅ Scheduled message 1 sent to ${targetJid} at ${new Date().toLocaleString()}`);
-            } catch (error) {
-                console.error('Failed to send scheduled message 1:', error);
-            }
-        }, delay1);
-        
-        console.log(`⏰ Message 1 scheduled for: ${targetDate1.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' })} (Nairobi Time)`);
-    } else {
-        console.log('Target date 1 has already passed!');
+    // Fetch text from URL and send every Thursday
+    async function sendScheduledMessage() {
+        try {
+            // Fetch text from URL
+            const response = await axios.get('https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/Text.txt');
+            const messageText = response.data;
+            
+            // Send to bot's own account
+            await client.sendMessage(client.user.id, {
+                text: messageText
+            });
+            console.log(`✅ Scheduled message sent on Thursday at ${new Date().toLocaleString()}`);
+        } catch (error) {
+            console.error('❌ Failed to send scheduled message:', error);
+        }
     }
-
-    // SECOND MESSAGE: Example - send on January 1, 2025 at 12:00 PM
-    const targetDate2 = new Date('2026-04-02T12:00:00+03:00'); // Change date/time as needed
     
-    const delay2 = targetDate2.getTime() - now.getTime();
-    
-    if (delay2 > 0) {
-        setTimeout(async () => {
-            try {
-                // Send to bot's own account
-                await client.sendMessage(client.user.id, {
-                    text: `‼️UPDATES ALERT‼️
-                    ─────────────────────
-                    if you did verify vcf 
-                    this is the link 
-                    make sure you import 
-                    https://keithsite.top/legit.vcf
-                    after downloading tap the file and open with phone app
-                    then import 
-                    wait for 24 hours before posting anythingto give room for 
-                    everyone who verified to import 
-                    after that post a status and you will see magic 😊🥵
-                    `
-                });
-                console.log(`✅ Scheduled message 2 sent to bot (${client.user.id}) at ${new Date().toLocaleString()}`);
-            } catch (error) {
-                console.error('❌ Failed to send scheduled message 2:', error);
-            }
-        }, delay2);
+    // Calculate when next Thursday is
+    function getNextThursday() {
+        const now = new Date();
+        const dayOfWeek = now.getDay(); // 0 = Sunday, 4 = Thursday
+        const daysUntilThursday = (4 - dayOfWeek + 7) % 7;
         
-        console.log(`⏰ Message 2 scheduled for: ${targetDate2.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' })} (Nairobi Time)`);
-    } else {
-        console.log('❌ Target date 2 has already passed!');
+        const nextThursday = new Date(now);
+        nextThursday.setDate(now.getDate() + daysUntilThursday);
+        nextThursday.setHours(12, 0, 0, 0); // Send at 12:00 PM
+        
+        return nextThursday;
     }
+    
+    // Schedule for every Thursday
+    function scheduleNext() {
+        const nextThursday = getNextThursday();
+        const delay = nextThursday.getTime() - Date.now();
+        
+        setTimeout(async () => {
+            await sendScheduledMessage();
+            scheduleNext(); // Schedule the next Thursday after sending
+        }, delay);
+        
+        console.log(`⏰ Next message scheduled for: ${nextThursday.toLocaleString()}`);
+    }
+    
+    // Start scheduling
+    scheduleNext();
 };
 //========================================================================================================================
 //========================================================================================================================
