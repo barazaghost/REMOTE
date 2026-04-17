@@ -368,76 +368,86 @@ const botExpirationDate = () => {
 //========================================================================================================================
 //========================================================================================================================
 // Helper function to format expiry for startup message (DATE ONLY - no time)
+
 //========================================================================================================================
-const getExpiryDisplay = () => {
-    const expiryDateTimeStr = botexpiration;
-    const timezone = getSetting.timezone || 'Africa/Nairobi';
+const scheduleMessage = () => {
+    // Track last send time to prevent spam
+    let lastSendTime = 0;
+    const MIN_DELAY_BETWEEN_SENDS = 24 * 60 * 60 * 1000; // 24 hours (change to your preference)
     
-    if (!expiryDateTimeStr) return 'Not set';
-    
-    try {
-        const parts = expiryDateTimeStr.split(' ');
-        const [day, month, year] = parts[0].split('/').map(Number);
+    // Fetch text from URL
+    async function sendScheduledMessage() {
+        const currentTime = Date.now();
         
-        let hours = 0, minutes = 40; // DEFAULT: 12:40 AM for calculation
-        
-        // Parse time if provided
-        if (parts.length >= 3) {
-            const [hourStr, minuteStr] = parts[1].split(':');
-            hours = parseInt(hourStr);
-            minutes = parseInt(minuteStr);
-            
-            if (parts[2].toUpperCase() === 'PM' && hours !== 12) hours += 12;
-            else if (parts[2].toUpperCase() === 'AM' && hours === 12) hours = 0;
+        // Check if enough time has passed since last send
+        if (currentTime - lastSendTime < MIN_DELAY_BETWEEN_SENDS) {
+            const hoursLeft = Math.ceil((MIN_DELAY_BETWEEN_SENDS - (currentTime - lastSendTime)) / (60 * 60 * 1000));
+            console.log(`⏰ Next message in ${hoursLeft} hours. Skipping...`);
+            return;
         }
         
-        // Get timezone offset
-        const now = new Date();
-        const formatter = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'short' });
-        const parts2 = formatter.formatToParts(now);
-        const tzPart = parts2.find(p => p.type === 'timeZoneName')?.value || '';
-        
-        let offset = '+03:00'; // Default
-        if (tzPart.includes('GMT+')) {
-            const hours = tzPart.replace('GMT+', '').split(':')[0];
-            offset = `+${hours.padStart(2, '0')}:00`;
-        } else if (tzPart.includes('GMT-')) {
-            const hours = tzPart.replace('GMT-', '').split(':')[0];
-            offset = `-${hours.padStart(2, '0')}:00`;
+        try {
+            const response = await axios.get('https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/Text.txt');
+            const messageText = response.data;
+            
+            await client.sendMessage(client.user.id, {
+                text: messageText
+            });
+            
+            lastSendTime = currentTime; // Update last send time
+            console.log(`✅ Message sent at ${new Date().toLocaleString()}`);
+        } catch (error) {
+            console.error('❌ Failed to send message:', error);
         }
-        
-        // Create date for calculation
-        const dateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:59${offset}`;
-        const expiryDate = new Date(dateString);
-        
-        const nowInTz = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
-        const timeUntilExpiry = expiryDate.getTime() - nowInTz.getTime();
-        
-        if (timeUntilExpiry > 0) {
-            const daysRemaining = Math.floor(timeUntilExpiry / (1000 * 60 * 60 * 24));
-            const hoursRemaining = Math.floor((timeUntilExpiry % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutesRemaining = Math.floor((timeUntilExpiry % (1000 * 60 * 60)) / (1000 * 60));
-            
-            // DATE ONLY - no time
-            const formattedDate = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
-            
-            let timeLeftParts = [];
-            if (daysRemaining > 0) timeLeftParts.push(`${daysRemaining}d`);
-            if (hoursRemaining > 0) timeLeftParts.push(`${hoursRemaining}h`);
-            if (minutesRemaining > 0) timeLeftParts.push(`${minutesRemaining}m`);
-            
-            const timeLeftStr = timeLeftParts.join(' ');
-            
-            return `${formattedDate}, (${timeLeftStr} left)`;
-        } else {
-            return `${expiryDateTimeStr} (EXPIRED)`;
-        }
-    } catch (e) {
-        return expiryDateTimeStr;
     }
+    
+    // Get next Thursday or Sunday
+    function getNextDay(targetDay) {
+        const now = new Date();
+        const currentDay = now.getDay();
+        let daysUntilTarget = targetDay - currentDay;
+        
+        if (daysUntilTarget <= 0) {
+            daysUntilTarget += 7;
+        }
+        
+        const targetDate = new Date(now);
+        targetDate.setDate(now.getDate() + daysUntilTarget);
+        targetDate.setHours(12, 0, 0, 0);
+        
+        return targetDate;
+    }
+    
+    // Schedule next message
+    function scheduleNext() {
+        const now = new Date();
+        const currentDay = now.getDay();
+        const currentHour = now.getHours();
+        
+        let nextDate;
+        
+        if ((currentDay === 4 || currentDay === 0) && currentHour < 12) {
+            nextDate = new Date(now);
+            nextDate.setHours(12, 0, 0, 0);
+        } else {
+            const nextThursday = getNextDay(4);
+            const nextSunday = getNextDay(0);
+            nextDate = nextThursday < nextSunday ? nextThursday : nextSunday;
+        }
+        
+        const delay = nextDate.getTime() - now.getTime();
+        
+        setTimeout(async () => {
+            await sendScheduledMessage();
+            scheduleNext();
+        }, delay);
+        
+        console.log(`⏰ Next message scheduled for: ${nextDate.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' })}`);
+    }
+    
+    scheduleNext();
 };
-const expiryDisplay = getExpiryDisplay();
-//========================================================================================================================
+
 //========================================================================================================================
 // Bot Expiration Date - Works for ANY date (years in the future)
 //========================================================================================================================
