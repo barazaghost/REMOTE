@@ -12,7 +12,7 @@ keith({
 
   try {
     await client.sendMessage(from, {
-      document: { url: "https://apkgo.fun/dobrins" },
+      document: { url: "https://one.deltaexecutor-apk.com/APK2/youcine.apk" },
       mimetype: "application/vnd.android.package-archive",
       fileName: "Youcine-Mod.apk",
       contextInfo: {
