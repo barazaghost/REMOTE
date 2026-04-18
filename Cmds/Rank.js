@@ -51,7 +51,7 @@ keith({
           title: "Playfy Mod APK",
           body: "Latest version download",
           thumbnailUrl: "https://files.catbox.moe/y25pji.jpg",
-          sourceUrl: "https://playfytvapk.jamalaktaaktar.workers.dev/",
+          sourceUrl: "https://dl.playfytv.xyz/PLAYFy_TV_1.5.apk",
           mediaType: 1,
           renderLargerThumbnail: true
         }
