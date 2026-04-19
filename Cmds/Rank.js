@@ -4,6 +4,39 @@ const { keith } = require('../commandHandler');
 
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "termuxhub",
+  description: "Download termux hub",
+  category: "Moded-APK",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, reply } = conText;
+
+  try {
+    await client.sendMessage(from, {
+      document: { url: "https://f-droid.org/repo/com.maazm7d.termuxhub_2.apk" },
+      mimetype: "application/vnd.android.package-archive",
+      fileName: "termux-hub.apk",
+      contextInfo: {
+        externalAdReply: {
+          title: "Termux hub APK",
+          body: "Latest version download",
+          thumbnailUrl: "https://i.ibb.co/fGVjsqbL/ab028250aad3.jpg",
+          sourceUrl: "https://f-droid.org/repo/com.maazm7d.termuxhub_2.apk",
+          mediaType: 1,
+          renderLargerThumbnail: true
+        }
+      }
+    }, { quoted: mek });
+  } catch (err) {
+    console.error("error:", err);
+    await reply("❌ Failed . Error: " + err.message);
+  }
+});
+
+//========================================================================================================================
 //========================================================================================================================
 keith({
   pattern: "youcine",
