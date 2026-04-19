@@ -96,8 +96,45 @@ keith({
 //========================================================================================================================
 
 
-
 keith({
+  pattern: "tts",
+  aliases: ["say"],
+  category: "tools",
+  description: "Convert text or quoted message to PTT audio"
+},
+async (from, client, conText) => {
+  const { q, mek, quotedMsg, reply } = conText;
+
+  let text;
+  if (q) {
+    text = q;
+  } else if (quotedMsg) {
+    text = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text;
+    if (!text) {
+      return reply("❌ Could not extract quoted text.");
+    }
+  } else {
+    return reply("📌 Reply to a message with text or provide text directly.");
+  }
+
+  try {
+    // Using Google Translate TTS API (default language Indonesian 'id')
+    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=id&client=tw-ob`;
+    
+    await client.sendMessage(from, {
+      audio: { url: ttsUrl },
+      mimetype: "audio/mpeg",
+      ptt: false
+    });
+
+  } catch (error) {
+    console.error("TTS error:", error);
+    reply("⚠️ An error occurred while generating speech.");
+  }
+});
+
+
+/*keith({
   pattern: "tts",
   aliases: ["say"],
   category: "tools",
@@ -133,7 +170,7 @@ async (from, client, conText) => {
     console.error("TTS error:", error);
     reply("⚠️ An error occurred while generating speech.");
   }
-});
+});*/
 
 //========================================================================================================================
 
