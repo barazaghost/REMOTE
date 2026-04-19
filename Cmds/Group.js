@@ -16,6 +16,115 @@ const fs = require('fs');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+keith({
+  pattern: "togroupstatus2",
+  aliases: ["gs2", "groupstatus2"],
+  category: "group",
+  description: "Send quoted text or media to any group status by JID",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, quoted, quotedMsg, mek, reply, isSuperUser } = conText;
+
+  // ✅ Superuser check from context
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  // Parse arguments from q (the text input)
+  const args = q ? q.trim().split(/\s+/) : [];
+  let targetGroupJid = args[0];
+  let contentText = args.slice(1).join(' ');
+
+  // If no group JID provided and we're in a group, use current group
+  if (!targetGroupJid && from.endsWith('@g.us')) {
+    targetGroupJid = from;
+    contentText = q; // Use full q as content when no JID specified
+  }
+  
+  // Check if first argument looks like a group JID
+  if (targetGroupJid && targetGroupJid.endsWith('@g.us')) {
+    // JID was provided, contentText is already set correctly
+    if (!contentText && !quotedMsg) {
+      return reply(
+        "📌 Usage:\n" +
+        "• .togroupstatus2 <groupJID> <text>\n" +
+        "• Reply to an image/video with .togroupstatus2 <groupJID> <caption>\n" +
+        "• Or just .togroupstatus2 <groupJID> to forward quoted media without caption"
+      );
+    }
+  } else {
+    // No valid JID found, treat entire q as content
+    targetGroupJid = null;
+    contentText = q;
+    
+    if (!contentText && !quotedMsg) {
+      return reply(
+        "❌ Please provide a valid group JID or use this command in a group!\n\n" +
+        "📌 Usage:\n" +
+        "• .togroupstatus2 120363425281814502@g.us <text>\n" +
+        "• Reply to media with .togroupstatus2 120363425281814502@g.us <caption>\n" +
+        "• Or use in target group without JID"
+      );
+    }
+    
+    // If no JID and not in a group, error
+    if (!from.endsWith('@g.us')) {
+      return reply("❌ Please provide a group JID or use this command inside a group!");
+    }
+    
+    targetGroupJid = from;
+  }
+
+  if (!targetGroupJid || !targetGroupJid.endsWith('@g.us')) {
+    return reply("❌ Invalid group JID! Must end with @g.us");
+  }
+
+  try {
+    let payload = { groupStatusMessage: {} };
+
+    if (quotedMsg) {
+      // Handle quoted media types
+      if (quoted?.imageMessage) {
+        const caption = contentText || quoted.imageMessage.caption || "";
+        const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
+        payload.groupStatusMessage.image = { url: filePath };
+        if (caption) payload.groupStatusMessage.caption = caption;
+      } else if (quoted?.videoMessage) {
+        const caption = contentText || quoted.videoMessage.caption || "";
+        const filePath = await client.downloadAndSaveMediaMessage(quoted.videoMessage);
+        payload.groupStatusMessage.video = { url: filePath };
+        if (caption) payload.groupStatusMessage.caption = caption;
+      } else if (quoted?.audioMessage) {
+        const filePath = await client.downloadAndSaveMediaMessage(quoted.audioMessage);
+        payload.groupStatusMessage.audio = { url: filePath };
+      } else if (quoted?.documentMessage) {
+        const filePath = await client.downloadAndSaveMediaMessage(quoted.documentMessage);
+        payload.groupStatusMessage.document = { url: filePath };
+      } else if (quoted?.stickerMessage) {
+        const filePath = await client.downloadAndSaveMediaMessage(quoted.stickerMessage);
+        payload.groupStatusMessage.sticker = { url: filePath };
+      } else if (quoted?.conversation || quoted?.extendedTextMessage?.text) {
+        payload.groupStatusMessage.text =
+          quoted.conversation || quoted.extendedTextMessage.text;
+      }
+
+      // If user supplied caption with quoted media
+      if (contentText && !payload.groupStatusMessage.caption) {
+        payload.groupStatusMessage.caption = contentText;
+      }
+    } else {
+      // Plain text status
+      if (!contentText) {
+        return reply("❌ Please provide text content or quote a message!");
+      }
+      payload.groupStatusMessage.text = contentText;
+    }
+
+    await client.sendMessage(targetGroupJid, payload, { quoted: mek });
+    await reply(`✅ Group status sent to: ${targetGroupJid}`);
+  } catch (err) {
+    console.error("togroupstatus2 error:", err);
+    await reply(`❌ Error sending group status: ${err.message}`);
+  }
+});
 //===========================================================================
 
 
