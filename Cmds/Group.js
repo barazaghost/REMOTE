@@ -738,6 +738,79 @@ async (from, client, conText) => {
 });
 //========================================================================================================================
 
+//const { keith } = require('../commandHandler');
+// From Group.js
+
+keith({
+  pattern: "demote",
+  aliases: ['removeadmin', 'd'],
+  category: "group",
+  description: "Demote an admin to regular member (reply or tag)"
+}, async (from, client, conText) => {
+  const { reply, sender, quotedUser, q, participants, superUser, isSuperAdmin, isAdmin, isSuperUser, isGroup, isBotAdmin, mek } = conText;
+  
+  if (!isSuperUser) {
+    return reply("❌ Owner Only Command!");
+  }
+
+  if (!isGroup) {
+    return reply("This command only works in groups!");
+  }
+
+  if (!isBotAdmin) {
+    return reply("This bot is not an admin");
+  }
+
+  let targetUser;
+
+  // Method 1: Check for quoted user
+  if (quotedUser) {
+    targetUser = quotedUser;
+  }
+  // Method 2: Check for tagged user in message text
+  else if (q && q.includes('@')) {
+    const mentionedJids = mek?.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+    
+    if (mentionedJids.length > 0) {
+      targetUser = mentionedJids[0];
+    } else {
+      return reply("Please reply to a user or tag someone to demote!");
+    }
+  }
+  else {
+    return reply("Please reply to a user or tag someone to demote!");
+  }
+
+  if (!targetUser || !targetUser.includes('@')) {
+    return reply("Invalid user ID");
+  }
+
+  // Check if user is an admin
+  const metadata = await client.groupMetadata(from);
+  const userInGroup = metadata.participants.find(p => p.id === targetUser);
+  
+  if (!userInGroup || (userInGroup.admin !== 'admin' && userInGroup.admin !== 'superadmin')) {
+    await client.sendMessage(from, {
+      text: `@${targetUser.split('@')[0]} is not an admin`,
+      mentions: [targetUser]
+    }, { quoted: mek });
+    return;
+  }
+
+  try {
+    await client.groupParticipantsUpdate(from, [targetUser], 'demote'); 
+    await client.sendMessage(from, {
+      text: `@${targetUser.split('@')[0]} is no longer an admin. 👎`,
+      mentions: [targetUser]
+    }, { quoted: mek });
+    
+  } catch (error) {
+    console.error("Demotion Error:", error);
+    await reply(`❌ Failed to demote: ${error.message}`);
+  }
+});
+
+//========================================================================================================================
 
 keith({
   pattern: "promote",
