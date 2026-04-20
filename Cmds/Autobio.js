@@ -22,10 +22,12 @@ async function saveMediaToTemp(client, quotedMedia, type) {
   return savedPath;
 }
 
+
 async function uploadToCatbox(filePath) {
   const buffer = await fs.readFile(filePath);
   const form = new FormData();
   form.append('reqtype', 'fileupload');
+  form.append('userhash', ''); 
   form.append('fileToUpload', buffer, {
     filename: path.basename(filePath),
     contentType: mime.lookup(path.extname(filePath)) || 'application/octet-stream'
@@ -37,9 +39,8 @@ async function uploadToCatbox(filePath) {
     maxBodyLength: Infinity
   });
 
-  return data.trim(); // Catbox returns the full valid URL
+  return data.trim(); 
 }
-
 async function uploadToLitterbox(filePath) {
   const buffer = await fs.readFile(filePath);
   const form = new FormData();
