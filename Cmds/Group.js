@@ -15,6 +15,68 @@ const fs = require('fs');
 //======================================================================================l==================================
 //========================================================================================================================
 //========================================================================================================================
+keith({
+  pattern: "rejectall",
+  aliases: ["declineall", "reject"],
+  category: "group",
+  description: "Reject all pending join requests"
+},
+async (from, client, conText) => {
+  const { reply, isGroup, isBotAdmin } = conText;
+
+  if (!isGroup) return reply("This command is meant for groups");
+  if (!isBotAdmin) return reply("I need admin privileges");
+
+  const responseList = await client.groupRequestParticipantsList(from);
+
+  if (!responseList.length) return reply("There are no pending join requests at this time.");
+
+  // Warn if too many requests
+  if (responseList.length > 100) {
+    //return reply(`⚠️ Too many requests (${responseList.length}). Please use /rejectall_batch to process in batches or run /rejectall again after some time.`);
+  }
+
+  if (responseList.length > 50) {
+   // await reply(`📊 Found ${responseList.length} requests. This will take approximately ${Math.ceil(responseList.length * 1.5 / 60)} minutes. I'll send progress updates...`);
+  }
+
+  let rejected = 0;
+  let failed = 0;
+  let rateLimitHit = false;
+
+  for (let i = 0; i < responseList.length; i++) {
+    const participant = responseList[i];
+    
+    try {
+      await client.groupRequestParticipantsUpdate(from, [participant.jid], "reject");
+      rejected++;
+      
+      // Progress update every 10 rejections
+      if (rejected % 10 === 0) {
+     //   await reply(`📈 Progress: ${rejected}/${responseList.length} completed`);
+      }
+      
+      // Dynamic delay - slower if rate limit was hit
+      const delayTime = rateLimitHit ? 3000 : 1500;
+      await new Promise(resolve => setTimeout(resolve, delayTime));
+      rateLimitHit = false; // Reset flag
+      
+    } catch (error) {
+      if (error.message?.includes("rate") || error.message?.includes("too many") || error.message?.includes("429")) {
+        rateLimitHit = true;
+     //   await reply("⚠️ Rate limit approaching. Slowing down...");
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Longer cooldown
+        i--; // Retry this participant
+      } else {
+        failed++;
+        console.error(`Failed to reject ${participant.jid}:`, error);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+
+ // reply(`✅ Complete! Rejected: ${rejected}\n❌ Failed: ${failed}`);
+});
 //========================================================================================================================
 keith({
   pattern: "togroupstatus2",
@@ -677,7 +739,7 @@ async (from, client, conText) => {
 //========================================================================================================================
 keith({
   pattern: "promote",
-  aliases: ['toadmin'],
+  aliases: ['toadmin', 'p'],
   category: "group",
   description: "Promote a user to admin (reply or tag)"
 }, async (from, client, conText) => {
@@ -1481,7 +1543,7 @@ async (from, client, conText) => {
     }
   }
 
-  reply(`✅ Complete! Approved: ${approved}\n❌ Failed: ${failed}`);
+ // reply(`✅ Complete! Approved: ${approved}\n❌ Failed: ${failed}`);
 });
 //========================================================================================================================
 
