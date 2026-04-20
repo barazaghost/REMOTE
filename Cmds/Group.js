@@ -737,6 +737,8 @@ async (from, client, conText) => {
   }
 });
 //========================================================================================================================
+
+
 keith({
   pattern: "promote",
   aliases: ['toadmin', 'p'],
@@ -753,75 +755,52 @@ keith({
     return reply("This command only works in groups!");
   }
 
-  
-
   if (!isBotAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, { 
-      text: `@${userNumber} This bot is not an admin`, 
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
+    return reply("This bot is not an admin");
   }
 
   let targetUser;
 
   // Method 1: Check for quoted user
   if (quotedUser) {
-    let result = quotedUser.startsWith('@') && quotedUser.includes('@lid')
-      ? quotedUser.replace('@', '') + '@lid'
-      : quotedUser;
-
-    targetUser = result.includes('@lid')
-      ? await client.getJidFromLid(result)
-      : result;
+    targetUser = quotedUser;
   }
   // Method 2: Check for tagged user in message text
   else if (q && q.includes('@')) {
-    // Extract mentioned user from the message
     const mentionedJids = mek?.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
     
     if (mentionedJids.length > 0) {
-      targetUser = mentionedJids[0]; // Use first mentioned user
+      targetUser = mentionedJids[0];
     } else {
       return reply("Please reply to a user or tag someone to promote!");
     }
   }
-  // Method 3: Check if q contains a phone number
-  else if (q) {
-    const phone = q.replace(/[^0-9]/g, '');
-    if (phone.length >= 10) {
-      targetUser = phone + '@s.whatsapp.net';
-    } else {
-      return reply("Please reply to a user, tag someone, or provide a phone number to promote!");
-    }
-  }
   else {
-    return reply("Please reply to a user, tag someone, or provide a phone number to promote!");
+    return reply("Please reply to a user or tag someone to promote!");
   }
 
-  if (!targetUser.includes('@')) {
+  if (!targetUser || !targetUser.includes('@')) {
     return reply("Invalid user ID");
   }
 
-  // Validate the user exists in group
+  // Check if already admin
   const metadata = await client.groupMetadata(from);
   const userInGroup = metadata.participants.find(p => p.id === targetUser);
   
-  if (!userInGroup) {
-    const userNumber = targetUser.split('@')[0];
-    return reply(`@${userNumber} is not in this group`, { mentions: [`${userNumber}@s.whatsapp.net`] });
-  }
-
-  // Check if already admin
-  if (userInGroup.admin === 'admin' || userInGroup.admin === 'superadmin') {
-    const userNumber = targetUser.split('@')[0];
-    return reply(`@${userNumber} is already an admin`, { mentions: [`${userNumber}@s.whatsapp.net`] });
+  if (userInGroup && (userInGroup.admin === 'admin' || userInGroup.admin === 'superadmin')) {
+    await client.sendMessage(from, {
+      text: `@${targetUser.split('@')[0]} is already an admin`,
+      mentions: [targetUser]
+    }, { quoted: mek });
+    return;
   }
 
   try {
     await client.groupParticipantsUpdate(from, [targetUser], 'promote'); 
-    const promotedUser = targetUser.split('@')[0];
-    await reply(`@${promotedUser} is now an admin. 👑`, { mentions: [`${promotedUser}@s.whatsapp.net`] }); 
+    await client.sendMessage(from, {
+      text: `@${targetUser.split('@')[0]} is now an admin. 👑`,
+      mentions: [targetUser]
+    }, { quoted: mek });
     
   } catch (error) {
     console.error("Promotion Error:", error);
@@ -915,95 +894,7 @@ async (from, client, conText) => {
 });
 //========================================================================================================================
 keith({
-  pattern: "demote",
-  aliases: ["removeadmin"],
-  category: "group",
-  description: "Demote a user from admin (reply or tag)"
-},
-async (from, client, conText) => {
-  const { reply, sender, quotedUser, q, participants, isSuperUser, isGroup, isAdmin, isBotAdmin, isSuperAdmin, mek } = conText;
 
-  if (!isSuperUser) return reply("❌ Owner Only Command!");
-  if (!isGroup) return reply("This command only works in groups!");
-
-  
-
-  if (!isBotAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} This bot is not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
-  }
-
-  let targetUser;
-
-  // Method 1: Check for quoted user
-  if (quotedUser) {
-    let result = quotedUser.startsWith('@') && quotedUser.includes('@lid')
-      ? quotedUser.replace('@', '') + '@lid'
-      : quotedUser;
-
-    targetUser = result.includes('@lid')
-      ? await client.getJidFromLid(result)
-      : result;
-  }
-  // Method 2: Check for tagged user in message text
-  else if (q && q.includes('@')) {
-    // Extract mentioned user from the message
-    const mentionedJids = mek?.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-    
-    if (mentionedJids.length > 0) {
-      targetUser = mentionedJids[0]; // Use first mentioned user
-    } else {
-      return reply("Please reply to a user or tag someone to demote!");
-    }
-  }
-  // Method 3: Check if q contains a phone number
-  else if (q) {
-    const phone = q.replace(/[^0-9]/g, '');
-    if (phone.length >= 10) {
-      targetUser = phone + '@s.whatsapp.net';
-    } else {
-      return reply("Please reply to a user, tag someone, or provide a phone number to demote!");
-    }
-  }
-  else {
-    return reply("Please reply to a user, tag someone, or provide a phone number to demote!");
-  }
-
-  if (!targetUser.includes('@')) {
-    return reply("Invalid user ID");
-  }
-
-  // Validate the user exists in group
-  const metadata = await client.groupMetadata(from);
-  const userInGroup = metadata.participants.find(p => p.id === targetUser);
-  
-  if (!userInGroup) {
-    const userNumber = targetUser.split('@')[0];
-    return reply(`@${userNumber} is not in this group`, { mentions: [`${userNumber}@s.whatsapp.net`] });
-  }
-
-  if (!userInGroup.admin) {
-    const userNumber = targetUser.split('@')[0];
-    return reply(`@${userNumber} is not an admin`, { mentions: [`${userNumber}@s.whatsapp.net`] });
-  }
-
-  if (targetUser.includes(isSuperAdmin)) {
-    const userNumber = targetUser.split('@')[0];
-    return reply(`@${userNumber} is a super admin and cannot be demoted`, { mentions: [`${userNumber}@s.whatsapp.net`] });
-  }
-
-  try {
-    await client.groupParticipantsUpdate(from, [targetUser], 'demote');
-    const demotedUser = targetUser.split('@')[0];
-    await reply(`@${demotedUser} has been demoted.`, { mentions: [`${demotedUser}@s.whatsapp.net`] });
-  } catch (error) {
-    console.error("Demotion Error:", error);
-    await reply(`❌ Failed to demote: ${error.message}`);
-  }
-});
 //========================================================================================================================
  
 
