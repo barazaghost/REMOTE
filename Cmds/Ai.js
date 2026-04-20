@@ -1185,7 +1185,7 @@ keith({
 //========================================================================================================================
 
 keith({
-  pattern: "vision2",
+  pattern: "vision",
   aliases: ["imgai", "analyze", "geminivision"],
   description: "Analyze quoted image using Gemini Vision AI",
   category: "Ai",
@@ -1207,7 +1207,7 @@ keith({
     filePath = await saveMediaToTemp(client, mediaNode, type);
     const imageUrl = await uploadToUguu(filePath);
 
-    const { data: result } = await axios.get(`${api}/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(q)}`);
+    const { data: result } = await axios.get(`${api}/ai/vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(q)}`);
     if (!result?.status || !result?.result) return reply("❌ No response from Vision AI");
 
     await client.sendMessage(from, { text: result.result }, { quoted: mek });
