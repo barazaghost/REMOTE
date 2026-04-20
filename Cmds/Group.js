@@ -419,29 +419,7 @@ async (from, client, conText) => {
 //========================================================================================================================
 
 
-keith({
-  pattern: "rejectall",
-  aliases: ["declineall", "reject"],
-  category: "group",
-  description: "Reject all pending join requests"
-},
-async (from, client, conText) => {
-  const { reply, isGroup, isAdmin, isBotAdmin } = conText;
 
-  if (!isGroup) return reply("This command is meant for groups");
-  // if (!isAdmin) return reply("You need admin privileges");
-  if (!isBotAdmin) return reply("I need admin privileges");
-
-  const responseList = await client.groupRequestParticipantsList(from);
-
-  if (!responseList.length) return reply("There are no pending join requests at this time.");
-
-  for (const participant of responseList) {
-    await client.groupRequestParticipantsUpdate(from, [participant.jid], "reject");
-  }
-
-  reply("❌ All pending participants have been rejected.");
-});
 //========================================================================================================================
 
 
@@ -1450,21 +1428,60 @@ keith({
   description: "Approve all pending join requests"
 },
 async (from, client, conText) => {
-  const { reply, isGroup, isAdmin, isBotAdmin } = conText;
+  const { reply, isGroup, isBotAdmin } = conText;
 
   if (!isGroup) return reply("This command is meant for groups");
-//  if (!isAdmin) return reply("You need admin privileges");
   if (!isBotAdmin) return reply("I need admin privileges");
 
   const responseList = await client.groupRequestParticipantsList(from);
 
   if (!responseList.length) return reply("There are no pending join requests at this time.");
 
-  for (const participant of responseList) {
-    await client.groupRequestParticipantsUpdate(from, [participant.jid], "approve");
+  // Warn if too many requests
+  if (responseList.length > 100) {
+   // return reply(`⚠️ Too many requests (${responseList.length}). Please use /approveall_batch to process in batches or run /approveall again after some time.`);
   }
 
-  reply("✅ All pending participants have been approved to join.");
+  if (responseList.length > 50) {
+   // await reply(`📊 Found ${responseList.length} requests. This will take approximately ${Math.ceil(responseList.length * 1.5 / 60)} minutes. I'll send progress updates...`);
+  }
+
+  let approved = 0;
+  let failed = 0;
+  let rateLimitHit = false;
+
+  for (let i = 0; i < responseList.length; i++) {
+    const participant = responseList[i];
+    
+    try {
+      await client.groupRequestParticipantsUpdate(from, [participant.jid], "approve");
+      approved++;
+      
+      // Progress update every 10 approvals
+      if (approved % 10 === 0) {
+      //  await reply(`📈 Progress: ${approved}/${responseList.length} completed`);
+      }
+      
+      // Dynamic delay - slower if rate limit was hit
+      const delayTime = rateLimitHit ? 3000 : 1500;
+      await new Promise(resolve => setTimeout(resolve, delayTime));
+      rateLimitHit = false; // Reset flag
+      
+    } catch (error) {
+      if (error.message?.includes("rate") || error.message?.includes("too many")) {
+        rateLimitHit = true;
+     //   await reply("⚠️ Rate limit approaching. Slowing down...");
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Longer cooldown
+        i--; // Retry this participant
+      } else {
+        failed++;
+        console.error(`Failed: ${participant.jid}`, error);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+
+  reply(`✅ Complete! Approved: ${approved}\n❌ Failed: ${failed}`);
 });
 //========================================================================================================================
 
