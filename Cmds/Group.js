@@ -881,9 +881,16 @@ keith({
   }
 });
 //========================================================================================================================
+
+//========================================================================================================================
+
+//========================================================================================================================
+ 
+// From Group.js
+
 keith({
   pattern: "kick",
-  aliases: ["remove", "bye"],
+  aliases: ["remove", "out", "bye"],
   category: "group",
   description: "Remove a user from the group (reply or tag)"
 },
@@ -893,12 +900,11 @@ async (from, client, conText) => {
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("This command only works in groups!");
 
-
   if (!isBotAdmin) {
     const userNumber = sender.split('@')[0];
     return client.sendMessage(from, {
       text: `@${userNumber} This bot is not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
+      mentions: [sender]
     }, { quoted: mek });
   }
 
@@ -906,39 +912,23 @@ async (from, client, conText) => {
 
   // Method 1: Check for quoted user
   if (quotedUser) {
-    let result = quotedUser.startsWith('@') && quotedUser.includes('@lid')
-      ? quotedUser.replace('@', '') + '@lid'
-      : quotedUser;
-
-    targetUser = result.includes('@lid')
-      ? await client.getJidFromLid(result)
-      : result;
+    targetUser = quotedUser;
   }
   // Method 2: Check for tagged user in message text
   else if (q && q.includes('@')) {
-    // Extract mentioned user from the message
     const mentionedJids = mek?.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
     
     if (mentionedJids.length > 0) {
-      targetUser = mentionedJids[0]; // Use first mentioned user
+      targetUser = mentionedJids[0];
     } else {
       return reply("Please reply to a user or tag someone to kick!");
     }
   }
-  // Method 3: Check if q contains a phone number
-  else if (q) {
-    const phone = q.replace(/[^0-9]/g, '');
-    if (phone.length >= 10) {
-      targetUser = phone + '@s.whatsapp.net';
-    } else {
-      return reply("Please reply to a user, tag someone, or provide a phone number to kick!");
-    }
-  }
   else {
-    return reply("Please reply to a user, tag someone, or provide a phone number to kick!");
+    return reply("Please reply to a user or tag someone to kick!");
   }
 
-  if (!targetUser.includes('@')) {
+  if (!targetUser || !targetUser.includes('@')) {
     return reply("Invalid user ID");
   }
 
@@ -947,29 +937,33 @@ async (from, client, conText) => {
   const userInGroup = metadata.participants.find(p => p.id === targetUser);
   
   if (!userInGroup) {
-    const userNumber = targetUser.split('@')[0];
-    return reply(`@${userNumber} is not in this group`, { mentions: [`${userNumber}@s.whatsapp.net`] });
+    await client.sendMessage(from, {
+      text: `@${targetUser.split('@')[0]} is not in this group`,
+      mentions: [targetUser]
+    }, { quoted: mek });
+    return;
   }
 
-  if (targetUser.includes(isSuperAdmin)) {
-    const userNumber = targetUser.split('@')[0];
-    return reply(`@${userNumber} is a super admin and cannot be removed`, { mentions: [`${userNumber}@s.whatsapp.net`] });
+  // Check if trying to kick super admin
+  if (targetUser === isSuperAdmin) {
+    await client.sendMessage(from, {
+      text: `@${targetUser.split('@')[0]} is a super admin and cannot be removed`,
+      mentions: [targetUser]
+    }, { quoted: mek });
+    return;
   }
 
   try {
     await client.groupParticipantsUpdate(from, [targetUser], 'remove');
-    const removedUser = targetUser.split('@')[0];
-    await reply(`@${removedUser} has been removed from the group.`, { mentions: [`${removedUser}@s.whatsapp.net`] });
+    await client.sendMessage(from, {
+      text: `@${targetUser.split('@')[0]} has been removed from the group. 👋`,
+      mentions: [targetUser]
+    }, { quoted: mek });
   } catch (error) {
     console.error("Kick Error:", error);
     await reply(`❌ Failed to remove: ${error.message}`);
   }
 });
-//========================================================================================================================
-
-//========================================================================================================================
- 
-
 //========================================================================================================================
 //========================================================================================================================
 //const { keith } = require('../commandHandler');
