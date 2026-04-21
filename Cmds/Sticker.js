@@ -11,6 +11,88 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+keith({
+  pattern: "bratvideo",
+  aliases: ["bratvid", "brat"],
+  description: "Convert text to Brat style video sticker",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, mek, reply, pushName, author, args } = conText;
+
+  if (!q) {
+    return reply(`📌 *Brat Video Sticker*
+    
+Convert text to Brat style animated sticker!
+
+*Usage:*
+.bratvideo amel hai
+.bratvid Hello World
+.brat keith
+
+*Options:*
+.bratvideo text | color
+Example: .bratvideo keith | red
+
+*Aliases:* .bratvid, .brat`);
+  }
+
+  // Parse text and optional color
+  let text = q;
+  let color = "";
+  
+  if (q.includes('|')) {
+    const parts = q.split('|');
+    text = parts[0].trim();
+    color = parts[1].trim();
+  }
+
+  // Format text for URL (replace spaces with +)
+  const formattedText = text.replace(/ /g, '+');
+  let apiUrl = `https://api.deline.web.id/maker/bratvid?text=${encodeURIComponent(formattedText)}`;
+  
+  // Add color if specified
+  if (color) {
+    apiUrl += `&color=${encodeURIComponent(color)}`;
+  }
+
+  try {
+   // await reply(`🎬 Creating Brat sticker for *${text.substring(0, 30)}*...`);
+
+    const response = await axios.get(apiUrl, {
+      responseType: 'arraybuffer',
+      timeout: 30000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    if (!response.data || response.data.byteLength < 500) {
+      return reply("❌ Failed to generate Brat sticker! Try different text.");
+    }
+
+    const sticker = new Sticker(response.data, {
+      pack: pushName || "Brat Pack",
+      author: author || "WhatsApp Bot",
+      type: StickerTypes.FULL,
+      categories: ["🎬", "✨", "💚"],
+      id: `brat-${Date.now()}`,
+      quality: 90,
+      background: "#000000"
+    });
+
+    const stickerBuffer = await sticker.toBuffer();
+    
+    await client.sendMessage(from, { 
+      sticker: stickerBuffer 
+    }, { quoted: mek });
+
+  } catch (err) {
+    console.error("bratvideo error:", err);
+    await reply("❌ Failed to generate Brat sticker! Please try again.");
+  }
+});
 //========================================================================================================================
 
 keith({
