@@ -10,6 +10,106 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+keith({
+  pattern: "attp",
+  aliases: ["textgif", "tenorsticker"],
+  description: "Create animated text sticker using Tenor API",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, mek, reply, pushName, author, args } = conText;
+
+  if (!q) {
+    return reply(`📌 *ATTp2 - Tenor Animated Text Sticker*
+    
+Create animated text stickers using Tenor API!
+
+*Usage:*
+.attp keith
+.attp Hello World
+
+*Style options:*
+.attp text | style
+.attp keith | neon
+.attp hello | rainbow
+
+*Available styles:* neon, rainbow, fire, ice, shadow
+
+*Aliases:* .textgif, .tenorsticker`);
+  }
+
+  // Parse text and optional style
+  let text = q;
+  let style = "258698638"; // default style ID
+  
+  if (q.includes('|')) {
+    const parts = q.split('|');
+    text = parts[0].trim();
+    const styleName = parts[1].trim().toLowerCase();
+    
+    // Map style names to Tenor IDs
+    const styleMap = {
+      neon: "258698638",
+      rainbow: "258698639",
+      fire: "258698640",
+      ice: "258698641",
+      shadow: "258698642"
+    };
+    
+    style = styleMap[styleName] || "258698638";
+  }
+
+  const encodedText = encodeURIComponent(text);
+  const apiUrl = `https://tenor.googleapis.com/v2/render_dynamic_text?client_key=waffles&key=AIzaSyCbDgY_wZO9guZMktW6MnOGo-nKVFXqaUE&%24alt=proto&text=${encodedText}&id=${style}`;
+
+  try {
+    await reply(`🎨 Creating ${style !== "258698638" ? styleName + " " : ""}animated sticker for *${text.substring(0, 30)}*...`);
+
+    const response = await axios.get(apiUrl, {
+      responseType: 'arraybuffer',
+      timeout: 30000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    if (!response.data || response.data.byteLength < 500) {
+      return reply("❌ Failed to generate animated sticker! Try different text.");
+    }
+
+    const sticker = new Sticker(response.data, {
+      pack: pushName || "ATTp2 Pack",
+      author: author || "WhatsApp Bot",
+      type: StickerTypes.FULL,
+      categories: ["✨", "📝", "🎨"],
+      id: `attp2-${Date.now()}`,
+      quality: 90,
+      background: "#FFFFFF"
+    });
+
+    const stickerBuffer = await sticker.toBuffer();
+    
+    await client.sendMessage(from, { 
+      sticker: stickerBuffer 
+    }, { quoted: mek });
+
+  } catch (err) {
+    console.error("attp2 error:", err);
+    
+    let errorMsg = "❌ Failed to generate animated sticker!";
+    
+    if (err.code === 'ECONNABORTED') {
+      errorMsg = "❌ Request timeout! Please try again with shorter text.";
+    } else if (err.response?.status === 403) {
+      errorMsg = "❌ API key expired or invalid! Please use another method.";
+    } else if (err.response?.status === 404) {
+      errorMsg = "❌ Style not found! Using default style.";
+    }
+    
+    await reply(errorMsg);
+  }
+});
 //========================================================================================================================
 
 keith({
@@ -96,7 +196,7 @@ Example: .bratvideo keith | red
 //========================================================================================================================
 
 keith({
-  pattern: "attp",
+  pattern: "attp2",
   aliases: ["texttosticker", "txtsticker"],
   description: "Convert text to animated sticker (ATTp)",
   category: "Sticker",
