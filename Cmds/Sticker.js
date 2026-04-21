@@ -12,6 +12,65 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+keith({
+  pattern: "attp",
+  aliases: ["texttosticker", "txtsticker"],
+  description: "Convert text to animated sticker (ATTp)",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, mek, reply, pushName, author } = conText;
+
+  if (!q) {
+    return reply(`📌 *ATTp - Any Text To Sticker*
+    
+Convert any text to an animated WhatsApp sticker!
+
+*Usage:*
+.attp keith
+.attp Hello World
+.attp I love you
+
+*Aliases:* .texttosticker, .txtsticker`);
+  }
+
+  const encodedText = encodeURIComponent(q);
+  const apiUrl = `https://api.deline.web.id/maker/attp?text=${encodedText}`;
+
+  try {
+  //  await reply(`🎨 Converting *${q.substring(0, 30)}* to animated sticker...`);
+
+    const response = await axios.get(apiUrl, {
+      responseType: 'arraybuffer',
+      timeout: 30000
+    });
+
+    if (!response.data || response.data.byteLength < 100) {
+      return reply("❌ Failed to generate sticker! Try different text.");
+    }
+
+    const sticker = new Sticker(response.data, {
+      pack: pushName || "ATTp Pack",
+      author: author || "WhatsApp Bot",
+      type: StickerTypes.FULL,
+      categories: ["✨", "📝", "🎨"],
+      id: `attp-${Date.now()}`,
+      quality: 85,
+      background: "#FFFFFF"
+    });
+
+    const stickerBuffer = await sticker.toBuffer();
+    
+    await client.sendMessage(from, { 
+      sticker: stickerBuffer 
+    }, { quoted: mek });
+
+  } catch (err) {
+    console.error("attp error:", err);
+    await reply("❌ Failed to generate sticker! Please try again.");
+  }
+});
 //========================================================================================================================
 keith({
   pattern: "egif",
