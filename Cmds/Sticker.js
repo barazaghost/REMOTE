@@ -37,7 +37,7 @@ keith({
   const gifUrl = `https://fonts.gstatic.com/s/e/notoemoji/latest/${emojiCode}/512.gif`;
 
   try {
-    await reply(`🎨 Converting ${emoji} to animated sticker...`);
+ //   await reply(`🎨 Converting ${emoji} to animated sticker...`);
 
     // Download the GIF
     const response = await axios.get(gifUrl, {
