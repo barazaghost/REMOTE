@@ -13,6 +13,63 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+keith({
+  pattern: "egif",
+  aliases: ["emojisticker", "emojigif", "emosticker"],
+  description: "Convert emoji to animated sticker (GIF)",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, mek, reply, pushName, author } = conText;
+
+  if (!q) {
+    return reply("📌 Provide an emoji!\nExample: .emojisticker 😂\nExample: .emojisticker 🎉");
+  }
+
+  // Get first emoji from input
+  const emojiMatch = q.match(/([\p{Emoji_Presentation}|\p{Extended_Pictographic}])/u);
+  if (!emojiMatch) {
+    return reply("❌ Please provide a valid emoji!");
+  }
+
+  const emoji = emojiMatch[0];
+  const emojiCode = emoji.codePointAt(0).toString(16);
+  const gifUrl = `https://fonts.gstatic.com/s/e/notoemoji/latest/${emojiCode}/512.gif`;
+
+  try {
+    await reply(`🎨 Converting ${emoji} to animated sticker...`);
+
+    // Download the GIF
+    const response = await axios.get(gifUrl, {
+      responseType: 'arraybuffer'
+    });
+
+    if (!response.data) {
+      return reply("❌ Failed to fetch emoji GIF!");
+    }
+
+    // Create animated sticker from GIF
+    const sticker = new Sticker(response.data, {
+      pack: pushName || "Emoji Sticker",
+      author: author || "WhatsApp Bot",
+      type: StickerTypes.FULL,
+      categories: ["✨", "🎨"],
+      id: `emoji-${emojiCode}`,
+      quality: 80,
+      background: "transparent"
+    });
+
+    const stickerBuffer = await sticker.toBuffer();
+    
+    await client.sendMessage(from, { 
+      sticker: stickerBuffer 
+    }, { quoted: mek });
+
+  } catch (err) {
+    console.error("emojisticker error:", err);
+    await reply(`❌ Error: ${err.message}`);
+  }
+});
 //========================================================================================================================
 
 
