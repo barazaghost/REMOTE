@@ -106,6 +106,80 @@ async function uploadToImgBB(filePath) {
 
   return data.data.url;
 }
+
+//========================================================================================================================
+//========================================================================================================================
+async function uploadToUploadF(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+
+  const formData = new FormData();
+  formData.append('file', fs.createReadStream(filePath));
+
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/javascript, */*; q=0.01',
+    'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Origin': 'https://uploadf.com',
+    'Referer': 'https://uploadf.com/id/',
+    'X-Requested-With': 'XMLHttpRequest',
+    ...formData.getHeaders()
+  };
+
+  const response = await axios.post('https://uploadf.com/fileup.php', formData, {
+    headers: headers,
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity
+  });
+
+  if (response.data.FLG === true || response.data.FLG === "true") {
+    return 'https://uploadf.com/s/' + response.data.NAME;
+  } else {
+    throw new Error("UploadF upload failed: " + JSON.stringify(response.data));
+  }
+}
+
+//========================================================================================================================
+//========================================================================================================================
+// ==================== UploadF Command ====================
+keith({
+  pattern: "uploadf",
+  aliases: ["uf", "uploadfcom"],
+  description: "Upload quoted media to UploadF.com",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type === "unknown") return reply("❌ Unsupported media type.");
+
+  const mediaNode =
+    quoted?.imageMessage ||
+    quoted?.videoMessage ||
+    quoted?.audioMessage ||
+    quoted?.stickerMessage ||
+    quoted?.documentMessage;
+
+  if (!mediaNode) return reply("❌ Could not extract media content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type);
+    const link = await uploadToUploadF(filePath);
+    await reply(link);
+  } catch (err) {
+    console.error("UploadF upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
+//========================================================================================================================
+//========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
 // ==================== uguu Command ====================
