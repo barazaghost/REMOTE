@@ -306,37 +306,7 @@ async function uploadToFreeImageHost(filePath) {
 //========================================================================================================================
 //========================================================================================================================
 // ==================== FreeImage.Host Command ====================
-keith({
-  pattern: "freeimage",
-  aliases: ["fih", "freeimagehost"],
-  description: "Upload quoted media to FreeImage.Host",
-  category: "Uploader",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { mek, quoted, quotedMsg, reply } = conText;
 
-  if (!quotedMsg) return reply("📌 Please quote an image to upload.");
-
-  const type = getMediaType(quotedMsg);
-  if (type !== "image") return reply("❌ FreeImage.Host only supports images.");
-
-  const mediaNode = quoted?.imageMessage;
-  if (!mediaNode) return reply("❌ Could not extract image content.");
-
-  let filePath;
-  try {
-    filePath = await saveMediaToTemp(client, mediaNode, type);
-    const link = await uploadToFreeImageHost(filePath);
-    await reply(link); // Sends only the direct URL
-  } catch (err) {
-    console.error("FreeImage.Host upload error:", err);
-    await reply("❌ Failed to upload. Error:\n" + err.message);
-  } finally {
-    if (filePath && fs.existsSync(filePath)) {
-      try { fs.unlinkSync(filePath); } catch (e) { console.error("unlink error:", e); }
-    }
-  }
-});
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -425,7 +395,37 @@ keith({
 //========================================================================================================================
 //========================================================================================================================
 
-  
+  keith({
+  pattern: "freeimage",
+  aliases: ["fih", "freeimagehost"],
+  description: "Upload quoted media to FreeImage.Host",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type !== "image") return reply("❌ FreeImage.Host only supports images.");
+
+  const mediaNode = quoted?.imageMessage;
+  if (!mediaNode) return reply("❌ Could not extract image content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type);
+    const link = await uploadToFreeImageHost(filePath);
+    await reply(link); // Sends only the direct URL
+  } catch (err) {
+    console.error("FreeImage.Host upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
   
 //========================================================================================================================
 //========================================================================================================================
