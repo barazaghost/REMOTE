@@ -256,88 +256,60 @@ async function uploadToAWS(filePath) {
 //========================================================================================================================
 //========================================================================================================================
 
-
 //========================================================================================================================
 //========================================================================================================================
-
-
-async function uploadToPostImages(filePath) {
+async function uploadToFreeImageHost(filePath) {
   if (!fs.existsSync(filePath)) throw new Error("File does not exist");
   
-  const baseHeaders = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9'
-  };
-
-  const getRes = await axios.get('https://postimages.org/', { 
-    headers: baseHeaders,
-    maxRedirects: 0,
-    validateStatus: status => status >= 200 && status < 400
-  });
-  
-  const html = getRes.data;
-  const cookies = (getRes.headers['set-cookie'] || []).map(c => c.split(';')[0]).join('; ');
-  
-  const tokenMatch = html.match(/name="token"\s+value="([^"]+)"/i);
-  const token = tokenMatch ? tokenMatch[1] : '';
-  
-  if (!token) throw new Error('Failed to extract token from PostImages');
-  
-  const fileBuffer = await fs.readFile(filePath);
+  const buffer = await fs.readFile(filePath);
   const mimeType = mime.lookup(filePath) || 'image/jpeg';
   const ext = path.extname(filePath).slice(1) || 'jpg';
-  const filename = `image.${ext}`;
+  const filename = `${Date.now()}.${ext}`;
   
-  const form = new FormData();
-  form.append('token', token);
-  form.append('upload_session', Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
-  form.append('numfiles', '1');
-  form.append('gallery', '');
-  form.append('ui', '22');
-  form.append('optsize', '0');
-  form.append('expire', '0');
-  form.append('cg', '1920x1080');
-  form.append('file', fileBuffer, { filename: filename, contentType: mimeType });
-  
-  const postRes = await axios.post('https://postimages.org/json', form, {
+  // Get auth token from homepage
+  const { data: html, headers } = await axios.get('https://freeimage.host/', {
     headers: {
-      ...baseHeaders,
-      'Accept': 'application/json',
-      'Cookie': cookies,
-      'Origin': 'https://postimages.org',
-      'Referer': 'https://postimages.org/',
-      'X-Requested-With': 'XMLHttpRequest',
-      ...form.getHeaders()
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 15; SM-F958 Build/AP3A.240905.015) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.86 Mobile Safari/537.36'
+    }
+  });
+  
+  const token = html.match(/auth_token\s*=\s*["']([a-f0-9]+)["']/)?.[1];
+  if (!token) throw new Error('Failed to extract auth_token from FreeImage.Host');
+  
+  // Upload file
+  const form = new FormData();
+  form.append('source', buffer, filename);
+  form.append('type', 'file');
+  form.append('action', 'upload');
+  form.append('timestamp', Date.now().toString());
+  form.append('auth_token', token);
+  
+  const { data } = await axios.post('https://freeimage.host/json', form, {
+    headers: {
+      ...form.getHeaders(),
+      cookie: headers['set-cookie'].join('; '),
+      origin: 'https://freeimage.host',
+      referer: 'https://freeimage.host/',
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 15; SM-F958 Build/AP3A.240905.015) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.86 Mobile Safari/537.36'
     },
     maxContentLength: Infinity,
     maxBodyLength: Infinity
   });
   
-  const data = postRes.data;
-  
-  if (data.url) {
-    const pageRes = await axios.get(data.url, { headers: baseHeaders });
-    const pageHtml = pageRes.data;
-    const $ = cheerio.load(pageHtml);
-    
-    const directUrl = $('#direct').val() || $('meta[property="og:image"]').attr('content');
-    
-    if (!directUrl) throw new Error('Could not extract direct URL');
-    
-    return directUrl; // Returns only the direct URL
+  if (data?.image?.image?.url) {
+    return data.image.image.url; // Returns only the direct URL
   }
   
-  throw new Error("PostImages upload failed: " + JSON.stringify(data));
+  throw new Error("FreeImage.Host upload failed: " + JSON.stringify(data));
 }
 
 //========================================================================================================================
 //========================================================================================================================
-// ==================== PostImages Command ====================
+// ==================== FreeImage.Host Command ====================
 keith({
-  pattern: "postimages",
-  aliases: ["pi", "postimg"],
-  description: "Upload quoted media to PostImages.org",
+  pattern: "freeimage",
+  aliases: ["fih", "freeimagehost"],
+  description: "Upload quoted media to FreeImage.Host",
   category: "Uploader",
   filename: __filename
 }, async (from, client, conText) => {
@@ -346,7 +318,7 @@ keith({
   if (!quotedMsg) return reply("📌 Please quote an image to upload.");
 
   const type = getMediaType(quotedMsg);
-  if (type !== "image") return reply("❌ PostImages only supports images.");
+  if (type !== "image") return reply("❌ FreeImage.Host only supports images.");
 
   const mediaNode = quoted?.imageMessage;
   if (!mediaNode) return reply("❌ Could not extract image content.");
@@ -354,10 +326,10 @@ keith({
   let filePath;
   try {
     filePath = await saveMediaToTemp(client, mediaNode, type);
-    const link = await uploadToPostImages(filePath);
+    const link = await uploadToFreeImageHost(filePath);
     await reply(link); // Sends only the direct URL
   } catch (err) {
-    console.error("PostImages upload error:", err);
+    console.error("FreeImage.Host upload error:", err);
     await reply("❌ Failed to upload. Error:\n" + err.message);
   } finally {
     if (filePath && fs.existsSync(filePath)) {
@@ -365,7 +337,15 @@ keith({
     }
   }
 });
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
 
+
+
+  
+  
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
