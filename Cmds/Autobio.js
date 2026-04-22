@@ -342,7 +342,88 @@ keith({
 //========================================================================================================================
 //========================================================================================================================
 
+//========================================================================================================================
+//========================================================================================================================
 
+async function uploadToAliOSS(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+  
+  const buffer = await fs.readFile(filePath);
+  const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+  const ext = path.extname(filePath).slice(1) || 'bin';
+  const filename = `${Date.now()}.${ext}`;
+  
+  // Get STS token from AliOSS
+  const { data } = await axios.get('https://visualgpt.io/api/v1/oss/sts-token');
+  
+  if (!data?.data) throw new Error('Failed to get STS token from AliOSS');
+  
+  const { AccessKeyId, AccessKeySecret, SecurityToken } = data.data;
+  
+  // Prepare upload
+  const ossKey = `nekoo/${filename}`;
+  const date = new Date().toUTCString();
+  const stringToSign = `PUT\n\n${mimeType}\n${date}\nx-oss-security-token:${SecurityToken}\n/nc-cdn/${ossKey}`;
+  const signature = crypto.createHmac('sha1', AccessKeySecret).update(stringToSign).digest('base64');
+  const url = `https://nc-cdn.oss-us-west-1.aliyuncs.com/${ossKey}`;
+  
+  // Upload to AliOSS
+  await axios.put(url, buffer, {
+    headers: {
+      'authorization': `OSS ${AccessKeyId}:${signature}`,
+      'content-type': mimeType,
+      'date': date,
+      'x-oss-security-token': SecurityToken
+    },
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity
+  });
+  
+  return url; // Returns only the direct URL
+}
+
+//========================================================================================================================
+//========================================================================================================================
+// ==================== AliOSS Command ====================
+keith({
+  pattern: "alioss",
+  aliases: ["oss", "aliupload"],
+  description: "Upload quoted media to AliOSS (Alibaba Cloud)",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type === "unknown") return reply("❌ Unsupported media type.");
+
+  const mediaNode =
+    quoted?.imageMessage ||
+    quoted?.videoMessage ||
+    quoted?.audioMessage ||
+    quoted?.stickerMessage ||
+    quoted?.documentMessage;
+
+  if (!mediaNode) return reply("❌ Could not extract media content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type);
+    const link = await uploadToAliOSS(filePath);
+    await reply(link); // Sends only the direct URL
+  } catch (err) {
+    console.error("AliOSS upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
+//========================================================================================================================
+//========================================================================================================================
 
   
   
