@@ -255,6 +255,139 @@ async function uploadToAWS(filePath) {
 
 //========================================================================================================================
 //========================================================================================================================
+async function uploadToVikingFile(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+  
+  const buffer = await fs.readFile(filePath);
+  const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+  const ext = path.extname(filePath).slice(1) || 'jpg';
+  const filename = `${Date.now()}.${ext}`;
+  
+  const inst = axios.create({
+    baseURL: 'https://vikingfile.com/api',
+    headers: {
+      origin: 'https://vikingfile.com',
+      referer: 'https://vikingfile.com/',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 15; SM-F958 Build/AP3A.240905.015) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.86 Mobile Safari/537.36'
+    }
+  });
+  
+  // Step 1: Get upload URL
+  const form = new FormData();
+  form.append('size', buffer.length);
+  const { data: up } = await inst.post('/get-upload-url', form, {
+    headers: form.getHeaders()
+  });
+  
+  if (!up?.urls?.[0]) throw new Error('Failed to get upload URL from VikingFile.');
+  
+  // Step 2: Upload file to S3
+  const { headers: uploadHeaders } = await axios.put(up.urls[0], buffer, {
+    headers: {
+      'content-type': mimeType
+    },
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity
+  });
+  
+  if (!uploadHeaders['etag']) throw new Error('Failed to upload file to VikingFile.');
+  
+  // Step 3: Complete upload
+  const formr = new FormData();
+  formr.append('name', filename);
+  formr.append('user', '');
+  formr.append('uploadId', up.uploadId);
+  formr.append('key', up.key);
+  formr.append('parts[0][PartNumber]', up.numberParts);
+  formr.append('parts[0][ETag]', uploadHeaders['etag']);
+  
+  const { data: b } = await inst.post('/complete-upload', formr, {
+    headers: formr.getHeaders()
+  });
+  
+  if (!b?.hash) throw new Error('Failed to complete upload on VikingFile.');
+  
+  // Step 4: Get CF turnstile token
+  const { data: cf } = await axios.post('https://rynekoo-cf.hf.space/action', {
+    url: `https://vik1ngfile.site/f/${b.hash}`,
+    siteKey: '0x4AAAAAAAgbsMNBuk2d3Qp6',
+    mode: 'turnstile-min'
+  });
+  
+  if (!cf?.data?.token) throw new Error('Failed to get Cloudflare turnstile token.');
+  
+  // Step 5: Submit CF token to get final URL
+  const { data } = await axios.post(`https://vik1ngfile.site/f/${b.hash}`, new URLSearchParams({
+    'cf-turnstile-response': cf.data.token,
+    'ipv4': [10, crypto.randomInt(256), crypto.randomInt(256), crypto.randomInt(256)].join('.'),
+    'ipv6': ''
+  }).toString(), {
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      origin: 'https://vik1ngfile.site',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 15; SM-F958 Build/AP3A.240905.015) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.86 Mobile Safari/537.36'
+    }
+  });
+  
+  // Extract the download URL from response
+  if (data && typeof data === 'string') {
+    // If response is HTML, try to extract the actual file URL
+    const urlMatch = data.match(/https?:\/\/[^\s"']+\.(?:jpg|png|mp4|zip|pdf|rar|7z)[^\s"']*/i);
+    if (urlMatch) return urlMatch[0];
+  }
+  
+  // If data is an object with URL property
+  if (data?.url) return data.url;
+  if (data?.download_url) return data.download_url;
+  
+  // Fallback: return the file page URL
+  return `https://vik1ngfile.site/f/${b.hash}`;
+}
+
+//========================================================================================================================
+//========================================================================================================================
+// ==================== VikingFile Command ====================
+keith({
+  pattern: "vikingfile",
+  aliases: ["vf", "viking"],
+  description: "Upload quoted media to VikingFile",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type === "unknown") return reply("❌ Unsupported media type.");
+
+  const mediaNode =
+    quoted?.imageMessage ||
+    quoted?.videoMessage ||
+    quoted?.audioMessage ||
+    quoted?.stickerMessage ||
+    quoted?.documentMessage;
+
+  if (!mediaNode) return reply("❌ Could not extract media content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type);
+    const link = await uploadToVikingFile(filePath);
+    await reply(link); // Just sends the link
+  } catch (err) {
+    console.error("VikingFile upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
 // ==================== AWS S3 Upload Command ====================
 keith({
   pattern: "aws",
