@@ -132,7 +132,7 @@ async function uploadToUploadF(filePath) {
   });
 
   if (response.data.FLG === true || response.data.FLG === "true") {
-    return 'https://uploadf.com/s/' + response.data.NAME;
+    return 'https://uploadf.com/file/' + response.data.NAME;
   } else {
     throw new Error("UploadF upload failed: " + JSON.stringify(response.data));
   }
