@@ -4,6 +4,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const FormData = require('form-data');
 const mime = require('mime-types');
+const crypto = require('crypto');
 //========================================================================================================================
 //========================================================================================================================
 function getMediaType(quoted) {
@@ -194,7 +195,106 @@ async function uploadToGoFile(filePath) {
     throw new Error("GoFile upload failed: " + JSON.stringify(uploadData));
   }
 }
+//========================================================================================================================
+//========================================================================================================================
 
+
+async function uploadToAWS(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+  
+  const buffer = await fs.readFile(filePath);
+  
+  // Get mime type and extension
+  const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+  const ext = path.extname(filePath).slice(1) || 'bin';
+  const filename = `${Date.now()}.${ext}`;
+  
+  // Get S3 upload credentials
+  const { data } = await axios.post('https://llamacoder.together.ai/api/s3-upload', {
+    filename,
+    filetype: mimeType,
+    _nextS3: { strategy: 'aws-sdk' }
+  });
+  
+  const { region, bucket, key } = data;
+  const { AccessKeyId, SecretAccessKey, SessionToken } = data.token.Credentials;
+  
+  // Generate AWS signatures
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '').slice(0, 15) + 'Z';
+  const dateStamp = amzDate.slice(0, 8);
+  const payloadHash = crypto.createHash('sha256').update(buffer).digest('hex');
+  const host = `${bucket}.s3.${region}.amazonaws.com`;
+  
+  const canonicalHeaders = `content-type:${mimeType}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\nx-amz-security-token:${SessionToken}\n`;
+  const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date;x-amz-security-token';
+  const canonicalRequest = `PUT\n/${key}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
+  
+  const credentialScope = `${dateStamp}/${region}/s3/aws4_request`;
+  const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${credentialScope}\n${crypto.createHash('sha256').update(canonicalRequest).digest('hex')}`;
+  
+  const signingKey = ['aws4_request', 's3', region, dateStamp].reduceRight((acc, val) => crypto.createHmac('sha256', acc).update(val).digest(), `AWS4${SecretAccessKey}`);
+  const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
+  const authorization = `AWS4-HMAC-SHA256 Credential=${AccessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  
+  // Upload to S3
+  await axios.put(`https://${host}/${key}`, buffer, {
+    headers: {
+      authorization: authorization,
+      'content-type': mimeType,
+      'x-amz-date': amzDate,
+      'x-amz-content-sha256': payloadHash,
+      'x-amz-security-token': SessionToken
+    },
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity
+  });
+  
+  return `https://${host}/${key}`;
+}
+
+//========================================================================================================================
+//========================================================================================================================
+// ==================== AWS S3 Upload Command ====================
+keith({
+  pattern: "aws",
+  aliases: ["s3upload", "awsupload"],
+  description: "Upload quoted media to AWS S3",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type === "unknown") return reply("❌ Unsupported media type.");
+
+  const mediaNode =
+    quoted?.imageMessage ||
+    quoted?.videoMessage ||
+    quoted?.audioMessage ||
+    quoted?.stickerMessage ||
+    quoted?.documentMessage;
+
+  if (!mediaNode) return reply("❌ Could not extract media content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type);
+    const link = await uploadToAWS(filePath);
+    await reply(link); // Just sends the link, no extra text
+  } catch (err) {
+    console.error("AWS S3 upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
+//========================================================================================================================
+//========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
 // ==================== GoFile Command ====================
