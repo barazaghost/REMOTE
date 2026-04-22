@@ -137,6 +137,107 @@ async function uploadToUploadF(filePath) {
     throw new Error("UploadF upload failed: " + JSON.stringify(response.data));
   }
 }
+//========================================================================================================================
+//========================================================================================================================
+async function uploadToGoFile(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+
+  const buffer = await fs.readFile(filePath);
+  
+  // Create account/token
+  const { data: accountData } = await axios.post('https://api.gofile.io/accounts', {}, {
+    headers: {
+      origin: 'https://gofile.io',
+      referer: 'https://gofile.io/',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 15; SM-F958 Build/AP3A.240905.015) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.86 Mobile Safari/537.36'
+    }
+  });
+  
+  if (!accountData?.data?.token) throw new Error('Failed to create account on GoFile.');
+  
+  // Create folder
+  const { data: folderData } = await axios.post('https://api.gofile.io/contents/createfolder', {
+    parentFolderId: accountData.data.rootFolder,
+    public: true
+  }, {
+    headers: {
+      authorization: `Bearer ${accountData.data.token}`,
+      origin: 'https://gofile.io',
+      referer: 'https://gofile.io/',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 15; SM-F958 Build/AP3A.240905.015) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.86 Mobile Safari/537.36'
+    }
+  });
+  
+  if (!folderData?.data?.id) throw new Error('Failed to create folder on GoFile.');
+  
+  // Upload file
+  const form = new FormData();
+  form.append('token', accountData.data.token);
+  form.append('folderId', folderData.data.id);
+  form.append('file', buffer, `${Date.now()}_${path.basename(filePath)}`);
+  
+  const { data: uploadData } = await axios.post('https://upload.gofile.io/uploadfile', form, {
+    headers: {
+      ...form.getHeaders(),
+      host: 'upload.gofile.io',
+      origin: 'https://gofile.io',
+      referer: 'https://gofile.io/',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 15; SM-F958 Build/AP3A.240905.015) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.86 Mobile Safari/537.36'
+    },
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity
+  });
+  
+  if (uploadData?.data?.downloadPage) {
+    return uploadData.data.downloadPage; // Return the download page URL
+  } else {
+    throw new Error("GoFile upload failed: " + JSON.stringify(uploadData));
+  }
+}
+
+//========================================================================================================================
+//========================================================================================================================
+// ==================== GoFile Command ====================
+keith({
+  pattern: "gofile",
+  aliases: ["gf", "gofileupload"],
+  description: "Upload quoted media to GoFile.io",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type === "unknown") return reply("❌ Unsupported media type.");
+
+  const mediaNode =
+    quoted?.imageMessage ||
+    quoted?.videoMessage ||
+    quoted?.audioMessage ||
+    quoted?.stickerMessage ||
+    quoted?.documentMessage;
+
+  if (!mediaNode) return reply("❌ Could not extract media content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type);
+    const link = await uploadToGoFile(filePath);
+    await reply(link);
+  } catch (err) {
+    console.error("GoFile upload error:", err);
+    await reply("❌ Failed to upload to GoFile. Error:\n" + err.message);
+  } finally {
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
+//========================================================================================================================
+//========================================================================================================================
+
 
 //========================================================================================================================
 //========================================================================================================================
