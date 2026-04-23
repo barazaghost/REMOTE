@@ -17,6 +17,129 @@ const { fileTypeFromBuffer } = require("file-type");
 //========================================================================================================================
 
 
+const config = {
+  createUrl: "https://api.photoeditorai.io/pe/photo-editor/create-job",
+  jobUrl: "https://api.photoeditorai.io/pe/photo-editor/get-job/",
+  creditsUrl: "https://api.photoeditorai.io/api/wl/credit/get-credits"
+};
+
+const headers = {
+  "product-serial": "94177bd5f370f2b4e54dd44668d58c35",
+  "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+  "origin": "https://photoeditorai.io",
+  "referer": "https://photoeditorai.io/",
+  "accept": "application/json, text/plain, */*",
+  "accept-language": "en-GB,en-US;q=0.9,en;q=0.8"
+};
+
+async function getCredits() {
+  const { data } = await axios.post(config.creditsUrl, {}, { headers });
+  if (data.code !== 100000) {
+    throw new Error(`Failed to get credits: ${data.message}`);
+  }
+  return data.result;
+}
+
+async function pollJobResult(jobId) {
+  for (let i = 0; i < 150; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+
+    const { data } = await axios.get(`${config.jobUrl}${jobId}`, { headers });
+
+    if (data.code !== 100000) {
+      throw new Error(data.message || "Job status error");
+    }
+    
+    if (data.result.error) {
+      throw new Error(data.result.error);
+    }
+
+    if (data.result.status === 2 && data.result.output?.length > 0) {
+      return data.result.output[0];
+    }
+  }
+  throw new Error("Timeout: Image processing took too long (5 minutes)");
+}
+
+async function processImage(imageBuffer, prompt) {
+  // Check credits first
+  const credits = await getCredits();
+  if (credits.free_credits <= 0 && credits.credits <= 0) {
+    throw new Error("No credits available. Please get more credits.");
+  }
+
+  // Create form data
+  const form = new FormData();
+  form.append("model_name", "photoeditor_4.0");
+  form.append("target_images", imageBuffer, {
+    filename: "image.jpg",
+    contentType: "image/jpeg"
+  });
+  form.append("prompt", prompt);
+  form.append("ratio", "4:3");
+  form.append("image_resolution", "1K");
+
+  // Create job
+  const { data: createData } = await axios.post(config.createUrl, form, {
+    headers: { ...headers, ...form.getHeaders() }
+  });
+
+  if (createData.code !== 100000) {
+    throw new Error(`Failed to create job: ${createData.message || "Unknown error"}`);
+  }
+
+  const jobId = createData.result.job_id;
+  const resultUrl = await pollJobResult(jobId);
+
+  // Download result
+  const resultRes = await axios.get(resultUrl, { responseType: "arraybuffer" });
+  return Buffer.from(resultRes.data);
+}
+
+keith({
+  pattern: "imageedit",
+  aliases: ["nanobananapro", "nabpro", "editimg"],
+  category: "Ai",
+  description: "Edit a quoted image with a prompt (PhotoEditor AI)",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg?.imageMessage) {
+    return reply("📌 Reply to an image with:\n`imageedit2 <prompt>`");
+  }
+  if (!q) {
+    return reply("❌ Provide a prompt!\nExample: imageedit2 make it black and white");
+  }
+
+  await reply("🖼️ Processing your image...");
+
+  let filePath = null;
+  try {
+    // Download image
+    filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
+    const imageBuffer = fs.readFileSync(filePath);
+
+    // Process image
+    const resultBuffer = await processImage(imageBuffer, q);
+
+    // Send result
+    await client.sendMessage(from, {
+      image: resultBuffer,
+      caption: `✅ *Image Edited Successfully!*\n📝 *Prompt:* ${q}`
+    }, { quoted: mek });
+
+  } catch (err) {
+    console.error("imageedit2 error:", err);
+    await reply(`❌ Error: ${err.message}`);
+  } finally {
+    // Cleanup temp file
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+});
+//========================================================================================================================
 keith({
   pattern: "rc",
   aliases: ["undress", "nude", "removeclothes"],
@@ -345,106 +468,6 @@ keith({
 });
 //========================================================================================================================
 
-const config = {
-  bypassUrl: "https://api.nekolabs.web.id/tools/bypass/cf-turnstile",
-  siteKey: "0x4AAAAAACLCCZe3S9swHyiM",
-  targetUrl: "https://photoeditorai.io",
-  createUrl: "https://api.photoeditorai.io/pe/photo-editor/create-job-v2",
-  jobUrl: "https://api.photoeditorai.io/pe/photo-editor/get-job/"
-};
-
-const headers = {
-  "product-serial": "94177bd5f370f2b4e54dd44668d58c35",
-  "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36",
-  "origin": "https://photoeditorai.io",
-  "referer": "https://photoeditorai.io/"
-};
-
-async function getTurnstileToken() {
-  const res = await axios.get(`${config.bypassUrl}?url=${encodeURIComponent(config.targetUrl)}&siteKey=${config.siteKey}`);
-  const data = res.data;
-  if (!data.success) throw new Error("❌ Security verification failed");
-  return data.result;
-}
-
-async function createJob(media, mime, prompt, token) {
-  const form = new FormData();
-  form.append("model_name", "nano_banana_pro");
-  form.append("turnstile_token", token);
-  form.append("target_images", media, { filename: "image.jpg", contentType: mime });
-  form.append("prompt", prompt);
-  form.append("ratio", "match_input_image");
-  form.append("image_resolution", "1K");
-
-  const res = await axios.post(config.createUrl, form, {
-    headers: { ...headers, ...form.getHeaders() }
-  });
-  const data = res.data;
-  if (data.code !== 100000) throw new Error(`❌ Failed to create job: ${data.message || "Unknown"}`);
-  return data.result.job_id;
-}
-
-async function pollJobResult(jobId) {
-  const maxAttempts = 150;
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, 2000));
-    const res = await axios.get(`${config.jobUrl}${jobId}`, { headers });
-    const data = res.data;
-
-    if (data.code !== 100000) throw new Error(`❌ Error: ${data.message}`);
-    if (data.result.error) throw new Error(`❌ ${data.result.error}`);
-
-    if (data.result.status === 2 && data.result.output?.length > 0) {
-      return data.result.output[0];
-    }
-  }
-  throw new Error("❌ Failed to process image (timeout)");
-}
-
-async function processImage(media, mime, prompt) {
-  const token = await getTurnstileToken();
-  const jobId = await createJob(media, mime, prompt, token);
-  const imageUrl = await pollJobResult(jobId);
-
-  const res = await axios.get(imageUrl, { responseType: "arraybuffer" });
-  return Buffer.from(res.data);
-}
-
-keith({
-  pattern: "imageedit2",
-  aliases: ["nanobananapro", "nabpro", "editimg"],
-  category: "Ai",
-  description: "Edit a quoted image with a prompt (NanoBanana Pro)",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, mek, quoted, quotedMsg, reply } = conText;
-
-  if (!quotedMsg?.imageMessage) {
-    return reply("📌 Reply to an image with:\n`imageedit2 <prompt>`");
-  }
-  if (!q) {
-    return reply("❌ Provide a prompt!\nExample: imageedit2 make it black and white");
-  }
-
-  reply("> Processing image...");
-
-  try {
-    const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
-    const buffer = fs.readFileSync(filePath);
-
-    const editedBuffer = await processImage(buffer, "image/jpeg", q);
-
-    await client.sendMessage(from, {
-      image: editedBuffer,
-      caption: `✅ Edited image\n📝 Prompt: ${q}`
-    }, { quoted: mek });
-
-    fs.unlinkSync(filePath); // cleanup temp file
-  } catch (e) {
-    console.error("imageedit2 error:", e);
-    await reply(typeof e === "string" ? e : `❌ Error: ${e.message}`);
-  }
-});
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
