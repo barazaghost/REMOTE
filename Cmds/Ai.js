@@ -1225,56 +1225,6 @@ keith({
 
 
 
-keith({
-  pattern: "imageedit",
-  aliases: ["editimg", "imgedit"],
-  description: "Edit a quoted image with a prompt",
-  category: "Ai",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, mek, quoted, quotedMsg, reply, api } = conText;
-
-  if (!quotedMsg) return reply("📌 Reply to an image with your edit prompt.");
-  if (!q) return reply("❌ Provide a prompt!\nExample: imageedit make it black and white");
-
-  const type = getMediaType(quotedMsg);
-  if (type !== "image") return reply("❌ Only image messages are supported");
-
-  const mediaNode = quoted?.imageMessage;
-  if (!mediaNode) return reply("❌ Could not extract image content");
-
-  let filePath;
-  try {
-    reply("> Processing image edit...");
-
-    // Save quoted image to temp
-    filePath = await saveMediaToTemp(client, mediaNode, type);
-
-    // Upload to Uguu
-    const mediaUrl = await uploadToUguu(filePath);
-
-    // Call your API
-    const { data: result } = await axios.get(
-      `${api}/ai/imageedit?q=${encodeURIComponent(q)}&url=${encodeURIComponent(mediaUrl)}`
-    );
-
-    if (!result?.status || !result?.result) return reply("❌ Failed to edit image");
-
-    // Send edited image back
-    await client.sendMessage(from, {
-      image: { url: result.result },
-      caption: `✅ Edited image\n📝 Prompt: ${q}`
-    }, { quoted: mek });
-
-  } catch (err) {
-    console.error("imageedit error:", err);
-    await reply("❌ Failed to edit image. Try again with a different prompt or image.");
-  } finally {
-    if (filePath && fs.existsSync(filePath)) {
-      try { fs.unlinkSync(filePath); } catch {}
-    }
-  }
-});
 //========================================================================================================================
 
 
