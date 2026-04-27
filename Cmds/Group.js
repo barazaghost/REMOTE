@@ -1569,32 +1569,56 @@ async (from, client, conText) => {
   }
 });
 //========================================================================================================================
+
+
 keith({
   pattern: "delete",
   aliases: ['del'],
   category: "group", 
-  description: "Delete bot's message",
+  description: "Delete bot's message (deletes both quoted message and the delete command)",
 }, async (from, client, conText) => {
-  const { reply, isGroup, isBotAdmin, mek, quotedMsg, isSuperUser, quotedKey, quotedSender } = conText;
+  const { reply, mek, quotedMsg, isSuperUser, quotedKey, quotedSender } = conText;
 
   if (!isSuperUser) return reply("owner only!");
   if (!quotedMsg) return reply("did you quote a message?");
 
-  
   try {
-    await client.sendMessage(from, {
-      delete: {
-        remoteJid: from,
-        fromMe: false,
-        id: quotedKey,
-        participant: quotedSender
-      }
-    });
+
+    const deletePromises = [];
+
+    
+    deletePromises.push(
+      client.sendMessage(from, {
+        delete: {
+          remoteJid: from,
+          fromMe: false,
+          id: quotedKey,
+          participant: quotedSender
+        }
+      })
+    );
+
+
+    if (mek?.key) {
+      deletePromises.push(
+        client.sendMessage(from, {
+          delete: {
+            remoteJid: from,
+            fromMe: true,
+            id: mek.key.id,
+            participant: mek.key.participant || client.user.id
+          }
+        })
+      );
+    }
+
+    await Promise.all(deletePromises);
+
   } catch (err) {
     console.error("Delete Error:", err);
-    reply(`❌ Failed to delete message: ${err.message}`);
   }
 });
+
 //========================================================================================================================
 keith({
   pattern: "poll",
