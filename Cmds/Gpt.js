@@ -103,7 +103,8 @@ keith({
   description: "Edit a quoted image with a prompt (PhotoEditor AI)",
   filename: __filename
 }, async (from, client, conText) => {
-  const { q, mek, quoted, quotedMsg, reply } = conText;
+  const { q, mek, quoted, quotedMsg, reply, isSuperUser } = conText;
+    if (!isSuperUser) return reply("❌ Owner Only Command!");
 
   if (!quotedMsg?.imageMessage) {
     return reply("📌 Reply to an image with:\n`imageedit2 <prompt>`");
