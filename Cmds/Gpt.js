@@ -126,8 +126,8 @@ keith({
 
     // Send result
     await client.sendMessage(from, {
-      image: resultBuffer,
-      caption: `✅ *Image Edited Successfully!*\n📝 *Prompt:* ${q}`
+      image: resultBuffer
+     
     }, { quoted: mek });
 
   } catch (err) {
