@@ -250,10 +250,12 @@ keith({
     reply,
     isGroup,
     mek,
+    isSuperUser,
     q,
     participants,
     quotedMsg
   } = conText;
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
 
   if (!isGroup) {
     return reply("can only be used in groups!");
@@ -316,9 +318,11 @@ keith({
     reply,
     isGroup,
     mek,
+    isSuperUser,
     q,
     participants
   } = conText;
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
 
   if (!isGroup) {
     return reply("❌ This command can only be used in groups!");
@@ -643,7 +647,8 @@ keith({
   description: "Join a WhatsApp group using invite link"
 },
 async (from, client, conText) => {
-  const { reply, q, quotedMsg } = conText;
+  const { reply, q, quotedMsg, isSuperUser } = conText;
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
 
   if (!q && !quotedMsg) {
     return reply("❌ Please provide a WhatsApp group invite link!\n\nExample: .join https://chat.whatsapp.com/IxMbtAN4lhVEhmbb6BfAsk\nOr quote a message containing the link");
@@ -1233,8 +1238,9 @@ keith({
   description: "Mention all group members with numbered list"
 },
 async (from, client, conText) => {
-  const { reply, q, isGroup, isBotAdmin } = conText;
-
+  const { reply, q, isGroup, isBotAdmin, isSuperUser } = conText;
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+//if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("This command only works in groups!");
 //  if (!isBotAdmin) return reply("Bot is not an admin");
 
