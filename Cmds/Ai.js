@@ -350,353 +350,35 @@ async (from, client, conText) => {
   }
 });*/
 
-
 //========================================================================================================================
-keith({
-  pattern: "mistral",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
+const aiModels = [
+  "mistral", "claudeai", "bard", "perplexity", "o3", "copilot",
+  "venice", "qwenai", "metai", "blackbox", "ilama", "gemini",
+  "deepseek", "grok", "wormgpt", "keithai"
+];
 
-  if (!q) return reply("❌ Provide a query");
 
-  try {
-    const res = await axios.get(`${api}/ai/mistral?q=${encodeURIComponent(q)}`);
+for (const pattern of aiModels) {
+  keith({
+    pattern: pattern,
+    category: "Ai",
+    description: `Query via ${pattern} API`
+  }, async (from, client, conText) => {
+    const { q, reply, api } = conText;
+    if (!q) return reply("❌ Provide a query");
 
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
+    try {
+      const res = await axios.get(`${api}/ai/${pattern}?q=${encodeURIComponent(q)}`);
+      reply(res.data?.status ? res.data.result : "API returned an error.");
+    } catch (err) {
+      console.error(`${pattern} error:`, err);
+      reply("⚠️ Failed." + err );
     }
-  } catch (err) {
-    console.error("mistral error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "claudeai",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
+  });
+}
 
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/claudeai?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("claudeai error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "bard",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/bard?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("bard error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "perplexity",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/perplexity?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("perplexity error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "o3",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/o3?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("o3 error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "chatgpt4",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/chatgpt4?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("chatgpt4 error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "venice",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/venice?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("venice error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "qwenai",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/qwenai?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("qwenai error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "metai",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/metai?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("metai error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "blackbox",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/blackbox?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("blackbox error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "ilama",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/ilama?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("ilama error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "gemini",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/gemini?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("gemini error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "deepseek",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/deepseek?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("deepseek error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "grok",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/ai/grok?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("grok error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "keithai",
-  category: "Ai",
-  description: "Query via Keith's API"
-}, async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query");
-
-  try {
-    const res = await axios.get(`${api}/keithai?q=${encodeURIComponent(q)}`);
-
-    if (res.data?.status) {
-      reply(res.data.result); 
-    } else {
-      reply("API returned an error.");
-    }
-  } catch (err) {
-    console.error("keithai error:", err);
-    reply("⚠️ Failed .");
-  }
-});
-//========================================================================================================================
+//====================================================================================================================
+//==================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -963,34 +645,7 @@ async (from, client, conText) => {
 });
 //========================================================================================================================
 
-keith({
-  pattern: "wormgpt",
-  aliases: ["wgpt", "evilgpt"],
-  category: "ai",
-  description: "Interact with WormGPT API"
-},
-async (from, client, conText) => {
-  const { q, reply, api } = conText;
 
-  if (!q) return reply("❌ Provide a query, e.g. .wormgpt hi");
-
-  try {
-    // Call WormGPT API
-    const res = await axios.get(`${api}/ai/wormgpt?q=${encodeURIComponent(q)}`);
-
-    if (!res.data || !res.data.status) {
-      return reply("❌ WormGPT API returned an invalid response.");
-    }
-
-    const output = res.data.result;
-
-    // Reply with the result
-    reply(output);
-  } catch (err) {
-    console.error("wormgpt Error:", err);
-    reply("❌ Failed to fetch WormGPT response: " + err.message);
-  }
-});
 //========================================================================================================================
 
 keith({
