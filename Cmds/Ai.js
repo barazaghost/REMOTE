@@ -787,7 +787,7 @@ async function uploadToUguu(filePath) {
   }
 }
 //========================================================================================================================
-keith({
+/*keith({
   pattern: "removebg",
   aliases: ["rmbg", "bgremove"],
   description: "Remove background from quoted image",
@@ -834,7 +834,7 @@ keith({
       try { fs.unlinkSync(filePath); } catch {}
     }
   }
-});
+});*/
 
 
 //========================================================================================================================
