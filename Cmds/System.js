@@ -18,8 +18,8 @@ const execAsync = util.promisify(require('child_process').exec);
 
 
 keith({
-  pattern: "removebg2",
-  aliases: ["bgremove2", "nobg"],
+  pattern: "removebg",
+  aliases: ["bgremove", "nobg"],
   category: "Ai",
   description: "Remove background from quoted image"
 }, async (from, client, conText) => {
