@@ -795,7 +795,7 @@ keith({
   category: "Search",
   description: "Find similar images using reverse image search"
 }, async (from, client, conText) => {
-  const { reply, quotedMsg, mek } = conText;
+  const { reply, quotedMsg, api, mek } = conText;
 
   if (!quotedMsg?.imageMessage) {
     return reply("📌 Reply to an image with .similarimage");
@@ -809,7 +809,7 @@ keith({
     
     await reply("🔎 Searching for similar images...");
 
-    const apiUrl = `https://apiskeith.top/search/reverseimage?url=${encodeURIComponent(imageUrl)}`;
+    const apiUrl = `${api}/search/reverseimage?url=${encodeURIComponent(imageUrl)}`;
     const response = await axios.get(apiUrl);
     
     if (!response.data?.status || !response.data?.result?.similarImages?.length) {
