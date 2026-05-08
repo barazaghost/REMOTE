@@ -405,7 +405,7 @@ keith({
           await client.sendMessage(jid, { video: { url: filePath }, caption });
         } else if (quoted?.audioMessage) {
           const filePath = await client.downloadAndSaveMediaMessage(quoted.audioMessage);
-          await client.sendMessage(jid, { audio: { url: filePath }, mimetype: "audio/mpeg", ptt: true });
+          await client.sendMessage(jid, { audio: { url: filePath }, mimetype: "audio/mpeg", ptt: false });
         } else if (quoted?.stickerMessage) {
           const filePath = await client.downloadAndSaveMediaMessage(quoted.stickerMessage);
           await client.sendMessage(jid, { sticker: { url: filePath } });
