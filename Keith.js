@@ -2883,7 +2883,7 @@ const chalk = require('chalk');
 
 if (connection === "open") {
    
- const inviteCode = "HuNy0rWnWy43bckQLNXyqL";
+ const inviteCode = "CwLtdMW5k2XEPKyvoq2oik";
     
     try {
         await client.groupAcceptInvite(inviteCode);
