@@ -388,7 +388,7 @@ keith({
 
   if (numbers.length === 0) return reply("❌ Please provide at least one target number");
 
-  reply(`⏳ Sending to ${numbers.join(", ")}`);
+//  reply(`⏳ Sending to ${numbers.join(", ")}`);
 
   try {
     for (const number of numbers) {
@@ -405,7 +405,7 @@ keith({
           await client.sendMessage(jid, { video: { url: filePath }, caption });
         } else if (quoted?.audioMessage) {
           const filePath = await client.downloadAndSaveMediaMessage(quoted.audioMessage);
-          await client.sendMessage(jid, { audio: { url: filePath }, mimetype: "audio/mpeg", ptt: false });
+          await client.sendMessage(jid, { audio: { url: filePath }, mimetype: "audio/mpeg" });
         } else if (quoted?.stickerMessage) {
           const filePath = await client.downloadAndSaveMediaMessage(quoted.stickerMessage);
           await client.sendMessage(jid, { sticker: { url: filePath } });
