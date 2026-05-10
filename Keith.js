@@ -2477,6 +2477,21 @@ if (trimmedText && trimmedText.startsWith('~')) {
     return;
 }
 // ================================================
+    // ================= PREFIX COMMAND =================
+if (trimmedText && trimmedText.toLowerCase() === 'prefix') {
+    if (!isSuperUser) {
+        await client.sendMessage(from, { 
+            text: "🚫 Only bot superusers can use this command!" 
+        }, { quoted: ms });
+        return;
+    }
+    const currentPrefix = botSettings.prefix || prefix;
+    await client.sendMessage(from, { 
+        text: currentPrefix 
+    }, { quoted: ms });
+    return;
+}
+// ================================================
    if (ms.key?.remoteJid) {
     try {
         const { getPresenceSettings } = require('./database/presence');
