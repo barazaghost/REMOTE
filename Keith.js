@@ -789,7 +789,86 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
     }
 }
 
+//========================================================================================================================
+// Auto Social Download Function
+//========================================================================================================================
+async function detectAndDownloadSocialMedia(client, message) {
+    try {
+        // Check if autosocialdownload is enabled
+        if (!autosocialdownload) return;
+        
+        if (!message?.message || message.key.fromMe) return;
+        
+        const from = message.key.remoteJid;
+        
+        // Don't process status broadcasts
+        if (from === 'status@broadcast') return;
+        
+        // Get text from message
+        const text = message.message?.conversation || 
+                    message.message?.extendedTextMessage?.text || 
+                    message.message?.imageMessage?.caption || '';
+        
+        if (!text) return;
+        
+        // Social media regex patterns
+        const patterns = {
+            tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/@[\w.-]+\/video\/\d+|vt\.tiktok\.com\/[\w]+|vm\.tiktok\.com\/[\w]+|tiktok\.com\/t\/[\w]+)/i,
+            instagram: /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com\/(?:reel|p|tv)\/[\w-]+)/i,
+            facebook: /(?:https?:\/\/)?(?:www\.)?(?:facebook\.com\/(?:watch\?v=\d+|share\/[\w]+\/[\w]+|reel\/\d+)|fb\.watch\/[\w]+)/i,
+            youtube: /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=[\w-]+|youtu\.be\/[\w-]+|youtube\.com\/shorts\/[\w-]+)/i,
+            twitter: /(?:https?:\/\/)?(?:www\.)?(?:twitter\.com\/[\w]+\/status\/\d+|x\.com\/[\w]+\/status\/\d+)/i
+        };
+        
+        let platform = null;
+        let url = null;
+        
+        for (const [key, pattern] of Object.entries(patterns)) {
+            const match = text.match(pattern);
+            if (match) {
+                platform = key;
+                url = match[0];
+                break;
+            }
+        }
+        
+        if (!platform || !url) return;
+        
+        const apiEndpoints = {
+            tiktok: `https://apiskeith.top/download/tiktokdl3?url=${encodeURIComponent(url)}`,
+            instagram: `https://apiskeith.top/download/instadl?url=${encodeURIComponent(url)}`,
+            facebook: `https://apiskeith.top/download/fbdl?url=${encodeURIComponent(url)}`,
+            youtube: `https://apiskeith.top/download/mp4?url=${encodeURIComponent(url)}`,
+            twitter: `https://apiskeith.top/download/twitter?url=${encodeURIComponent(url)}`
+        };
+        
+        const apiUrl = apiEndpoints[platform];
+        if (!apiUrl) return;
+        
+        try {
+            const response = await axios.get(apiUrl);
             
+            if (response.data && response.data.status === true && response.data.result) {
+                const videoUrl = response.data.result;
+                
+                // Send video directly using URL - no download needed
+                await client.sendMessage(from, {
+                    video: { url: videoUrl }
+                }, { quoted: message });
+                
+                console.log(`✅ Sent ${platform} video from: ${url}`);
+            }
+            
+        } catch (error) {
+            console.error(`${platform} download error:`, error.message);
+        }
+        
+    } catch (error) {
+        console.error('Auto social download error:', error.message);
+    }
+}
+//========================================================================================================================
+
 // Anti Status Mention Functions
 //========================================================================================================================
 function isStatusMention(message) {
