@@ -795,7 +795,7 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 async function detectAndDownloadSocialMedia(client, message) {
     try {
         // Check if autosocialdownload is enabled
-        if (!autosocialdownload) return;
+        if (autosocialdownload !== 'true') return;
         
         if (!message?.message || message.key.fromMe) return;
         
