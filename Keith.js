@@ -2729,7 +2729,9 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
     
     // Add this line
     await handleChatbot(client, ms.message, from, sender, isGroup, isSuperUser, ms); //
-  //await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);  //========================================================================================================================//========================================================================================================================
+  //await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
+    await detectAndDownloadSocialMedia(client, ms);  
+    //========================================================================================================================//========================================================================================================================
 
 
 
