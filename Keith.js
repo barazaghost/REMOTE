@@ -29,7 +29,7 @@ const {
 
 const { getSudoNumbers, setSudo, delSudo, isSudo } = require("./database/sudo");
 
-const { session, dev, botexpiration } = require("./settings");
+const { session, dev, botexpiration, autosocialdownload } = require("./settings");
 
 const { keith, commands, evt } = require("./commandHandler");
 const { 
