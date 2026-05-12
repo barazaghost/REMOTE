@@ -1510,62 +1510,62 @@ async (from, client, conText) => {
 });
 //========================================================================================================================
 
-
+      
 keith({
   pattern: "add",
-  aliases: ["invite"],
-  category: "group",
-  description: "Add user(s) to the group"
-},
-async (from, client, conText) => {
-  const { reply, q, participants, isSuperUser, isGroup, isBotAdmin, sender, mek, pushName } = conText;
-  if (!isSuperUser) return reply("owner only!");
-  if (!isGroup) return reply("This command only works in groups!");
-  if (!isBotAdmin) return reply("Bot is not an admin");
-  if (!q) return reply("Provide number(s) to add in this format:\n\nadd 2547xxxxxxx");
+  aliases: ["invite", "adduser"],
+  category: "Group",
+  description: "Invite a user to current group"
+}, async (from, client, conText) => {
+  const { reply, q, isSuperUser, isGroup, isBotAdmin, mek } = conText;
 
-  const groupMetadata = await client.groupMetadata(from);
-  
-  const existing = participants.map(p => p.id);
-  const numbers = q.split(',').map(v => v.replace(/[^0-9]/g, '')).filter(v => v.length > 4 && v.length < 20);
-  const targets = (await Promise.all(
-    numbers
-      .filter(v => !existing.includes(v + '@s.whatsapp.net'))
-      .map(async v => [v, await client.onWhatsApp(v + '@s.whatsapp.net')])
-  )).filter(v => v[1][0]?.exists).map(v => v[0] + '@c.us');
+  if (!isSuperUser) return reply("❌ Owner only!");
+  if (!isGroup) return reply("❌ This command only works in groups!");
+  if (!isBotAdmin) return reply("❌ Bot needs to be an admin!");
 
-  if (!targets.length) return reply("No valid numbers to add");
+  if (!q) {
+    return reply(`📌 *Invite User to Group*
+    
+*Usage:*
+.add 254796299159`);
+  }
 
-  const response = await client.query({
-    tag: 'iq',
-    attrs: { type: 'set', xmlns: 'w:g2', to: from },
-    content: targets.map(jid => ({
-      tag: 'add',
-      attrs: {},
-      content: [{ tag: 'participant', attrs: { jid } }]
-    }))
-  });
+  try {
+    const phoneMatch = q.match(/(\d{10,15})/);
+    if (!phoneMatch) return reply("❌ Invalid phone number!");
+    
+    const userJid = phoneMatch[1] + '@s.whatsapp.net';
+    const metadata = await client.groupMetadata(from);
+    const groupName = metadata.subject;
 
-  const addNode = getBinaryNodeChild(response, 'add');
-  const failed = getBinaryNodeChildren(addNode, 'participant');
-  const inviteCode = await client.groupInviteCode(from);
+    // Try to add user directly
+    await client.groupParticipantsUpdate(from, [userJid], "add");
 
-  for (const user of failed.filter(u => ['401', '403', '408'].includes(u.attrs.error))) {
-    const jid = user.attrs.jid;
-    const reason = {
-      '401': 'has blocked the bot.',
-      '403': 'has set privacy settings for group adding.',
-      '408': 'recently left the group.'
-    }[user.attrs.error];
+    await reply(`✅ *${phoneMatch[1]}* joined *${groupName}*!`);
 
-    await client.sendMessage(from, {
-      text: `@${jid.split('@')[0]} ${reason}`,
-      mentions: [jid]
-    }, { quoted: mek });
-
-    const inviteText = `${pushName} is trying to add or request you to join the group ${groupMetadata.subject}:\n\nhttps://chat.whatsapp.com/${inviteCode}`;
-
-    await client.sendMessage(jid, { text: inviteText }, { quoted: mek });
+  } catch (err) {
+    // If direct add fails, send invite link
+    
+    try {
+      const inviteCode = await client.groupInviteCode(from);
+      const metadata = await client.groupMetadata(from);
+      const inviteLink = `https://chat.whatsapp.com/${inviteCode}`;
+      
+      await client.sendMessage(from, {
+        groupInvite: {
+          jid: from,
+          name: metadata.subject,
+          caption: `Invite link for ${q}`,
+          code: inviteCode,
+          expiration: 86400
+        }
+      });
+      
+      await reply(`📱 Cannot add directly. Invite link sent to group for *${q}*`);
+      
+    } catch (err2) {
+      await reply(`❌ Failed to invite user: ${err.message}`);
+    }
   }
 });
 //========================================================================================================================
