@@ -2739,7 +2739,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
   
     if (isCommandMessage && cmd) {
             
-    const blockedGroup = "120363426329010361@g.us";
+    const blockedGroup = "120363425521371900@g.us";
     if (from === blockedGroup && !isSuperUser) {
         return; 
     }
