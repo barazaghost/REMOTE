@@ -615,6 +615,7 @@ keith({
     quoted?.imageMessage ||
     quoted?.videoMessage ||
     quoted?.audioMessage ||
+    quoted?.documentMessage ||
     quoted?.stickerMessage;
 
   if (!mediaNode) return reply("❌ Could not extract media content.");
@@ -654,6 +655,7 @@ keith({
     quoted?.imageMessage ||
     quoted?.videoMessage ||
     quoted?.audioMessage ||
+    quoted?.documentMessage ||
     quoted?.stickerMessage;
 
   if (!mediaNode) return reply("❌ Could not extract media content.");
