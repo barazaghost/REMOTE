@@ -7,23 +7,61 @@ const mime = require('mime-types');
 const crypto = require('crypto');
 //========================================================================================================================
 //========================================================================================================================
+
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+
+//========================================================================================================================
+//========================================================================================================================
 function getMediaType(quoted) {
   if (quoted.imageMessage) return "image";
   if (quoted.videoMessage) return "video";
   if (quoted.stickerMessage) return "sticker";
   if (quoted.audioMessage) return "audio";
+  if (quoted.documentMessage) return "document";
   return "unknown";
 }
 
 async function saveMediaToTemp(client, quotedMedia, type) {
   const tmpDir = path.join(__dirname, "..", "tmp");
   await fs.ensureDir(tmpDir);
-  const fileName = `${type}-${Date.now()}`;
+  
+  // Generate unique filename with proper extension
+  let extension = '';
+  switch (type) {
+    case 'image': extension = '.jpg'; break;
+    case 'video': extension = '.mp4'; break;
+    case 'audio': extension = '.mp3'; break;
+    case 'sticker': extension = '.webp'; break;
+    case 'document': 
+      // Try to get extension from mimetype or filename
+      if (quotedMedia.fileName) {
+        extension = path.extname(quotedMedia.fileName) || '';
+      }
+      if (!extension && quotedMedia.mimetype) {
+        extension = '.' + quotedMedia.mimetype.split('/')[1];
+      }
+      if (!extension) extension = '.bin';
+      break;
+    default: extension = '.bin';
+  }
+  
+  const fileName = `${type}-${Date.now()}${extension}`;
   const filePath = path.join(tmpDir, fileName);
-  const savedPath = await client.downloadAndSaveMediaMessage(quotedMedia, filePath);
-  return savedPath;
+  
+  // Use downloadMediaMessage which is more reliable for all types including documents
+  const buffer = await downloadMediaMessage(
+    { message: { [type + 'Message']: quotedMedia } },
+    'buffer',
+    {},
+    { 
+      reuploadRequest: client.updateMediaMessage,
+      logger: console 
+    }
+  );
+  
+  await fs.writeFile(filePath, buffer);
+  return filePath;
 }
-
 
 async function uploadToCatbox(filePath) {
   const buffer = await fs.readFile(filePath);
