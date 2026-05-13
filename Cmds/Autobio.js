@@ -5,12 +5,16 @@ const path = require('path');
 const FormData = require('form-data');
 const mime = require('mime-types');
 const crypto = require('crypto');
-//========================================================================================================================
-//========================================================================================================================
-
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 
 //========================================================================================================================
+//========================================================================================================================
+
+
+//========================================================================================================================
+
+
+
 function getMediaType(quoted) {
   if (quoted.imageMessage) return "image";
   if (quoted.videoMessage) return "video";
@@ -20,10 +24,19 @@ function getMediaType(quoted) {
   return "unknown";
 }
 
-async function saveMediaToTemp(client, quotedMedia, type) {
+function getFileExtensionFromMimetype(mimetype) {
+  if (!mimetype) return '';
+  const ext = mime.extension(mimetype);
+  return ext ? `.${ext}` : '';
+}
+
+async function saveMediaToTemp(client, quotedMedia, type, mimetype) {
   const tmpDir = path.join(__dirname, "..", "tmp");
   await fs.ensureDir(tmpDir);
-  const fileName = `${type}-${Date.now()}`;
+  
+  // Get extension from mimetype
+  const extension = getFileExtensionFromMimetype(mimetype);
+  const fileName = `${type}-${Date.now()}${extension}`;
   const filePath = path.join(tmpDir, fileName);
   
   // Use downloadMediaMessage for all types including documents
@@ -40,6 +53,7 @@ async function saveMediaToTemp(client, quotedMedia, type) {
   await fs.writeFile(filePath, buffer);
   return filePath;
 }
+
 //========================================================================================================================
 
 
