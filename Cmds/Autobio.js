@@ -17,12 +17,22 @@ function getMediaType(quoted) {
   return "unknown";
 }
 
-async function saveMediaToTemp(client, quotedMedia, type) {
+function getFileExtensionFromMimetype(mimetype) {
+  if (!mimetype) return '';
+  const ext = mime.extension(mimetype);
+  return ext ? `.${ext}` : '';
+}
+
+async function saveMediaToTemp(client, quotedMedia, type, mimetype) {
   const tmpDir = path.join(__dirname, "..", "tmp");
   await fs.ensureDir(tmpDir);
-  const fileName = `${type}-${Date.now()}`;
+  
+  // Get extension from mimetype
+  const extension = getFileExtensionFromMimetype(mimetype);
+  const fileName = `${type}-${Date.now()}${extension}`;
   const filePath = path.join(tmpDir, fileName);
   
+  // Use downloadMediaMessage for all types including documents
   const buffer = await downloadMediaMessage(
     { message: { [type + 'Message']: quotedMedia } },
     'buffer',
