@@ -4,6 +4,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const FormData = require('form-data');
 const mime = require('mime-types');
+const crypto = require('crypto');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 
 //========================================================================================================================
@@ -27,12 +28,10 @@ async function saveMediaToTemp(client, quotedMedia, type, mimetype) {
   const tmpDir = path.join(__dirname, "..", "tmp");
   await fs.ensureDir(tmpDir);
   
-  // Get extension from mimetype
   const extension = getFileExtensionFromMimetype(mimetype);
   const fileName = `${type}-${Date.now()}${extension}`;
   const filePath = path.join(tmpDir, fileName);
   
-  // Use downloadMediaMessage for all types including documents
   const buffer = await downloadMediaMessage(
     { message: { [type + 'Message']: quotedMedia } },
     'buffer',
@@ -54,7 +53,7 @@ async function uploadToCatbox(filePath) {
   form.append('userhash', ''); 
   form.append('fileToUpload', buffer, {
     filename: path.basename(filePath),
-    contentType: mime.lookup(path.extname(filePath)) || 'application/octet-stream'
+    contentType: mime.lookup(filePath) || 'application/octet-stream'
   });
 
   const { data } = await axios.post('https://catbox.moe/user/api.php', form, {
@@ -74,7 +73,7 @@ async function uploadToLitterbox(filePath) {
   form.append('reqtype', 'fileupload');
   form.append('fileToUpload', buffer, {
     filename: path.basename(filePath),
-    contentType: mime.lookup(path.extname(filePath)) || 'application/octet-stream'
+    contentType: mime.lookup(filePath) || 'application/octet-stream'
   });
 
   const { data } = await axios.post('https://litterbox.catbox.moe/resources/internals/api.php', form, {
@@ -89,11 +88,10 @@ async function uploadToLitterbox(filePath) {
 async function uploadToUguu(filePath) {
   if (!fs.existsSync(filePath)) throw new Error("File does not exist");
 
-  const mimeType = mime.lookup(filePath) || 'application/octet-stream';
   const form = new FormData();
   form.append('files[]', fs.createReadStream(filePath), {
     filename: path.basename(filePath),
-    contentType: mimeType
+    contentType: mime.lookup(filePath) || 'application/octet-stream'
   });
 
   const response = await axios.post('https://uguu.se/upload.php', form, {
@@ -141,17 +139,34 @@ keith({
   if (type === "unknown") return reply("❌ Unsupported media type.");
 
   let mediaNode;
-  if (type === "image") mediaNode = quotedMsg.imageMessage;
-  else if (type === "video") mediaNode = quotedMsg.videoMessage;
-  else if (type === "audio") mediaNode = quotedMsg.audioMessage;
-  else if (type === "sticker") mediaNode = quotedMsg.stickerMessage;
-  else if (type === "document") mediaNode = quotedMsg.documentMessage;
+  let mimetype = '';
+  
+  if (type === "image") {
+    mediaNode = quotedMsg.imageMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "video") {
+    mediaNode = quotedMsg.videoMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "audio") {
+    mediaNode = quotedMsg.audioMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "sticker") {
+    mediaNode = quotedMsg.stickerMessage;
+    mimetype = mediaNode.mimetype || 'image/webp';
+  }
+  else if (type === "document") {
+    mediaNode = quotedMsg.documentMessage;
+    mimetype = mediaNode.mimetype;
+  }
 
   if (!mediaNode) return reply("❌ Could not extract media content.");
 
   let filePath;
   try {
-    filePath = await saveMediaToTemp(client, mediaNode, type);
+    filePath = await saveMediaToTemp(client, mediaNode, type, mimetype);
     const link = await uploadToUguu(filePath);
     await reply(link);
   } catch (err) {
@@ -166,9 +181,9 @@ keith({
 
 // ==================== imgbb Command ====================
 keith({
-  pattern: "imgbb",
-  aliases: ["uploadimg", "imgurl"],
-  description: "Convert quoted image to ImgBB URL",
+  pattern: "url",
+  aliases: ["upload", "urlconvert"],
+  description: "Convert quoted media to Catbox URL",
   category: "Uploader",
   filename: __filename
 }, async (from, client, conText) => {
@@ -177,19 +192,37 @@ keith({
   if (!quotedMsg) return reply("📌 Please quote an image.");
 
   const type = getMediaType(quotedMsg);
-  if (type !== "image") return reply("❌ Only images are supported for ImgBB.");
+  if (type === "unknown") return reply("❌ Unsupported media type.");
 
-  const mediaNode = quotedMsg.imageMessage;
+  let mediaNode;
+  let mimetype = '';
+  
+  if (type === "image") {
+    mediaNode = quotedMsg.imageMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "video") {
+    mediaNode = quotedMsg.videoMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "audio") {
+    mediaNode = quotedMsg.audioMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "sticker") {
+    mediaNode = quotedMsg.stickerMessage;
+    mimetype = mediaNode.mimetype || 'image/webp';
+  }
 
   if (!mediaNode) return reply("❌ Could not extract media content.");
 
   let filePath;
   try {
-    filePath = await saveMediaToTemp(client, mediaNode, type);
+    filePath = await saveMediaToTemp(client, mediaNode, type, mimetype);
     const link = await uploadToImgBB(filePath);
-    await reply(link);
+    await client.sendMessage(from, { text: link }, { quoted: mek });
   } catch (err) {
-    console.error("ImgBB upload error:", err);
+    console.error("Catbox upload error:", err);
     await reply("❌ Failed to upload. Error:\n" + err.message);
   } finally {
     if (filePath && await fs.pathExists(filePath)) {
@@ -201,32 +234,45 @@ keith({
 // ==================== Catbox Command ====================
 keith({
   pattern: "catbox",
-  aliases: ["catupload", "caturl"],
+  aliases: ["upload", "urlconvert"],
   description: "Convert quoted media to Catbox URL",
   category: "Uploader",
   filename: __filename
 }, async (from, client, conText) => {
   const { mek, quoted, quotedMsg, reply } = conText;
 
-  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, or sticker to upload.");
 
   const type = getMediaType(quotedMsg);
   if (type === "unknown") return reply("❌ Unsupported media type.");
 
   let mediaNode;
-  if (type === "image") mediaNode = quotedMsg.imageMessage;
-  else if (type === "video") mediaNode = quotedMsg.videoMessage;
-  else if (type === "audio") mediaNode = quotedMsg.audioMessage;
-  else if (type === "sticker") mediaNode = quotedMsg.stickerMessage;
-  else if (type === "document") mediaNode = quotedMsg.documentMessage;
+  let mimetype = '';
+  
+  if (type === "image") {
+    mediaNode = quotedMsg.imageMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "video") {
+    mediaNode = quotedMsg.videoMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "audio") {
+    mediaNode = quotedMsg.audioMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "sticker") {
+    mediaNode = quotedMsg.stickerMessage;
+    mimetype = mediaNode.mimetype || 'image/webp';
+  }
 
   if (!mediaNode) return reply("❌ Could not extract media content.");
 
   let filePath;
   try {
-    filePath = await saveMediaToTemp(client, mediaNode, type);
+    filePath = await saveMediaToTemp(client, mediaNode, type, mimetype);
     const link = await uploadToCatbox(filePath);
-    await reply(link);
+    await client.sendMessage(from, { text: link }, { quoted: mek });
   } catch (err) {
     console.error("Catbox upload error:", err);
     await reply("❌ Failed to upload. Error:\n" + err.message);
@@ -241,29 +287,46 @@ keith({
 keith({
   pattern: "litterbox",
   aliases: ["litupload", "tempurl"],
-  description: "Convert quoted media to Litterbox temporary URL (expires in 1 hour)",
+  description: "Convert quoted media to Litterbox temporary URL",
   category: "Uploader",
   filename: __filename
 }, async (from, client, conText) => {
   const { mek, quoted, quotedMsg, reply } = conText;
 
-  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, document, or sticker to upload.");
 
   const type = getMediaType(quotedMsg);
   if (type === "unknown") return reply("❌ Unsupported media type.");
 
   let mediaNode;
-  if (type === "image") mediaNode = quotedMsg.imageMessage;
-  else if (type === "video") mediaNode = quotedMsg.videoMessage;
-  else if (type === "audio") mediaNode = quotedMsg.audioMessage;
-  else if (type === "sticker") mediaNode = quotedMsg.stickerMessage;
-  else if (type === "document") mediaNode = quotedMsg.documentMessage;
+  let mimetype = '';
+  
+  if (type === "image") {
+    mediaNode = quotedMsg.imageMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "video") {
+    mediaNode = quotedMsg.videoMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "audio") {
+    mediaNode = quotedMsg.audioMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "sticker") {
+    mediaNode = quotedMsg.stickerMessage;
+    mimetype = mediaNode.mimetype || 'image/webp';
+  }
+  else if (type === "document") {
+    mediaNode = quotedMsg.documentMessage;
+    mimetype = mediaNode.mimetype;
+  }
 
   if (!mediaNode) return reply("❌ Could not extract media content.");
 
   let filePath;
   try {
-    filePath = await saveMediaToTemp(client, mediaNode, type);
+    filePath = await saveMediaToTemp(client, mediaNode, type, mimetype);
     const link = await uploadToLitterbox(filePath);
     await reply(link);
   } catch (err) {
