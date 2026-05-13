@@ -1959,11 +1959,277 @@ async function startAutoBio() {
 
 //========================================================================================================================
 // Anti-Delete with Document Support, Quoted Messages & Captions
+//========================================================================================================================
+// Anti-Delete with Document Support & Quoted Message
+//========================================================================================================================
+const baseDir = path.join(__dirname, 'tmp');
+if (!fs.existsSync(baseDir)) {
+    fs.mkdirSync(baseDir, { recursive: true });
+}
 
+function getChatFilePath(remoteJid) {
+    const safeJid = remoteJid.replace(/[^a-zA-Z0-9@]/g, '_');
+    return path.join(baseDir, `${safeJid}.json`);
+}
+
+function loadChatData(remoteJid) {
+    const filePath = getChatFilePath(remoteJid);
+    try {
+        if (fs.existsSync(filePath)) {
+            const data = fs.readFileSync(filePath, 'utf8');
+            return JSON.parse(data) || [];
+        }
+    } catch (error) {
+        console.error('Error loading chat data:', error);
+    }
+    return [];
+}
+
+function saveChatData(remoteJid, messages) {
+    const filePath = getChatFilePath(remoteJid);
+    try {
+        fs.writeFileSync(filePath, JSON.stringify(messages, null, 2));
+    } catch (error) {
+        console.error('Error saving chat data:', error);
+    }
+}
+
+// Helper function to extract text from any message type
+function extractMessageText(msg) {
+    if (!msg) return null;
+    
+    if (msg.conversation) return msg.conversation;
+    if (msg.extendedTextMessage?.text) return msg.extendedTextMessage.text;
+    if (msg.imageMessage?.caption) return msg.imageMessage.caption;
+    if (msg.videoMessage?.caption) return msg.videoMessage.caption;
+    if (msg.documentMessage?.caption) return msg.documentMessage.caption;
+    if (msg.audioMessage?.caption) return msg.audioMessage.caption;
+    
+    return null;
+}
+
+// Helper function to get media message from nested structures
+function getMediaMessage(msg, type) {
+    if (!msg) return null;
+    
+    if (msg[type + 'Message']) return msg[type + 'Message'];
+    if (msg.ephemeralMessage?.message?.[type + 'Message']) return msg.ephemeralMessage.message[type + 'Message'];
+    if (msg.viewOnceMessage?.message?.[type + 'Message']) return msg.viewOnceMessage.message[type + 'Message'];
+    if (msg.viewOnceMessageV2?.message?.[type + 'Message']) return msg.viewOnceMessageV2.message[type + 'Message'];
+    
+    return null;
+}
+
+async function sendDeletedMessageNotification(client, settings, {
+    remoteJid,
+    deleterJid,
+    senderJid,
+    isGroup,
+    deletedMsg,
+    groupInfo = ''
+}) {
+    const notification = `${settings.notification}\n` +
+                       `• Deleted by: @${deleterJid.split('@')[0]}\n` +
+                       `• Original sender: @${senderJid.split('@')[0]}\n` +
+                       `${groupInfo}\n` +
+                       `• Chat type: ${isGroup ? 'Group' : 'Private'}`;
+
+    const contextInfo = {
+        mentionedJid: [deleterJid, senderJid],
+        forwardingScore: 0,
+        isForwarded: false
+    };
+
+    const targetJid = settings.sendToOwner ? 
+        (client?.dev || client.user.id.split(':')[0] + '@s.whatsapp.net') : 
+        remoteJid;
+
+    // For text messages - send with quoted
+    if (deletedMsg.message.conversation) {
+        await client.sendMessage(targetJid, {
+            text: `${notification}\n\n📝 *Deleted Text:*\n${deletedMsg.message.conversation}`,
+            mentions: [deleterJid, senderJid],
+            contextInfo
+        }, { quoted: deletedMsg }); // QUOTED ADDED
+    } 
+    else if (deletedMsg.message.extendedTextMessage) {
+        await client.sendMessage(targetJid, {
+            text: `${notification}\n\n📝 *Deleted Text:*\n${deletedMsg.message.extendedTextMessage.text}`,
+            mentions: [deleterJid, senderJid],
+            contextInfo
+        }, { quoted: deletedMsg }); // QUOTED ADDED
+    }
+    else if (settings.includeMedia) {
+        try {
+            // Handle Image
+            if (deletedMsg.message.imageMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { imageMessage: deletedMsg.message.imageMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                const caption = deletedMsg.message.imageMessage?.caption || '';
+                const finalCaption = notification + (caption ? `\n\n🖼️ *Caption:* ${caption}` : '');
+                
+                await client.sendMessage(targetJid, {
+                    image: buffer,
+                    caption: finalCaption,
+                    mentions: [deleterJid, senderJid],
+                    contextInfo
+                }, { quoted: deletedMsg }); // QUOTED ADDED
+            }
+            // Handle Video
+            else if (deletedMsg.message.videoMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { videoMessage: deletedMsg.message.videoMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                const caption = deletedMsg.message.videoMessage?.caption || '';
+                const finalCaption = notification + (caption ? `\n\n🎥 *Caption:* ${caption}` : '');
+                
+                await client.sendMessage(targetJid, {
+                    video: buffer,
+                    caption: finalCaption,
+                    mentions: [deleterJid, senderJid],
+                    contextInfo
+                }, { quoted: deletedMsg }); // QUOTED ADDED
+            }
+            // Handle Document (FIXED)
+            else if (getMediaMessage(deletedMsg.message, 'document')) {
+                const docMsg = getMediaMessage(deletedMsg.message, 'document');
+                const buffer = await downloadMediaMessage(
+                    { message: { documentMessage: docMsg } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                const fileName = docMsg.fileName || 'document';
+                const mimetype = docMsg.mimetype || mime.lookup(fileName) || 'application/octet-stream';
+                const caption = docMsg.caption || '';
+                const finalCaption = notification + (caption ? `\n\n📄 *Caption:* ${caption}` : '');
+                
+                await client.sendMessage(targetJid, {
+                    document: buffer,
+                    fileName: fileName,
+                    mimetype: mimetype,
+                    caption: finalCaption,
+                    mentions: [deleterJid, senderJid],
+                    contextInfo
+                }, { quoted: deletedMsg }); // QUOTED ADDED
+            }
+            // Handle Audio
+            else if (deletedMsg.message.audioMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { audioMessage: deletedMsg.message.audioMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                const caption = deletedMsg.message.audioMessage?.caption || '';
+                const finalCaption = notification + (caption ? `\n\n🎵 *Caption:* ${caption}` : '');
+                
+                await client.sendMessage(targetJid, {
+                    audio: buffer,
+                    ptt: deletedMsg.message.audioMessage.ptt || false,
+                    caption: finalCaption,
+                    mentions: [deleterJid, senderJid],
+                    contextInfo
+                }, { quoted: deletedMsg }); // QUOTED ADDED
+            }
+            // Handle Sticker
+            else if (deletedMsg.message.stickerMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { stickerMessage: deletedMsg.message.stickerMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                
+                await client.sendMessage(targetJid, {
+                    sticker: buffer,
+                    mentions: [deleterJid, senderJid],
+                    contextInfo
+                }, { quoted: deletedMsg }); // QUOTED ADDED
+            }
+        } catch (mediaError) {
+            console.error('Error processing media message:', mediaError);
+            await client.sendMessage(targetJid, {
+                text: `${notification}\n\n⚠️ A media message was deleted but could not be retrieved`,
+                mentions: [deleterJid, senderJid],
+                contextInfo
+            }, { quoted: deletedMsg }); // QUOTED ADDED
+        }
+    }
+    else {
+        await client.sendMessage(targetJid, {
+            text: `${notification}\n\n⚠️ A media message was deleted (media capture is disabled)`,
+            mentions: [deleterJid, senderJid],
+            contextInfo
+        }, { quoted: deletedMsg }); // QUOTED ADDED
+    }
+}
+
+client.ev.on('messages.upsert', async ({ messages }) => {
+    try {
+        const settings = await getAntiDeleteSettings();
+        if (!settings.status) return;
+
+        const message = messages[0];
+        if (!message.message || message.key.remoteJid === 'status@broadcast') return;
+
+        const remoteJid = message.key.remoteJid;
+        const chatData = loadChatData(remoteJid);
+        
+        // Store the entire message object including media info
+        chatData.push(JSON.parse(JSON.stringify(message)));
+        if (chatData.length > 100) chatData.shift();
+        
+        saveChatData(remoteJid, chatData);
+
+        if (message.message.protocolMessage?.type === 0) {
+            const deletedKey = message.message.protocolMessage.key;
+            const deletedMsg = chatData.find(m => m.key.id === deletedKey.id);
+            
+            if (!deletedMsg) return;
+
+            const deleterJid = message.key.participant || message.key.remoteJid;
+            const senderJid = deletedMsg.key.participant || deletedMsg.key.remoteJid;
+            
+            if (deleterJid.includes(client.user.id.split(':')[0])) return;
+
+            const isGroup = remoteJid.endsWith('@g.us');
+            let groupInfo = '';
+            
+            if (isGroup && settings.includeGroupInfo) {
+                try {
+                    const groupMetadata = await client.groupMetadata(remoteJid);
+                    groupInfo = `\n• Group: ${groupMetadata.subject}`;
+                } catch (e) {
+                    console.error('Error fetching group metadata:', e);
+                }
+            }
+
+            await sendDeletedMessageNotification(client, settings, {
+                remoteJid,
+                deleterJid,
+                senderJid,
+                isGroup,
+                deletedMsg,
+                groupInfo
+            });
+        }
+    } catch (error) {
+        console.error('Error in antidelete handler:', error);
+    }
+});
+//========================================================================================================================
 //========================================================================================================================
 // Anti-Delete with Document Support & Quoted Message (mek)
 //========================================================================================================================
-const baseDir = path.join(__dirname, 'tmp');
+/*const baseDir = path.join(__dirname, 'tmp');
 if (!fs.existsSync(baseDir)) {
     fs.mkdirSync(baseDir, { recursive: true });
 }
@@ -2256,7 +2522,7 @@ client.ev.on('messages.upsert', async ({ messages }) => {
 });
 //========================================================================================================================        
         //========================================================================================================================
-/*const baseDir = path.join(__dirname, 'tmp');
+const baseDir = path.join(__dirname, 'tmp');
 if (!fs.existsSync(baseDir)) {
     fs.mkdirSync(baseDir, { recursive: true });
 }
