@@ -799,7 +799,7 @@ async function detectAndDownloadSocialMedia(client, message) {
         if (settings.autosocialdownload !== 'true') return;
       //  if (autosocialdownload !== 'true') return;
         
-        if (!message?.message || message.key.fromMe) return;
+       // if (!message?.message || message.key.fromMe) return;
         
         const from = message.key.remoteJid;
         
