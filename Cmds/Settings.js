@@ -113,6 +113,116 @@ const {
     toggleAntiBot 
 } = require('../database/antibots');
 
+
+
+// =======================================================================================
+// AUTO SOCIAL DOWNLOAD COMMAND - SINGLE PATTERN (Enable/Disable/Status)
+// =======================================================================================
+keith({
+  pattern: "autosocialdl",
+  aliases: ["autosd", "socialdl", "autodownload", "autosocialdownload"],
+  category: "Settings",
+  description: "Enable/disable auto social media download or check status"
+},
+async (from, client, conText) => {
+  const { reply, q, isSuperUser, botSettings } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  const newStatus = q?.trim().toLowerCase();
+
+  // Get current settings from database
+  const currentSettings = await getSettings();
+  const currentStatus = currentSettings.autosocialdownload || "false";
+
+  // CASE 1: No argument - Show current status
+  if (!newStatus) {
+    const statusEmoji = currentStatus === "true" ? "✅" : "❌";
+    const statusText = currentStatus === "true" ? "ENABLED" : "DISABLED";
+    
+    let message = `*📱 Auto Social Download*\n\n`;
+    message += `${statusEmoji} *Current Status:* ${statusText}\n\n`;
+    
+    if (currentStatus === "true") {
+      message += `*Active Features:*\n`;
+      message += `▸ TikTok videos will be auto-downloaded\n`;
+      message += `▸ Instagram reels/posts will be auto-downloaded\n`;
+      message += `▸ Facebook videos will be auto-downloaded\n`;
+      message += `▸ YouTube videos/shorts will be auto-downloaded\n`;
+      message += `▸ Twitter/X videos will be auto-downloaded\n\n`;
+      message += `*To disable:* \`${botSettings.prefix}autosocial off\`\n`;
+    } else {
+      message += `*Auto download is currently OFF*\n`;
+      message += `The bot will NOT automatically download social media links.\n\n`;
+      message += `*To enable:* \`${botSettings.prefix}autosocial on\`\n`;
+    }
+    
+    message += `\n*Usage:* \`${botSettings.prefix}autosocial <on/off>\``;
+    
+    return reply(message);
+  }
+
+  // CASE 2: Enable/Disable - Update setting
+  if (['on', 'off', 'true', 'false', 'enable', 'disable'].includes(newStatus)) {
+    // Convert to boolean string
+    let booleanStatus;
+    if (['on', 'true', 'enable'].includes(newStatus)) {
+      booleanStatus = "true";
+    } else {
+      booleanStatus = "false";
+    }
+
+    // Check if already in desired state
+    if (currentStatus === booleanStatus) {
+      const alreadyStatus = booleanStatus === "true" ? "enabled" : "disabled";
+      return reply(`⚠️ Auto social download is already ${alreadyStatus}! No changes made.`);
+    }
+
+    try {
+      // Update settings in database
+      await updateSettings({ autosocialdownload: booleanStatus });
+      
+      // Refresh botSettings in context
+      const updatedSettings = await getSettings();
+      conText.botSettings.autosocialdownload = updatedSettings.autosocialdownload;
+      
+      const statusEmoji = booleanStatus === "true" ? "✅" : "❌";
+      const statusText = booleanStatus === "true" ? "ENABLED" : "DISABLED";
+      const actionText = booleanStatus === "true" ? "enabled" : "disabled";
+      
+      let message = `${statusEmoji} *Auto Social Download ${statusText}*\n\n`;
+      message += `Auto downloading of social media content has been ${actionText}.\n`;
+      message += `*Database updated successfully!*\n\n`;
+      
+      if (booleanStatus === "true") {
+        message += `*Now auto-detecting:*\n`;
+        message += `▸ TikTok\n▸ Instagram\n▸ Facebook\n▸ YouTube\n▸ Twitter/X\n\n`;
+        message += `⚠️ Any social media link sent will be automatically downloaded.\n`;
+        message += `*To disable:* \`${botSettings.prefix}autosocial off\``;
+      } else {
+        message += `The bot will no longer auto-download social media content.\n\n`;
+        message += `*To enable:* \`${botSettings.prefix}autosocial on\``;
+      }
+      
+      return reply(message);
+      
+    } catch (error) {
+      console.error('Auto social download update error:', error);
+      return reply("❌ Failed to update auto social download settings in database!");
+    }
+  }
+
+  // CASE 3: Invalid argument
+  return reply(
+    `❌ *Invalid option!*\n\n` +
+    `*Usage:*\n` +
+    `▸ \`${botSettings.prefix}autosocial\` - Check current status\n` +
+    `▸ \`${botSettings.prefix}autosocial on\` - Enable auto download\n` +
+    `▸ \`${botSettings.prefix}autosocial off\` - Disable auto download\n\n` +
+    `*Current status:* ${currentStatus === "true" ? "✅ ENABLED" : "❌ DISABLED"}`
+  );
+});
+
 // ==================== ANTI-BOT COMMAND ====================
 keith({
     pattern: "antibot",
