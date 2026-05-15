@@ -509,10 +509,10 @@ async (from, client, conText) => {
     const response = await axios.get(apiUrl, { timeout: 100000 });
     const result = response.data?.result;
 
-    if (!result?.video_hd) return;
+   // if (!result?.video_hd) return;
 
     await client.sendMessage(from, {
-      video: { url: result.video_hd },
+      video: { url: result },
       mimetype: "video/mp4"
     }, { quoted: mek });
 
