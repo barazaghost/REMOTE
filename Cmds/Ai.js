@@ -789,48 +789,6 @@ async function uploadToUguu(filePath) {
 //========================================================================================================================
 
 
-keith({
-  pattern: "similarimage",
-  aliases: ["reverse", "similarimg", "reverseimage", "findimage"],
-  category: "Search",
-  description: "Find similar images using reverse image search"
-}, async (from, client, conText) => {
-  const { reply, quotedMsg, api, mek } = conText;
-
-  if (!quotedMsg?.imageMessage) {
-    return reply("📌 Reply to an image with .similarimage");
-  }
-
-  
-  try {
-    const filePath = await client.downloadAndSaveMediaMessage(quotedMsg.imageMessage);
-    const imageUrl = await uploadToUguu(filePath);
-    await fs.remove(filePath);
-    
-    await reply("🔎 Searching for similar images...");
-
-    const apiUrl = `${api}/search/reverseimage?url=${encodeURIComponent(imageUrl)}`;
-    const response = await axios.get(apiUrl);
-    
-    if (!response.data?.status || !response.data?.result?.similarImages?.length) {
-      return reply("❌ No similar images found.");
-    }
-
-    const similarImages = response.data.result.similarImages.slice(0, 5);
-    
-    for (let i = 0; i < similarImages.length; i++) {
-      await client.sendMessage(from, {
-        image: { url: similarImages[i].thumbnailUrl }
-      }, { quoted: mek });
-      
-      await new Promise(r => setTimeout(r, 300));
-    }
-
-  } catch (err) {
-    console.error("similarimage error:", err);
-    await reply(`❌ Error: ${err.message}`);
-  }
-});
 
 /*keith({
   pattern: "removebg",
