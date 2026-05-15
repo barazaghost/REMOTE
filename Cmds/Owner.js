@@ -1,11 +1,13 @@
 
 
 const { keith } = require('../commandHandler');
-const { S_WHATSAPP_NET } = require('@whiskeysockets/baileys');
+const { S_WHATSAPP_NET, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const Jimp = require('jimp');
 const moment = require('moment-timezone');
 const fs = require('fs/promises');
 const { exec } = require("child_process");
+//const {  } = require('@whiskeysockets/baileys');
+
 //const { keith } = require('../commandHandler');
 const axios = require('axios');
 const util = require('util');
@@ -797,6 +799,10 @@ keith({
   }
 });
 //========================================================================================================================
+
+
+// From Owner.js
+
 keith({
   pattern: "save",
   aliases: ["savestatus", "statussave"],
@@ -811,26 +817,42 @@ keith({
   try {
     if (quoted?.imageMessage) {
       const caption = quoted.imageMessage.caption || "";
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
-      await client.sendMessage(from, { image: { url: filePath }, caption }, { quoted: mek });
+      const buffer = await downloadMediaMessage(
+        { message: { imageMessage: quoted.imageMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(from, { image: buffer, caption }, { quoted: mek });
     }
 
     if (quoted?.videoMessage) {
       const caption = quoted.videoMessage.caption || "";
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.videoMessage);
-      await client.sendMessage(from, { video: { url: filePath }, caption }, { quoted: mek });
+      const buffer = await downloadMediaMessage(
+        { message: { videoMessage: quoted.videoMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(from, { video: buffer, caption }, { quoted: mek });
     }
 
     if (quoted?.audioMessage) {
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.audioMessage);
-      await client.sendMessage(from, { audio: { url: filePath }, mimetype: 'audio/mpeg' }, { quoted: mek });
+      const buffer = await downloadMediaMessage(
+        { message: { audioMessage: quoted.audioMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(from, { audio: buffer, mimetype: 'audio/mpeg' }, { quoted: mek });
     }
 
   } catch (err) {
-    console.error("vv command error:", err);
+    console.error("save command error:", err);
     reply("❌ Failed to retrieve media. Try again.");
   }
 });
+//========================================================================================================================
 //========================================================================================================================
 
 
