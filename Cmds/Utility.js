@@ -64,6 +64,56 @@ async function toPtt(buffer) {
 //========================================================================================================================
 // toptt Command
 
+//========================================================================================================================
+// 5. Loop Command (Repeat Media)
+//========================================================================================================================
+keith({
+  pattern: "loop",
+  aliases: ["repeat"],
+  description: "Loop audio or video N times",
+  category: "Utility",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, quotedMsg, mek, reply, keithRandom } = conText;
+  
+  let loops = 2;
+  if (q && !isNaN(parseInt(q))) {
+    loops = Math.min(parseInt(q), 10);
+  }
+  
+  const media = quotedMsg?.videoMessage || quotedMsg?.audioMessage;
+  if (!media) {
+    return reply("📌 Reply to an audio or video to loop it.\nUsage: .loop 3 (loops 3 times)");
+  }
+  
+  const isVideo = !!quotedMsg.videoMessage;
+  const type = isVideo ? 'video' : 'audio';
+  const inputExt = isVideo ? '.mp4' : '.mp3';
+  const outputExt = isVideo ? '.mp4' : '.mp3';
+  
+  try {
+    const buffer = await downloadMediaBuffer(client, media, type);
+    const inputPath = keithRandom(inputExt);
+    const outputPath = keithRandom(outputExt);
+    
+    fs.writeFileSync(inputPath, buffer);
+    
+    exec(`ffmpeg -stream_loop ${loops} -i ${inputPath} -c copy ${outputPath}`, async (err) => {
+      fs.unlinkSync(inputPath);
+      if (err) return reply("❌ Failed to loop media.");
+      
+      const outputBuffer = fs.readFileSync(outputPath);
+      const message = isVideo
+        ? { video: outputBuffer, mimetype: "video/mp4" }
+        : { audio: outputBuffer, mimetype: "audio/mpeg" };
+      
+      await client.sendMessage(from, message, { quoted: mek });
+      fs.unlinkSync(outputPath);
+    });
+  } catch (error) {
+    reply(`❌ Error: ${error.message}`);
+  }
+});
 
 //========================================================================================================================
 // Image to Video with Audio (More Stable - Resizes Image First)
