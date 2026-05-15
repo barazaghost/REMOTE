@@ -1,8 +1,145 @@
 const axios = require('axios');
-const { generateWAMessageContent, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
+const { generateWAMessageContent, generateWAMessageFromContent, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const { keith } = require('../commandHandler');
 const more = String.fromCharCode(8206);
 const readmore = more.repeat(4001);
+// From Ai.js
+//const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+const fs = require('fs-extra');
+const path = require('path');
+const FormData = require('form-data');
+//const axios = require('axios');
+const mime = require('mime-types');
+
+//========================================================================================================================
+// Helper Functions
+//========================================================================================================================
+function getMediaType(quoted) {
+  if (quoted.imageMessage) return "image";
+  if (quoted.videoMessage) return "video";
+  if (quoted.stickerMessage) return "sticker";
+  if (quoted.audioMessage) return "audio";
+  if (quoted.documentMessage) return "document";
+  return "unknown";
+}
+
+function getFileExtensionFromMimetype(mimetype) {
+  if (!mimetype) return '';
+  const ext = mime.extension(mimetype);
+  return ext ? `.${ext}` : '';
+}
+
+async function saveMediaToTemp(client, quotedMedia, type, mimetype) {
+  const tmpDir = path.join(__dirname, "..", "tmp");
+  await fs.ensureDir(tmpDir);
+  
+  const extension = getFileExtensionFromMimetype(mimetype);
+  const fileName = `${type}-${Date.now()}${extension}`;
+  const filePath = path.join(tmpDir, fileName);
+  
+  const buffer = await downloadMediaMessage(
+    { message: { [type + 'Message']: quotedMedia } },
+    'buffer',
+    {},
+    { 
+      reuploadRequest: client.updateMediaMessage,
+      logger: console 
+    }
+  );
+  
+  await fs.writeFile(filePath, buffer);
+  return filePath;
+}
+
+async function uploadToUguu(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+
+  const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+  const form = new FormData();
+  form.append('files[]', fs.createReadStream(filePath), {
+    filename: path.basename(filePath),
+    contentType: mimeType
+  });
+
+  const response = await axios.post('https://uguu.se/upload.php', form, {
+    headers: {
+      ...form.getHeaders(),
+      'origin': 'https://uguu.se',
+      'referer': 'https://uguu.se/',
+      'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
+    }
+  });
+
+  const result = response.data;
+  if (result.success && result.files?.[0]?.url) {
+    return result.files[0].url;
+  } else {
+    throw new Error("Uguu upload failed or malformed response");
+  }
+}
+
+//========================================================================================================================
+// Similar Image Command
+//========================================================================================================================
+keith({
+  pattern: "similarimage",
+  aliases: ["reverse", "similarimg", "reverseimage", "findimage"],
+  category: "Search",
+  description: "Find similar images using reverse image search"
+}, async (from, client, conText) => {
+  const { reply, quotedMsg, api, mek } = conText;
+
+  if (!quotedMsg?.imageMessage) {
+    return reply("📌 Reply to an image with .similarimage");
+  }
+
+  let filePath;
+  try {
+    const type = getMediaType(quotedMsg);
+    const mimetype = quotedMsg.imageMessage.mimetype;
+    const mediaNode = quotedMsg.imageMessage;
+    
+    filePath = await saveMediaToTemp(client, mediaNode, type, mimetype);
+    
+    await reply("🔎 Searching for similar images...");
+
+    const imageUrl = await uploadToUguu(filePath);
+    const apiUrl = `${api}/search/reverseimage?url=${encodeURIComponent(imageUrl)}`;
+    const response = await axios.get(apiUrl);
+    
+    if (!response.data?.status || !response.data?.result?.similarImages?.length) {
+      return reply("❌ No similar images found.");
+    }
+
+    const similarImages = response.data.result.similarImages.slice(0, 10);
+    
+    // Create album for similar images
+    const album = [];
+    for (let i = 0; i < similarImages.length; i++) {
+      const img = similarImages[i];
+      const imageUrl = img.thumbnailUrl || img.url;
+      if (imageUrl) {
+        album.push({ 
+          image: { url: imageUrl },
+          caption: i === 0 ? `🔍 *Similar Images Found*\n📸 ${similarImages.length} results` : undefined
+        });
+      }
+    }
+
+    if (album.length === 0) return reply("❌ Failed to load similar images.");
+    
+    // Send all similar images as album
+    await client.sendMessage(from, { album }, { quoted: mek });
+
+  } catch (err) {
+    console.error("similarimage error:", err);
+    await reply(`❌ Error: ${err.message}`);
+  } finally {
+    if (filePath && await fs.pathExists(filePath)) {
+      try { await fs.unlink(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
