@@ -1142,85 +1142,50 @@ async (from, client, conText) => {
 //========================================================================================================================
 keith({
   pattern: "image",
-  aliases: ["img"],
+  aliases: ["imgsearch", "photosearch", "img"],
   category: "Search",
-  description: "Search and download images"
-},
-async (from, client, conText) => {
-  const { q, mek, api } = conText;
-  if (!q) return;
+  description: "Search for images and send as album"
+}, async (from, client, conText) => {
+  const { q, reply, mek, api } = conText;
+
+  if (!q) {
+    return reply(`📌 *Image Search*
+    
+*Usage:* .imagesearch dog
+*Aliases:* .imgsearch, .photosearch`);
+  }
+
+  await reply(`🔍 Searching for "${q}"...`);
 
   try {
-    const apiUrl = `${api}/search/images?query=${encodeURIComponent(q)}`;
-    const res = await axios.get(apiUrl, { timeout: 100000 });
-    const results = res.data?.result;
+    const { data } = await axios.get(`${api}/search/images?query=${encodeURIComponent(q)}`);
+    
+    if (!data.status || !data.result?.length) {
+      return reply("❌ No images found.");
+    }
 
-    if (!Array.isArray(results) || results.length === 0) return;
-
-    const images = results.slice(0, 8);
-    const picked = [];
-
-    for (const img of images) {
-      try {
-        const bufferRes = await axios.get(img.url, { responseType: "arraybuffer" });
-        picked.push({ buffer: bufferRes.data, directLink: img.url });
-      } catch {
-        console.error("Image download failed:", img.url);
+    const album = [];
+    for (let i = 0; i < Math.min(data.result.length, 10); i++) {
+      const img = data.result[i];
+      const imageUrl = img.thumbnail || img.url;
+      if (imageUrl) {
+        album.push({ 
+          image: { url: imageUrl },
+          caption: i === 0 ? `🔎 *${q}*\n📸 ${data.result.length} results` : undefined
+        });
       }
     }
 
-    if (picked.length === 0) return;
-
-    const cards = await Promise.all(picked.map(async (item, i) => ({
-      header: {
-        title: `📸 Image ${i + 1}`,
-        hasMediaAttachment: true,
-        imageMessage: (await generateWAMessageContent({ image: item.buffer }, {
-          upload: client.waUploadToServer
-        })).imageMessage
-      },
-      body: { text: `🔍 Search: ${q}` },
-      footer: { text: "🔹 Scroll to see more images" },
-      nativeFlowMessage: {
-        buttons: [
-          {
-            name: "cta_url",
-            buttonParamsJson: JSON.stringify({
-              display_text: "🌐 View Original",
-              url: item.directLink
-            })
-          },
-          {
-            name: "cta_copy",
-            buttonParamsJson: JSON.stringify({
-              display_text: "📋 Copy Link",
-              copy_code: item.directLink
-            })
-          }
-        ]
-      }
-    })));
-
-    const message = generateWAMessageFromContent(from, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
-          },
-          interactiveMessage: {
-            body: { text: `🔍 Search Results for: ${q}` },
-            footer: { text: `📂 Found ${picked.length} images` },
-            carouselMessage: { cards }
-          }
-        }
-      }
-    }, { quoted: mek });
-
-    await client.relayMessage(from, message.message, { messageId: message.key.id });
+    if (album.length === 0) return reply("❌ Failed to load images.");
+    
+    await client.sendMessage(from, { album }, { quoted: mek });
 
   } catch (err) {
-    console.error("Image command error:", err);
+    console.error("imagesearch error:", err);
+    reply("❌ Error: " + err.message);
   }
 });
-//========================================================================================================================
+
+
+
+
