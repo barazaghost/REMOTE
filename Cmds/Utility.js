@@ -2,19 +2,26 @@ const { keith } = require('../commandHandler');
 const fs = require('fs');
 const { exec, execFile } = require('child_process');
 const axios = require('axios');
-//const { keith } = require('../commandHandler');
-//const fs = require('fs');
-//const { exec } = require('child_process');
-//const { execFile } = require('child_process');
 const path = require('path');
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+const mime = require('mime-types');
+
 //========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
+// Helper Functions
 //========================================================================================================================
 
+async function downloadMediaBuffer(client, mediaMsg, type) {
+  const buffer = await downloadMediaMessage(
+    { message: { [type + 'Message']: mediaMsg } },
+    'buffer',
+    {},
+    { 
+      reuploadRequest: client.updateMediaMessage,
+      logger: console 
+    }
+  );
+  return buffer;
+}
 
 async function toPtt(buffer) {
   const tempDir = path.join(__dirname, 'temp');
@@ -54,6 +61,9 @@ async function toPtt(buffer) {
   });
 }
 
+//========================================================================================================================
+// toptt Command
+//========================================================================================================================
 keith({
     pattern: "toptt",
     aliases: ['tovoice', 'tovn', 'tovoicenote'],
@@ -61,7 +71,7 @@ keith({
     description: "Convert audio to WhatsApp voice note"
   },
   async (from, client, conText) => {
-    const { mek, reply, botPic, quoted, quotedMsg } = conText;
+    const { mek, reply, quoted, quotedMsg } = conText;
 
     if (!quotedMsg) {
       return reply("Please reply to an audio message");
@@ -73,10 +83,8 @@ keith({
       return reply("The quoted message doesn't contain any audio");
     }
 
-    let tempFilePath;
     try {
-      tempFilePath = await client.downloadAndSaveMediaMessage(quotedAudio, 'temp_media');
-      const buffer = await fs.promises.readFile(tempFilePath);
+      const buffer = await downloadMediaBuffer(client, quotedAudio, 'audio');
       const convertedBuffer = await toPtt(buffer);
       
       await client.sendMessage(from, {
@@ -88,14 +96,13 @@ keith({
     } catch (e) {
       console.error("Error in toptt command:", e);
       await reply("Failed to convert to voice note");
-    } finally {
-      if (tempFilePath) await fs.promises.unlink(tempFilePath).catch(console.error);
     }
   }
 );
+
 //========================================================================================================================
-
-
+// tts Command
+//========================================================================================================================
 keith({
   pattern: "tts",
   aliases: ["say"],
@@ -118,7 +125,6 @@ async (from, client, conText) => {
   }
 
   try {
-    // Using Google Translate TTS API (default language Indonesian 'id')
     const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=id&client=tw-ob`;
     
     await client.sendMessage(from, {
@@ -133,48 +139,9 @@ async (from, client, conText) => {
   }
 });
 
-
-/*keith({
-  pattern: "tts",
-  aliases: ["say"],
-  category: "tools",
-  description: "Convert text or quoted message to PTT audio"
-},
-async (from, client, conText) => {
-  const { q, mek, quotedMsg, reply } = conText;
-
-  let text;
-  if (q) {
-    text = q;
-  } else if (quotedMsg) {
-    text = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text;
-    if (!text) {
-      return reply("❌ Could not extract quoted text.");
-    }
-  } else {
-    return reply("📌 Reply to a message with text or provide text directly.");
-  }
-
-  try {
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
-    const response = await axios.get(ttsUrl, { responseType: 'arraybuffer' });
-    const convertedBuffer = await toPtt(Buffer.from(response.data));
-    
-    await client.sendMessage(from, {
-      audio: convertedBuffer,
-      mimetype: "audio/ogg; codecs=opus",
-      ptt: true
-    });
-
-  } catch (error) {
-    console.error("TTS error:", error);
-    reply("⚠️ An error occurred while generating speech.");
-  }
-});*/
-
 //========================================================================================================================
-
-
+// tom4a Command
+//========================================================================================================================
 keith({
   pattern: "tom4a",
   aliases: ["audioextract"],
@@ -184,33 +151,38 @@ keith({
 }, async (from, client, conText) => {
   const { quotedMsg, mek, reply } = conText;
 
-  const mediaType = quotedMsg?.videoMessage || quotedMsg?.audioMessage;
+  let mediaType = null;
+  let mediaTypeName = null;
+  
+  if (quotedMsg?.videoMessage) {
+    mediaType = quotedMsg.videoMessage;
+    mediaTypeName = 'video';
+  } else if (quotedMsg?.audioMessage) {
+    mediaType = quotedMsg.audioMessage;
+    mediaTypeName = 'audio';
+  }
+  
   if (!mediaType) {
     return reply("❌ Quote an audio or video to convert to MP3.");
   }
 
   try {
-    // Download quoted media
-    const mediaPath = await client.downloadAndSaveMediaMessage(mediaType);
-    const buffer = fs.readFileSync(mediaPath);
+    const buffer = await downloadMediaBuffer(client, mediaType, mediaTypeName);
 
-    // Send as audio/mp3 directly
     await client.sendMessage(from, {
       audio: buffer,
       mimetype: "audio/mp4"
     }, { quoted: mek });
 
-    // Cleanup
-    fs.unlinkSync(mediaPath);
-
   } catch (error) {
-    console.error("toaudio error:", error);
+    console.error("tom4a error:", error);
     await reply("❌ An error occurred while converting the media.");
   }
 });
+
 //========================================================================================================================
-
-
+// tomp3 Command
+//========================================================================================================================
 keith({
   pattern: "tomp3",
   aliases: ["audioextract"],
@@ -220,32 +192,38 @@ keith({
 }, async (from, client, conText) => {
   const { quotedMsg, mek, reply } = conText;
 
-  const mediaType = quotedMsg?.videoMessage || quotedMsg?.audioMessage;
+  let mediaType = null;
+  let mediaTypeName = null;
+  
+  if (quotedMsg?.videoMessage) {
+    mediaType = quotedMsg.videoMessage;
+    mediaTypeName = 'video';
+  } else if (quotedMsg?.audioMessage) {
+    mediaType = quotedMsg.audioMessage;
+    mediaTypeName = 'audio';
+  }
+  
   if (!mediaType) {
     return reply("❌ Quote an audio or video to convert to MP3.");
   }
 
   try {
-    // Download quoted media
-    const mediaPath = await client.downloadAndSaveMediaMessage(mediaType);
-    const buffer = fs.readFileSync(mediaPath);
+    const buffer = await downloadMediaBuffer(client, mediaType, mediaTypeName);
 
-    // Send as audio/mp3 directly
     await client.sendMessage(from, {
       audio: buffer,
       mimetype: "audio/mpeg"
     }, { quoted: mek });
 
-    // Cleanup
-    fs.unlinkSync(mediaPath);
-
   } catch (error) {
-    console.error("toaudio error:", error);
+    console.error("tomp3 error:", error);
     await reply("❌ An error occurred while converting the media.");
   }
 });
-//========================================================================================================================
 
+//========================================================================================================================
+// imgsize Command
+//========================================================================================================================
 keith({
   pattern: "imgsize",
   aliases: ["imagesize", "dimension"],
@@ -255,19 +233,19 @@ keith({
 }, async (from, client, conText) => {
   const { reply, mek, quoted, quotedMsg, keithRandom } = conText;
 
-  // Must reply to an image
   if (!quotedMsg || !quoted?.imageMessage) {
     return reply(`📌 Reply to an *image* to get its dimensions.\nExample: .imgsize`);
   }
 
-  // Download quoted image
-  const mediaPath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
-
+  const tempPath = keithRandom('.jpg');
   try {
+    const buffer = await downloadMediaBuffer(client, quoted.imageMessage, 'image');
+    fs.writeFileSync(tempPath, buffer);
+
     await new Promise((resolve, reject) => {
-      exec(`ffmpeg -i ${mediaPath} -f null - 2>&1 | grep -oP 'Stream.*Video:.*\\s\\K\\d+x\\d+'`, async (err, stdout) => {
+      exec(`ffmpeg -i ${tempPath} -f null - 2>&1 | grep -oP 'Stream.*Video:.*\\s\\K\\d+x\\d+'`, async (err, stdout) => {
         try {
-          fs.unlinkSync(mediaPath);
+          fs.unlinkSync(tempPath);
 
           if (err || !stdout) return reject(new Error("Couldn't detect image dimensions"));
 
@@ -284,8 +262,10 @@ keith({
     reply(`❌ Error: ${err.message}`);
   }
 });
-//========================================================================================================================
 
+//========================================================================================================================
+// resize Command
+//========================================================================================================================
 keith({
   pattern: "resize",
   aliases: ["imgresize"],
@@ -295,12 +275,10 @@ keith({
 }, async (from, client, conText) => {
   const { q, reply, mek, quoted, quotedMsg, keithRandom } = conText;
 
-  // Must reply to an image
   if (!quotedMsg || !quoted?.imageMessage) {
     return reply(`📌 Reply to an *image* with dimensions like *300×250* to resize it.\nExample: .resize 300×250`);
   }
 
-  // Validate dimensions format
   if (!q || !q.match(/^\d+×\d+$/)) {
     return reply(`📌 Provide dimensions in format *width×height* (e.g., 300×250)`);
   }
@@ -311,15 +289,17 @@ keith({
     return reply(`❌ Invalid dimensions. Please use values between 1 and 5000`);
   }
 
-  // Download quoted image
-  const mediaPath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
+  const inputPath = keithRandom('.jpg');
   const outputPath = keithRandom('.jpg');
 
   try {
+    const buffer = await downloadMediaBuffer(client, quoted.imageMessage, 'image');
+    fs.writeFileSync(inputPath, buffer);
+
     await new Promise((resolve, reject) => {
-      exec(`ffmpeg -i ${mediaPath} -vf "scale=${width}:${height}" ${outputPath}`, async (error) => {
+      exec(`ffmpeg -i ${inputPath} -vf "scale=${width}:${height}" ${outputPath}`, async (error) => {
         try {
-          fs.unlinkSync(mediaPath);
+          fs.unlinkSync(inputPath);
 
           if (error) return reject(new Error(`Error resizing image: ${error.message}`));
 
@@ -340,8 +320,10 @@ keith({
     reply(`❌ Error: ${err.message}`);
   }
 });
-//========================================================================================================================
 
+//========================================================================================================================
+// watermark Command
+//========================================================================================================================
 const namedColors = {
   black: "000000", white: "ffffff", red: "ff0000", blue: "0000ff", green: "00ff00",
   yellow: "ffff00", pink: "ffc0cb", purple: "800080", orange: "ffa500", gray: "808080",
@@ -361,7 +343,9 @@ keith({
     return reply(`📌 Reply to an *image* to add watermark.\nExample: .watermark MyBrand |red,60 (text)\nOr reply with an image and caption .watermark to use another quoted image as watermark`);
   }
 
-  const baseImagePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
+  const baseImageBuffer = await downloadMediaBuffer(client, quoted.imageMessage, 'image');
+  const baseImagePath = keithRandom('.jpg');
+  fs.writeFileSync(baseImagePath, baseImageBuffer);
   const outputPath = keithRandom('.jpg');
 
   try {
@@ -371,7 +355,7 @@ keith({
       const watermarkText = textPart.trim().length > 20 ? textPart.trim().substring(0, 20) + "..." : textPart.trim();
 
       let fontColor = "white";
-      let fontSize = 48; // default size
+      let fontSize = 48;
 
       if (options) {
         const parts = options.split(",").map(p => p.trim().toLowerCase());
@@ -400,12 +384,14 @@ keith({
           });
       });
     } else {
-      // Image watermark (same as before)
+      // Image watermark
       if (!quotedMsg.quoted || !quotedMsg.quoted.imageMessage) {
         return reply(`📌 For image watermark, reply to the main image and quote another image as watermark.`);
       }
 
-      const watermarkPath = await client.downloadAndSaveMediaMessage(quotedMsg.quoted.imageMessage);
+      const watermarkBuffer = await downloadMediaBuffer(client, quotedMsg.quoted.imageMessage, 'image');
+      const watermarkPath = keithRandom('.png');
+      fs.writeFileSync(watermarkPath, watermarkBuffer);
       const tempWatermarkPath = keithRandom('.png');
 
       await new Promise((resolve, reject) => {
@@ -452,9 +438,9 @@ keith({
   }
 });
 
-
 //========================================================================================================================
-
+// trim Command
+//========================================================================================================================
 keith({
   pattern: "trim",
   description: "Trim quoted audio or video using start and end time",
@@ -472,16 +458,29 @@ keith({
     return reply("⚠️ Invalid format.\n\nExample: `trim 0:10 0:30`");
   }
 
-  const mediaType = quotedMsg.audioMessage || quotedMsg.videoMessage;
+  let mediaType = null;
+  let mediaTypeName = null;
+  
+  if (quotedMsg.audioMessage) {
+    mediaType = quotedMsg.audioMessage;
+    mediaTypeName = 'audio';
+  } else if (quotedMsg.videoMessage) {
+    mediaType = quotedMsg.videoMessage;
+    mediaTypeName = 'video';
+  }
+  
   if (!mediaType) {
     return reply("❌ Unsupported media type. Quote an audio or video file.");
   }
 
   try {
-    const mediaPath = await client.downloadAndSaveMediaMessage(mediaType);
+    const buffer = await downloadMediaBuffer(client, mediaType, mediaTypeName);
+    const mediaPath = keithRandom(mediaTypeName === 'audio' ? '.mp3' : '.mp4');
+    fs.writeFileSync(mediaPath, buffer);
+    
     const isAudio = !!quotedMsg.audioMessage;
     const outputExt = isAudio ? ".mp3" : ".mp4";
-    const outputPath = await keithRandom(outputExt);
+    const outputPath = keithRandom(outputExt);
 
     exec(`ffmpeg -i ${mediaPath} -ss ${startTime} -to ${endTime} -c copy ${outputPath}`, async (err) => {
       fs.unlinkSync(mediaPath);
@@ -490,10 +489,10 @@ keith({
         return reply("❌ Trimming failed.");
       }
 
-      const buffer = fs.readFileSync(outputPath);
+      const outputBuffer = fs.readFileSync(outputPath);
       const message = isAudio
-        ? { audio: buffer, mimetype: "audio/mpeg" }
-        : { video: buffer, mimetype: "video/mp4" };
+        ? { audio: outputBuffer, mimetype: "audio/mpeg" }
+        : { video: outputBuffer, mimetype: "video/mp4" };
 
       await client.sendMessage(from, message, { quoted: mek });
       fs.unlinkSync(outputPath);
@@ -503,8 +502,10 @@ keith({
     await reply("❌ An error occurred while processing the media.");
   }
 });
-//========================================================================================================================
 
+//========================================================================================================================
+// volume Command
+//========================================================================================================================
 keith({
   pattern: "volume",
   description: "Adjust volume of quoted audio or video",
@@ -517,16 +518,29 @@ keith({
     return reply("⚠️ Example: volume 1.5");
   }
 
-  const mediaType = quotedMsg?.audioMessage || quotedMsg?.videoMessage;
+  let mediaType = null;
+  let mediaTypeName = null;
+  
+  if (quotedMsg?.audioMessage) {
+    mediaType = quotedMsg.audioMessage;
+    mediaTypeName = 'audio';
+  } else if (quotedMsg?.videoMessage) {
+    mediaType = quotedMsg.videoMessage;
+    mediaTypeName = 'video';
+  }
+  
   if (!mediaType) {
     return reply("❌ Quote an audio or video file to adjust its volume.");
   }
 
   try {
-    const mediaPath = await client.downloadAndSaveMediaMessage(mediaType);
+    const buffer = await downloadMediaBuffer(client, mediaType, mediaTypeName);
+    const mediaPath = keithRandom(mediaTypeName === 'audio' ? '.mp3' : '.mp4');
+    fs.writeFileSync(mediaPath, buffer);
+    
     const isAudio = !!quotedMsg.audioMessage;
     const outputExt = isAudio ? ".mp3" : ".mp4";
-    const outputPath = await keithRandom(outputExt);
+    const outputPath = keithRandom(outputExt);
 
     exec(`ffmpeg -i ${mediaPath} -filter:a volume=${q} ${outputPath}`, async (err) => {
       fs.unlinkSync(mediaPath);
@@ -535,10 +549,10 @@ keith({
         return reply("❌ Volume adjustment failed.");
       }
 
-      const buffer = fs.readFileSync(outputPath);
+      const outputBuffer = fs.readFileSync(outputPath);
       const message = isAudio
-        ? { audio: buffer, mimetype: "audio/mpeg" }
-        : { video: buffer, mimetype: "video/mp4" };
+        ? { audio: outputBuffer, mimetype: "audio/mpeg" }
+        : { video: outputBuffer, mimetype: "video/mp4" };
 
       await client.sendMessage(from, message, { quoted: mek });
       fs.unlinkSync(outputPath);
@@ -548,9 +562,10 @@ keith({
     await reply("❌ An error occurred while processing the media.");
   }
 });
+
 //========================================================================================================================
-
-
+// toaudio Command
+//========================================================================================================================
 keith({
   pattern: "toaudio",
   aliases: ["audioextract"],
@@ -560,33 +575,38 @@ keith({
 }, async (from, client, conText) => {
   const { quotedMsg, mek, reply } = conText;
 
-  const mediaType = quotedMsg?.videoMessage || quotedMsg?.audioMessage;
+  let mediaType = null;
+  let mediaTypeName = null;
+  
+  if (quotedMsg?.videoMessage) {
+    mediaType = quotedMsg.videoMessage;
+    mediaTypeName = 'video';
+  } else if (quotedMsg?.audioMessage) {
+    mediaType = quotedMsg.audioMessage;
+    mediaTypeName = 'audio';
+  }
+  
   if (!mediaType) {
     return reply("❌ Quote an audio or video to convert to MP3.");
   }
 
   try {
-    // Download quoted media
-    const mediaPath = await client.downloadAndSaveMediaMessage(mediaType);
-    const buffer = fs.readFileSync(mediaPath);
+    const buffer = await downloadMediaBuffer(client, mediaType, mediaTypeName);
 
-    // Send as audio/mp3 directly
     await client.sendMessage(from, {
       audio: buffer,
       mimetype: "audio/mpeg"
     }, { quoted: mek });
-
-    // Cleanup
-    fs.unlinkSync(mediaPath);
 
   } catch (error) {
     console.error("toaudio error:", error);
     await reply("❌ An error occurred while converting the media.");
   }
 });
+
 //========================================================================================================================
-
-
+// toimg Command
+//========================================================================================================================
 keith({
   pattern: "toimg",
   aliases: ["sticker2img", "webp2png"],
@@ -601,29 +621,21 @@ keith({
   }
 
   try {
-    // Download sticker and save to temp file
-    const mediaPath = await client.downloadAndSaveMediaMessage(quotedMsg.stickerMessage);
-
-    // Check if sticker is animated
+    const buffer = await downloadMediaBuffer(client, quotedMsg.stickerMessage, 'sticker');
     const isAnimated = quotedMsg.stickerMessage.isAnimated || quotedMsg.stickerMessage.isAnimatedSticker;
 
     if (isAnimated) {
-      // Send back as video
       await client.sendMessage(from, {
-        video: fs.readFileSync(mediaPath),
+        video: buffer,
         mimetype: "video/mp4",
         caption: "🎞️ Converted from animated sticker"
       }, { quoted: mek });
     } else {
-      // Send back as image
       await client.sendMessage(from, {
-        image: fs.readFileSync(mediaPath),
+        image: buffer,
         caption: "🖼️ Converted from sticker"
       }, { quoted: mek });
     }
-
-    // Clean up temp file
-    fs.unlinkSync(mediaPath);
 
   } catch (e) {
     console.error("toimg error:", e);
@@ -631,8 +643,9 @@ keith({
   }
 });
 
-
-//==================================================================================================================
+//========================================================================================================================
+// amplify Command
+//========================================================================================================================
 keith({
   pattern: "amplify",
   aliases: ["replaceaudio", "mergeaudio"],
@@ -652,26 +665,28 @@ keith({
 
   try {
     const audioUrl = q.trim();
-    const media = await client.downloadAndSaveMediaMessage(quotedMsg.videoMessage);
+    const videoBuffer = await downloadMediaBuffer(client, quotedMsg.videoMessage, 'video');
+    const videoPath = keithRandom('.mp4');
+    fs.writeFileSync(videoPath, videoBuffer);
 
     const ext = audioUrl.split('.').pop().split('?')[0].toLowerCase();
-    const audioPath = await keithRandom(`.${ext}`);
-    const outputPath = await keithRandom(".mp4");
+    const audioPath = keithRandom(`.${ext}`);
+    const outputPath = keithRandom(".mp4");
 
     const response = await axios.get(audioUrl, { responseType: 'arraybuffer' });
     fs.writeFileSync(audioPath, response.data);
 
-    exec(`ffmpeg -i ${media} -i ${audioPath} -c:v copy -map 0:v:0 -map 1:a:0 -shortest ${outputPath}`, async (err) => {
-      fs.unlinkSync(media);
+    exec(`ffmpeg -i ${videoPath} -i ${audioPath} -c:v copy -map 0:v:0 -map 1:a:0 -shortest ${outputPath}`, async (err) => {
+      fs.unlinkSync(videoPath);
       fs.unlinkSync(audioPath);
       if (err) {
         console.error("ffmpeg error:", err);
         return reply("❌ Error during audio replacement.");
       }
 
-      const videoBuffer = fs.readFileSync(outputPath);
+      const videoBufferOut = fs.readFileSync(outputPath);
       await client.sendMessage(from, {
-        video: videoBuffer,
+        video: videoBufferOut,
         mimetype: "video/mp4"
       }, { quoted: mek });
 
@@ -682,15 +697,3 @@ keith({
     await reply("❌ An error occurred while processing the media.");
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
