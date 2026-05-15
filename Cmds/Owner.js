@@ -855,6 +855,8 @@ keith({
 //========================================================================================================================
 //========================================================================================================================
 
+//========================================================================================================================
+//========================================================================================================================
 
 keith({
   pattern: "vv2",
@@ -868,17 +870,32 @@ keith({
   try {
     if (quoted?.imageMessage) {
       const caption = quoted.imageMessage.caption || "";
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
-      await client.sendMessage(sender, { image: { url: filePath }, caption }, { quoted: mek });
+      const buffer = await downloadMediaMessage(
+        { message: { imageMessage: quoted.imageMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(sender, { image: buffer, caption }, { quoted: mek });
     }
     if (quoted?.videoMessage) {
       const caption = quoted.videoMessage.caption || "";
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.videoMessage);
-      await client.sendMessage(sender, { video: { url: filePath }, caption }, { quoted: mek });
+      const buffer = await downloadMediaMessage(
+        { message: { videoMessage: quoted.videoMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(sender, { video: buffer, caption }, { quoted: mek });
     }
     if (quoted?.audioMessage) {
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.audioMessage);
-      await client.sendMessage(sender, { audio: { url: filePath }, mimetype: 'audio/mpeg' }, { quoted: mek });
+      const buffer = await downloadMediaMessage(
+        { message: { audioMessage: quoted.audioMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(sender, { audio: buffer, mimetype: 'audio/mpeg' }, { quoted: mek });
     }
   } catch (err) {
     console.error("vv2 command error:", err);
@@ -886,10 +903,7 @@ keith({
   }
 });
 
-
 //========================================================================================================================
-
-
 
 keith({
   pattern: "vv",
@@ -905,19 +919,34 @@ keith({
   try {
     if (quoted?.imageMessage) {
       const caption = quoted.imageMessage.caption || "";
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
-      await client.sendMessage(from, { image: { url: filePath }, caption }, { quoted: mek });
+      const buffer = await downloadMediaMessage(
+        { message: { imageMessage: quoted.imageMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(from, { image: buffer, caption }, { quoted: mek });
     }
 
     if (quoted?.videoMessage) {
       const caption = quoted.videoMessage.caption || "";
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.videoMessage);
-      await client.sendMessage(from, { video: { url: filePath }, caption }, { quoted: mek });
+      const buffer = await downloadMediaMessage(
+        { message: { videoMessage: quoted.videoMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(from, { video: buffer, caption }, { quoted: mek });
     }
 
     if (quoted?.audioMessage) {
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.audioMessage);
-      await client.sendMessage(from, { audio: { url: filePath }, mimetype: 'audio/mpeg' }, { quoted: mek });
+      const buffer = await downloadMediaMessage(
+        { message: { audioMessage: quoted.audioMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(from, { audio: buffer, mimetype: 'audio/mpeg' }, { quoted: mek });
     }
 
   } catch (err) {
@@ -925,6 +954,8 @@ keith({
     reply("❌ Failed to retrieve media. Try again.");
   }
 });
+//========================================================================================================================
+
 //========================================================================================================================
 
 
