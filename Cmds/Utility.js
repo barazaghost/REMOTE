@@ -63,6 +63,96 @@ async function toPtt(buffer) {
 
 //========================================================================================================================
 // toptt Command
+
+
+//========================================================================================================================
+// Image to Video with Audio (More Stable - Resizes Image First)
+//========================================================================================================================
+keith({
+  pattern: "slideshow",
+  aliases: ["imgewaudio", "imagewithaudio", "imgaudio"],
+  description: "Convert quoted image to video with audio (audio URL required)",
+  category: "Utility",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, quotedMsg, mek, reply, keithRandom } = conText;
+
+  if (!quotedMsg?.imageMessage) {
+    return reply("📌 Reply to an *image* and provide an audio URL.\n\nExample: .img2video https://example.com/song.mp3");
+  }
+
+  if (!q || !q.startsWith('http')) {
+    return reply("🎵 Please provide a valid audio URL.\n\nExample: .img2video https://example.com/song.mp3");
+  }
+
+  const audioUrl = q.trim();
+  const outputPath = keithRandom('.mp4');
+
+  try {
+    await reply("🎬 Processing...");
+
+    // Download image
+    const imageBuffer = await downloadMediaBuffer(client, quotedMsg.imageMessage, 'image');
+    const imagePath = keithRandom('.jpg');
+    fs.writeFileSync(imagePath, imageBuffer);
+
+    // Resize image first to 480p (smaller = faster, less memory)
+    const resizedImagePath = keithRandom('.jpg');
+    
+    await new Promise((resolve, reject) => {
+      exec(`ffmpeg -i ${imagePath} -vf "scale=640:-2" -frames:v 1 ${resizedImagePath}`, (err) => {
+        fs.unlinkSync(imagePath);
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Download audio
+    const audioResponse = await axios.get(audioUrl, { 
+      responseType: 'arraybuffer',
+      timeout: 60000
+    });
+    const audioBuffer = Buffer.from(audioResponse.data);
+    const audioPath = keithRandom('.mp3');
+    fs.writeFileSync(audioPath, audioBuffer);
+
+    // Get audio duration
+    let audioDuration = 30;
+    await new Promise((resolve) => {
+      exec(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 ${audioPath}`, (err, stdout) => {
+        if (!err && stdout) audioDuration = parseFloat(stdout.trim());
+        resolve();
+      });
+    });
+
+    // Create video
+    await new Promise((resolve, reject) => {
+      exec(`ffmpeg -loop 1 -i ${resizedImagePath} -i ${audioPath} -c:v libx264 -c:a aac -vf "format=yuv420p" -shortest -preset ultrafast -crf 30 -movflags +faststart ${outputPath}`, 
+        { timeout: 90000 }, (err) => {
+          fs.unlinkSync(resizedImagePath);
+          fs.unlinkSync(audioPath);
+          if (err) reject(err);
+          else resolve();
+        });
+    });
+
+    const videoBuffer = fs.readFileSync(outputPath);
+    const minutes = Math.floor(audioDuration / 60);
+    const seconds = Math.floor(audioDuration % 60);
+    
+    await client.sendMessage(from, {
+      video: videoBuffer,
+      mimetype: "video/mp4",
+      caption: `🎬 Image to Video\n🎵 Duration: ${minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`}`
+    }, { quoted: mek });
+
+    fs.unlinkSync(outputPath);
+
+  } catch (error) {
+    console.error("img2video error:", error);
+    await reply(`❌ Error: ${error.message}`);
+  }
+});
 //========================================================================================================================
 keith({
     pattern: "toptt",
