@@ -471,7 +471,7 @@ async function getAIResponse(message, userJid) {
 
         const fullMessage = context + `Current: ${message}`;
         
-        const response = await axios.get(`https://apiskeith.top/keithai?q=${encodeURIComponent(fullMessage)}`);
+        const response = await axios.get(`https://apis.keithsite.top/keithai?q=${encodeURIComponent(fullMessage)}`);
         
         if (response.data.status && response.data.result) {
             return response.data.result;
@@ -488,7 +488,7 @@ async function getAIResponse(message, userJid) {
 // API call to Keith AI Text-to-Speech
 async function getAIAudioResponse(message, voice = 'Kimberly') {
     try {
-        const response = await axios.get(`https://apiskeith.top/ai/text2speech?q=${encodeURIComponent(message)}&voice=${voice}`);
+        const response = await axios.get(`https://apis.keithsite.top/ai/text2speech?q=${encodeURIComponent(message)}&voice=${voice}`);
         
         if (response.data.status && response.data.result && response.data.result.URL) {
             return {
@@ -508,7 +508,7 @@ async function getAIAudioResponse(message, voice = 'Kimberly') {
 // API call to Keith AI Text-to-Video
 async function getAIVideoResponse(message) {
     try {
-        const response = await axios.get(`https://apiskeith.top/text2video?q=${encodeURIComponent(message)}`);
+        const response = await axios.get(`https://apis.keithsite.top/text2video?q=${encodeURIComponent(message)}`);
         
         if (response.data.success && response.data.results) {
             return {
@@ -528,7 +528,7 @@ async function getAIVideoResponse(message) {
 // API call to Keith AI Image Generation (Flux)
 async function getAIImageResponse(message) {
     try {
-        const response = await axios.get(`https://apiskeith.top/ai/magicstudio?prompt=${encodeURIComponent(message)}`);
+        const response = await axios.get(`https://apis.keithsite.top/ai/magicstudio?prompt=${encodeURIComponent(message)}`);
         
         // Since Flux returns image directly, we use the API URL as image source
         return {
@@ -544,7 +544,7 @@ async function getAIImageResponse(message) {
 // API call to Keith AI Vision Analysis
 async function getAIVisionResponse(imageUrl, question) {
     try {
-        const response = await axios.get(`https://apiskeith.top/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(question)}`);
+        const response = await axios.get(`https://apis.keithsite.top/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(question)}`);
         
         if (response.data.status && response.data.result) {
             return response.data.result;
@@ -838,10 +838,10 @@ async function detectAndDownloadSocialMedia(client, message) {
         
         const apiEndpoints = {
             tiktok: `https://apiskeith.top/download/tiktokdl3?url=${encodeURIComponent(url)}`,
-            instagram: `https://apiskeith.top/download/instadl?url=${encodeURIComponent(url)}`,
-            facebook: `https://apiskeith.top/download/fbdl?url=${encodeURIComponent(url)}`,
-            youtube: `https://apiskeith.top/download/mp4?url=${encodeURIComponent(url)}`,
-            twitter: `https://apiskeith.top/download/twitter?url=${encodeURIComponent(url)}`
+            instagram: `https://apis.keithsite.top/download/instadl?url=${encodeURIComponent(url)}`,
+            facebook: `https://apis.keithsite.top/download/fbdl?url=${encodeURIComponent(url)}`,
+            youtube: `https://apis.keithsite.top/download/mp4?url=${encodeURIComponent(url)}`,
+            twitter: `https://apis.keithsite.top/download/twitter?url=${encodeURIComponent(url)}`
         };
         
         const apiUrl = apiEndpoints[platform];
@@ -3982,7 +3982,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
                     m: ms,
                     mek: ms,
                     edit,
-                    api: "https://apiskeith.top",
+                    api: "https://apis.keithsite.top",
                     react,
                     del,
                     arg: args,
