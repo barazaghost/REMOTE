@@ -7,9 +7,8 @@ const jidsPath = path.join(__dirname, '..', 'jids.json');
 let statusJidList = [];
 try {
   const allJids = JSON.parse(fs.readFileSync(jidsPath, 'utf-8'));
-  // ✅ Keep contacts ending with @s.whatsapp.net OR @lid
-  statusJidList = allJids.filter(jid => typeof jid === "string" && 
-    (jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid')));
+  // ✅ Only keep contacts ending with @s.whatsapp.net
+  statusJidList = allJids.filter(jid => typeof jid === "string" && jid.endsWith('@s.whatsapp.net'));
 } catch (err) {
   console.error('Error reading jids.json:', err);
 }
@@ -17,7 +16,7 @@ try {
 keith({
   pattern: "reshare",
   aliases: ["story", "tostatus", "poststatus", "sendstatus"],
-  description: "Post a status visible only to selected contacts (@s.whatsapp.net and @lid)",
+  description: "Post a status visible only to selected contacts (@s.whatsapp.net only)",
   category: "Owner",
   filename: __filename
 }, async (from, client, conText) => {
@@ -28,7 +27,7 @@ keith({
   }
 
   if (!quotedMsg) return reply("❌ Please quote an image or video message to post.");
-  if (statusJidList.length === 0) return reply("❌ No valid @s.whatsapp.net or @lid contacts configured for private status.");
+  if (statusJidList.length === 0) return reply("❌ No valid @s.whatsapp.net contacts configured for private status.");
 
   try {
     const tmpDir = path.join(__dirname, "..", "tmp");
