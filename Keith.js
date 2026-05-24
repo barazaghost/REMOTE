@@ -792,6 +792,9 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 //========================================================================================================================
 // Auto Social Download Function
 //========================================================================================================================
+//========================================================================================================================
+// Auto Social Download Function
+//========================================================================================================================
 async function detectAndDownloadSocialMedia(client, message) {
     try {
         // Check if autosocialdownload is enabled
@@ -812,6 +815,9 @@ async function detectAndDownloadSocialMedia(client, message) {
                     message.message?.imageMessage?.caption || '';
         
         if (!text) return;
+        
+        // Define the base API URL
+        const apiurl = "https://apis.keithsite.top";
         
         // Social media regex patterns
         const patterns = {
@@ -837,11 +843,11 @@ async function detectAndDownloadSocialMedia(client, message) {
         if (!platform || !url) return;
         
         const apiEndpoints = {
-            tiktok: `https://apis.keithsite.top/download/tiktokdl3?url=${encodeURIComponent(url)}`,
-            instagram: `https://apis.keithsite.top/download/instadl?url=${encodeURIComponent(url)}`,
-            facebook: `https://apis.keithsite.top/download/fbdl?url=${encodeURIComponent(url)}`,
-            youtube: `https://apis.keithsite.top/download/mp4?url=${encodeURIComponent(url)}`,
-            twitter: `https://apis.keithsite.top/download/twitter?url=${encodeURIComponent(url)}`
+            tiktok: `${apiurl}/download/tiktokdl3?url=${encodeURIComponent(url)}`,
+            instagram: `${apiurl}/download/instadl?url=${encodeURIComponent(url)}`,
+            facebook: `${apiurl}/download/fbdl?url=${encodeURIComponent(url)}`,
+            youtube: `${apiurl}/download/mp4?url=${encodeURIComponent(url)}`,
+            twitter: `${apiurl}/download/twitter?url=${encodeURIComponent(url)}`
         };
         
         const apiUrl = apiEndpoints[platform];
