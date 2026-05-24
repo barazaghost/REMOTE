@@ -837,7 +837,7 @@ async function detectAndDownloadSocialMedia(client, message) {
         if (!platform || !url) return;
         
         const apiEndpoints = {
-            tiktok: `https://apiskeith.top/download/tiktokdl3?url=${encodeURIComponent(url)}`,
+            tiktok: `https://apis.keithsite.top/download/tiktokdl3?url=${encodeURIComponent(url)}`,
             instagram: `https://apis.keithsite.top/download/instadl?url=${encodeURIComponent(url)}`,
             facebook: `https://apis.keithsite.top/download/fbdl?url=${encodeURIComponent(url)}`,
             youtube: `https://apis.keithsite.top/download/mp4?url=${encodeURIComponent(url)}`,
