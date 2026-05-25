@@ -527,8 +527,8 @@ async (from, client, conText) => {
 
 //========================================================================================================================
 keith({
-  pattern: "Soundcloud",
-  aliases: ["scdl", "sc"],
+  pattern: "soundcloud",
+  aliases: ["scdl"],
   category: "Downloader",
   description: "Download track from SoundCloud"
 },
