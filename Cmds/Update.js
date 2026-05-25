@@ -46,15 +46,12 @@ async function setCurrentHash(hash) {
 // File Sync with preservation rules
 async function syncFiles(source, target) {
   const preserveFiles = ['app.json', 'set.env'];
-  const preserveFolders = ['backups', 'logs']; // Removed 'database' from here
+  const preserveFolders = ['backups', 'logs'];
   
   const items = await fs.readdir(source);
 
   for (const item of items) {
-    // Skip preserved files
     if (preserveFiles.includes(item)) continue;
-    
-    // Skip preserved folders
     if (preserveFolders.includes(item)) continue;
     
     const srcPath = path.join(source, item);
@@ -79,13 +76,15 @@ keith({
   filename: __filename,
   reaction: "🔄"
 }, async (from, client, conText) => {
-  const { reply, isSuperUser } = conText;
+  const { reply, isSuperUser, mek } = conText;
 
   if (!isSuperUser) return reply("❌ Owner-only command");
 
-  try {
-    await reply("🔍 Checking for updates...");
+  // Send initial message and get its key
+  const sent = await client.sendMessage(from, { text: "🔍 Checking for updates..." });
+  const statusKey = sent.key;
 
+  try {
     const repo = "kkeizza/Keith";
     const { data: commit } = await axios.get(
       `https://api.github.com/repos/${repo}/commits/main`,
@@ -94,10 +93,19 @@ keith({
 
     const currentHash = await getCurrentHash();
     if (commit.sha === currentHash) {
-      return reply("✅ Already running the latest version!");
+      await client.sendMessage(from, { 
+        text: "✅ Already running the latest version!", 
+        edit: statusKey 
+      });
+      return;
     }
 
-    await reply("⬇️ Downloading update...");
+    // Download update
+    await client.sendMessage(from, { 
+      text: "⬇️ Downloading update...", 
+      edit: statusKey 
+    });
+    
     const zipUrl = `https://github.com/${repo}/archive/${commit.sha}.zip`;
     const zipPath = path.join(__dirname, '..', 'temp_update.zip');
     const writer = fs.createWriteStream(zipPath);
@@ -115,7 +123,12 @@ keith({
       writer.on('error', reject);
     });
 
-    await reply("📦 Extracting files...");
+    // Extract files
+    await client.sendMessage(from, { 
+      text: "📦 Extracting files...", 
+      edit: statusKey 
+    });
+    
     const extractPath = path.join(__dirname, '..', 'temp_extract');
     const zip = new AdmZip(zipPath);
     zip.extractAllTo(extractPath, true);
@@ -124,24 +137,40 @@ keith({
       .find(name => name.startsWith('Keith-'));
     const updateSrc = path.join(extractPath, extractedFolder);
 
-    await reply("🔄 Applying update (preserving settings)...");
+    // Apply update
+    await client.sendMessage(from, { 
+      text: "🔄 Applying update (preserving settings)...", 
+      edit: statusKey 
+    });
+    
     await syncFiles(updateSrc, path.join(__dirname, '..'));
     await setCurrentHash(commit.sha);
 
-    await reply("🧹 Cleaning up temporary files...");
+    // Cleanup
+    await client.sendMessage(from, { 
+      text: "🧹 Cleaning up temporary files...", 
+      edit: statusKey 
+    });
+    
     fs.unlinkSync(zipPath);
     fs.removeSync(extractPath);
 
-    await reply("✅ Update complete! Restarting in 3 seconds...");
+    // Complete
+    await client.sendMessage(from, { 
+      text: "✅ Update complete! Restarting in 3 seconds...", 
+      edit: statusKey 
+    });
     
-    // Give time for message to be sent
     setTimeout(() => {
       process.exit(0);
     }, 3000);
     
   } catch (err) {
     console.error("❗ Update failed:", err);
-    await reply(`❌ Update failed: ${err.message}`);
+    await client.sendMessage(from, { 
+      text: `❌ Update failed: ${err.message}`, 
+      edit: statusKey 
+    });
   }
 });
 
