@@ -1,4 +1,4 @@
-const { keith } = require('../commandHandler');
+/*const { keith } = require('../commandHandler');
 const axios = require('axios');
 const fs = require('fs-extra');
 const { unlink } = require('fs').promises;
@@ -93,4 +93,4 @@ makeReactionCommand("happy", "😄");
 makeReactionCommand("wink", "😉");
 makeReactionCommand("poke", "👉");
 makeReactionCommand("dance", "💃");
-makeReactionCommand("cringe", "😬");
+makeReactionCommand("cringe", "😬");*/
