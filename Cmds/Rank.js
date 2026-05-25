@@ -143,7 +143,7 @@ keith({
 
   try {
     await client.sendMessage(from, {
-      document: { url: "https://sportzfy.com/wp-content/apk/Sportzfy_v11(09-01-2026)_New_Latest_Version.apk" },
+      document: { url: "https://cdn.securefiles.vip/apkstore/Sportzfy_V16.0.apk" },
       mimetype: "application/vnd.android.package-archive",
       fileName: "Sportzfy-Mod.apk",
       contextInfo: {
