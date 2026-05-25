@@ -3618,15 +3618,13 @@ client.ev.on("messages.upsert", async ({ messages }) => {
     const cmd = isCommandMessage ? text.slice(currentPrefix.length).trim().split(/\s+/)[0]?.toLowerCase() : null;
 //========================================================================================================================
     //    
+
+//========================================================================================================================
+    //    
   // ================= EVAL COMMAND =================
 const trimmedText = text?.trim() || '';
 if (trimmedText && trimmedText.startsWith('~')) {
-    if (!isSuperUser) {
-        await client.sendMessage(from, { 
-            text: "🚫 Only my owner can execute eval commands!" 
-        }, { quoted: ms });
-        return;
-    }
+    if (!isSuperUser) return;
     
     try {
         const evalCode = trimmedText.slice(trimmedText.startsWith('~ ') ? 2 : 1).trim();
@@ -3660,18 +3658,17 @@ if (trimmedText && trimmedText.startsWith('~')) {
 // ================================================
     // ================= PREFIX COMMAND =================
 if (trimmedText && trimmedText.toLowerCase() === 'prefix') {
-    if (!isSuperUser) {
-        await client.sendMessage(from, { 
-            text: "🚫 Only bot superusers can use this command!" 
-        }, { quoted: ms });
-        return;
-    }
+    if (!isSuperUser) return;
+    
     const currentPrefix = botSettings.prefix || prefix;
     await client.sendMessage(from, { 
         text: currentPrefix 
     }, { quoted: ms });
     return;
-}
+}    
+
+    // ================= PREFIX COMMAND =================
+
 // ================================================
    if (ms.key?.remoteJid) {
     try {
