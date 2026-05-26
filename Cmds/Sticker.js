@@ -12,7 +12,7 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 //========================================================================================================================
 
 keith({
-  pattern: "attp",
+  pattern: "attp2",
   aliases: ["textgif", "tenorsticker"],
   description: "Create animated text sticker using Tenor API",
   category: "Sticker",
@@ -64,7 +64,7 @@ Create animated text stickers using Tenor API!
   const apiUrl = `https://tenor.googleapis.com/v2/render_dynamic_text?client_key=waffles&key=AIzaSyCbDgY_wZO9guZMktW6MnOGo-nKVFXqaUE&%24alt=proto&text=${encodedText}&id=${style}`;
 
   try {
-    await reply(`🎨 Creating ${style !== "258698638" ? styleName + " " : ""}animated sticker for *${text.substring(0, 30)}*...`);
+   // await reply(`🎨 Creating ${style !== "258698638" ? styleName + " " : ""}animated sticker for *${text.substring(0, 30)}*...`);
 
     const response = await axios.get(apiUrl, {
       responseType: 'arraybuffer',
@@ -196,7 +196,7 @@ Example: .bratvideo keith | red
 //========================================================================================================================
 
 keith({
-  pattern: "attp2",
+  pattern: "attp",
   aliases: ["texttosticker", "txtsticker"],
   description: "Convert text to animated sticker (ATTp)",
   category: "Sticker",
@@ -677,7 +677,7 @@ keith({
 //========================================================================================================================
 // From Sticker.js
 
-keith({
+/*keith({
   pattern: "circle",
   description: "Quote a sticker and resend it with your packname and author",
   category: "Sticker",
@@ -746,7 +746,7 @@ keith({
     console.error("take error:", err);
     await reply("❌ Failed to restick the quoted sticker.");
   }
-});
+});*/
 //========================================================================================================================
 //=======================
 //========================================================================================================================
