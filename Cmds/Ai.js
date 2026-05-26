@@ -14,7 +14,7 @@ const mime = require('mime-types');
 //========================================================================================================================
 //const axios = require('axios');
 
-const STYLES = {
+/*const STYLES = {
   flataipro: 'Flat AI Pro',
   flatai: 'Flat AI Base',
   runware_quality: 'Standard',
@@ -147,7 +147,7 @@ async (from, client, conText) => {
   }
 });
 
-/*// Style-specific commands for quick access
+// Style-specific commands for quick access
 Object.keys(STYLES).forEach(style => {
   keith({
     pattern: style,
@@ -495,7 +495,7 @@ keith({
 //========================================================================================================================
 
 
-keith({
+/*keith({
   pattern: "sora",
   aliases: ["text2video", "t2v"],
   category: "AI",
@@ -527,7 +527,7 @@ async (from, client, conText) => {
     console.error("Sora error:", error);
     reply("❌ Failed to fetch Sora video: " + error.message);
   }
-});
+});*/
 
 //========================================================================================================================
 
