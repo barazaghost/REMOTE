@@ -644,7 +644,7 @@ async (from, client, conText) => {
 //========================================================================================================================
 
 
-keith({
+/*keith({
   pattern: "knec",
   category: "education",
   description: "Fetch KNEC exam results by index number and candidate name"
@@ -850,7 +850,7 @@ async (from, client, conText) => {
     console.error("GitHub followers error:", err);
     reply("⚠️ An error occurred while fetching followers.");
   }
-});
+});*/
 //========================================================================================================================
 
 
