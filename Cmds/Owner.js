@@ -81,10 +81,10 @@ async (from, client, conText) => {
   try {
     const filePath = await client.downloadAndSaveMediaMessage(quotedImg);
     await client.updateProfilePicture(client.user.id, { url: filePath });
-    await reply("✅ Profile picture updated successfully!");
+    await reply(" Profile picture updated successfully!");
   } catch (err) {
     console.error("pp error:", err);
-    reply(`❌ Failed: ${err.message}`);
+    reply(`Failed: ${err.message}`);
   }
 });
 //========================================================================================================================
