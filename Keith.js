@@ -4561,7 +4561,7 @@ client.ev.on('group-participants.update', async (keizzah) => {
             try {
                 return await client.profilePictureUrl(jid, 'image');
             } catch {
-                return 'https://i.imgur.com/iEWHnOH.jpeg';
+                return 'https://telegra.ph/file/95670d63378f7f4210f03.png';
             }
         };
 
