@@ -6,7 +6,7 @@ const FormData = require('form-data');
 const mime = require('mime-types');
 const crypto = require('crypto');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-
+const cheerio = require('cheerio'); 
 //========================================================================================================================
 // Helper Functions
 //========================================================================================================================
@@ -68,6 +68,129 @@ async function uploadToCatbox(filePath) {
 
   return data.trim(); 
 }
+
+
+//========================================================================================================================
+// Upload Functions
+//=============
+async function uploadToPostimages(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+
+  const baseHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9'
+  };
+
+  // Get initial page and cookies
+  const getRes = await axios.get('https://postimages.org/', { headers: baseHeaders });
+  const html = getRes.data;
+  const cookies = getRes.headers['set-cookie']?.map(c => c.split(';')[0]).join('; ') || '';
+
+  // Extract token
+  const tokenMatch = html.match(/name="token"\s+value="([^"]+)"/i);
+  const token = tokenMatch ? tokenMatch[1] : '';
+
+  // Prepare form data
+  const fileBuffer = await fs.readFile(filePath);
+  const form = new FormData();
+  form.append('token', token);
+  form.append('upload_session', Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
+  form.append('numfiles', '1');
+  form.append('gallery', '');
+  form.append('ui', '22');
+  form.append('optsize', '0');
+  form.append('expire', '0');
+  form.append('cg', '1920x1080');
+  form.append('file', fileBuffer, { filename: 'image.jpg', contentType: 'image/jpeg' });
+
+  // Upload
+  const postRes = await axios.post('https://postimages.org/json', form, {
+    headers: {
+      ...baseHeaders,
+      'Accept': 'application/json',
+      'Cookie': cookies,
+      'Origin': 'https://postimages.org',
+      'Referer': 'https://postimages.org/',
+      'X-Requested-With': 'XMLHttpRequest',
+      ...form.getHeaders()
+    }
+  });
+
+  const data = postRes.data;
+
+  if (data.url) {
+    const pageRes = await axios.get(data.url, { headers: baseHeaders });
+    const pageHtml = pageRes.data;
+    const $ = cheerio.load(pageHtml);
+    
+    const directUrl = $('#direct').val() || $('meta[property="og:image"]').attr('content');
+    if (directUrl) {
+      return directUrl;
+    }
+  }
+
+  throw new Error("Failed to get direct URL from PostImages");
+}async function uploadToPostimages(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+
+  const baseHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9'
+  };
+
+  // Get initial page and cookies
+  const getRes = await axios.get('https://postimages.org/', { headers: baseHeaders });
+  const html = getRes.data;
+  const cookies = getRes.headers['set-cookie']?.map(c => c.split(';')[0]).join('; ') || '';
+
+  // Extract token
+  const tokenMatch = html.match(/name="token"\s+value="([^"]+)"/i);
+  const token = tokenMatch ? tokenMatch[1] : '';
+
+  // Prepare form data
+  const fileBuffer = await fs.readFile(filePath);
+  const form = new FormData();
+  form.append('token', token);
+  form.append('upload_session', Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
+  form.append('numfiles', '1');
+  form.append('gallery', '');
+  form.append('ui', '22');
+  form.append('optsize', '0');
+  form.append('expire', '0');
+  form.append('cg', '1920x1080');
+  form.append('file', fileBuffer, { filename: 'image.jpg', contentType: 'image/jpeg' });
+
+  // Upload
+  const postRes = await axios.post('https://postimages.org/json', form, {
+    headers: {
+      ...baseHeaders,
+      'Accept': 'application/json',
+      'Cookie': cookies,
+      'Origin': 'https://postimages.org',
+      'Referer': 'https://postimages.org/',
+      'X-Requested-With': 'XMLHttpRequest',
+      ...form.getHeaders()
+    }
+  });
+
+  const data = postRes.data;
+
+  if (data.url) {
+    const pageRes = await axios.get(data.url, { headers: baseHeaders });
+    const pageHtml = pageRes.data;
+    const $ = cheerio.load(pageHtml);
+    
+    const directUrl = $('#direct').val() || $('meta[property="og:image"]').attr('content');
+    if (directUrl) {
+      return directUrl;
+    }
+  }
+
+  throw new Error("Failed to get direct URL from PostImages");
+  }
+
 
 async function uploadToLitterbox(filePath) {
   const buffer = await fs.readFile(filePath);
