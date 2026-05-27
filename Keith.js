@@ -454,11 +454,347 @@ const expiryDisplay = getExpiryDisplay();
 
 //========================================================================================================================
 //========================================================================================================================
-
 //========================================================================================================================
+// API Base URL Configuration
+//========================================================================================================================
+const apiUrl = 'https://apiskeith2-production-2ecd.up.railway.app';
 
 // API call to Keith AI Text
 async function getAIResponse(message, userJid) {
+    try {
+        const history = await getConversationHistory(userJid, 5);
+        
+        let context = '';
+        if (history.length > 0) {
+            context = history.map(conv => 
+                `User: ${conv.user}\nAI: ${conv.ai}`
+            ).join('\n') + '\n';
+        }
+
+        const fullMessage = context + `Current: ${message}`;
+        
+        const response = await axios.get(`${apiUrl}/keithai?q=${encodeURIComponent(fullMessage)}`);
+        
+        if (response.data.status && response.data.result) {
+            return response.data.result;
+        } else {
+            console.error('Chatbot API returned invalid response:', response.data);
+            return null;
+        }
+    } catch (error) {
+        console.error('Chatbot API error:', error);
+        return null;
+    }
+}
+
+// API call to Keith AI Text-to-Speech
+async function getAIAudioResponse(message, voice = 'Kimberly') {
+    try {
+        const response = await axios.get(`${apiUrl}/ai/text2speech?q=${encodeURIComponent(message)}&voice=${voice}`);
+        
+        if (response.data.status && response.data.result && response.data.result.URL) {
+            return {
+                url: response.data.result.URL,
+                text: message
+            };
+        } else {
+            console.error('Audio API returned invalid response:', response.data);
+            return null;
+        }
+    } catch (error) {
+        console.error('Chatbot Audio API error:', error);
+        return null;
+    }
+}
+
+// API call to Keith AI Text-to-Video
+async function getAIVideoResponse(message) {
+    try {
+        const response = await axios.get(`${apiUrl}/text2video?q=${encodeURIComponent(message)}`);
+        
+        if (response.data.success && response.data.results) {
+            return {
+                url: response.data.results,
+                text: `Generated video for: ${message}`
+            };
+        } else {
+            console.error('Video API returned invalid response:', response.data);
+            return null;
+        }
+    } catch (error) {
+        console.error('Chatbot Video API error:', error);
+        return null;
+    }
+}
+
+// API call to Keith AI Image Generation (Flux)
+async function getAIImageResponse(message) {
+    try {
+        const response = await axios.get(`${apiUrl}/ai/magicstudio?prompt=${encodeURIComponent(message)}`);
+        
+        // Since Flux returns image directly, we use the API URL as image source
+        return {
+            url: `${apiUrl}/ai/flux?q=${encodeURIComponent(message)}`,
+            text: `Generated image for: ${message}`
+        };
+    } catch (error) {
+        console.error('Chatbot Image API error:', error);
+        return null;
+    }
+}
+
+// API call to Keith AI Vision Analysis
+async function getAIVisionResponse(imageUrl, question) {
+    try {
+        const response = await axios.get(`${apiUrl}/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(question)}`);
+        
+        if (response.data.status && response.data.result) {
+            return response.data.result;
+        } else {
+            console.error('Vision API returned invalid response:', response.data);
+            return null;
+        }
+    } catch (error) {
+        console.error('Chatbot Vision API error:', error);
+        return null;
+    }
+}
+
+// Download media and convert to buffer
+async function downloadMedia(mediaUrl) {
+    try {
+        const response = await axios.get(mediaUrl, { responseType: 'arraybuffer' });
+        return Buffer.from(response.data);
+    } catch (error) {
+        console.error('Error downloading media:', error);
+        return null;
+    }
+}
+
+// Get direct image URL from WhatsApp message
+function getImageUrl(message) {
+    if (message?.imageMessage) {
+        return message.imageMessage.url;
+    }
+    return null;
+}
+
+// Chatbot detection and response
+async function handleChatbot(client, message, from, sender, isGroup, isSuperUser, quoted, pushName, groupName) {
+    try {
+        // Get settings for this specific chat/group
+        const settings = await getChatbotSettings(from, isGroup ? groupName : pushName, isGroup ? 'group' : 'private');
+        
+        // Skip if chatbot is off for this chat
+        if (!settings || settings.status === 'off') return;
+        
+        // Skip super users
+        if (isSuperUser) return;
+
+        const text = message?.conversation || 
+                    message?.extendedTextMessage?.text || 
+                    message?.imageMessage?.caption || '';
+
+        // Check for image message for vision analysis
+        if (message?.imageMessage && text && (text.toLowerCase().includes('analyze') || text.toLowerCase().includes('what') || text.toLowerCase().includes('describe') || text.toLowerCase().includes('vision'))) {
+            return await handleVisionAnalysis(client, message, from, sender, quoted);
+        }
+
+        if (!text) return;
+
+        // Check trigger based on settings
+        let shouldRespond = false;
+        let cleanMessage = text;
+        
+        if (isGroup) {
+            // Group handling based on trigger
+            if (settings.trigger === 'mention') {
+                const botMention = `@${client.user.id.split(':')[0]}`;
+                if (text.includes(botMention)) {
+                    shouldRespond = true;
+                    cleanMessage = text.replace(botMention, '').trim();
+                }
+            } else if (settings.trigger === 'all') {
+                shouldRespond = true;
+            }
+        } else {
+            // Private chat handling
+            if (settings.trigger === 'dm' || settings.trigger === 'all') {
+                shouldRespond = true;
+            }
+        }
+
+        if (!shouldRespond || !cleanMessage) return;
+
+        // Determine response type from message
+        const responseType = determineResponseType(cleanMessage);
+        cleanMessage = cleanMessage.replace(/audio|voice|video|image|generate/gi, '').trim();
+
+        // Handle different response types using chat-specific settings
+        switch (responseType) {
+            case 'audio':
+                await handleAudioResponse(client, from, sender, cleanMessage, settings.voice, quoted || message);
+                break;
+            case 'video':
+                await handleVideoResponse(client, from, sender, cleanMessage, quoted || message);
+                break;
+            case 'image':
+                await handleImageResponse(client, from, sender, cleanMessage, quoted || message);
+                break;
+            default:
+                await handleTextResponse(client, from, sender, cleanMessage, quoted || message);
+                break;
+        }
+
+    } catch (error) {
+        console.error('Chatbot handler error:', error);
+    }
+}
+
+// Determine response type based on message content
+function determineResponseType(message) {
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('video') || lowerMessage.includes('generate video')) {
+        return 'video';
+    } else if (lowerMessage.includes('image') || lowerMessage.includes('generate image') || lowerMessage.includes('picture')) {
+        return 'image';
+    } else if (lowerMessage.includes('audio') || lowerMessage.includes('voice')) {
+        return 'audio';
+    }
+    return 'text';
+}
+
+// Handle text response
+async function handleTextResponse(client, from, sender, message, quoted) {
+    const aiResponse = await getAIResponse(message, sender);
+    await client.sendMessage(from, { 
+        text: aiResponse
+    }, { 
+        quoted: quoted 
+    });
+    await saveConversation(sender, message, aiResponse, 'text');
+}
+
+// Handle audio response - FIXED: Get AI response first, then convert to audio
+async function handleAudioResponse(client, from, sender, message, voice, quoted) {
+    try {
+        // First get the AI text response
+        const aiTextResponse = await getAIResponse(message, sender);
+        
+        // Then convert the AI response to audio
+        const audioData = await getAIAudioResponse(aiTextResponse, voice);
+        
+        if (audioData && audioData.url) {
+            const audioBuffer = await downloadMedia(audioData.url);
+            if (audioBuffer) {
+                await client.sendMessage(from, {
+                    audio: audioBuffer,
+                    ptt: false,
+                    mimetype: 'audio/mpeg'
+                }, { 
+                    quoted: quoted 
+                });
+                await saveConversation(sender, message, aiTextResponse, 'audio', audioData.url);
+                return;
+            }
+        }
+        
+        // Fallback to text if audio fails
+        console.error('Audio generation failed, falling back to text response');
+        await client.sendMessage(from, { 
+            text: aiTextResponse
+        }, { 
+            quoted: quoted 
+        });
+        await saveConversation(sender, message, aiTextResponse, 'text');
+        
+    } catch (error) {
+        console.error('Audio response error:', error);
+        // Fallback to text on error
+        await handleTextResponse(client, from, sender, message, quoted);
+    }
+}
+
+// Handle video response
+async function handleVideoResponse(client, from, sender, message, quoted) {
+    const videoData = await getAIVideoResponse(message);
+    
+    if (videoData && videoData.url) {
+        const videoBuffer = await downloadMedia(videoData.url);
+        if (videoBuffer) {
+            await client.sendMessage(from, {
+                video: videoBuffer,
+                caption: `🎥 ${videoData.text}`
+            }, { 
+                quoted: quoted 
+            });
+            await saveConversation(sender, message, videoData.text, 'video', videoData.url);
+            return;
+        }
+    }
+    
+    console.error('Video generation failed for message:', message);
+    // Don't send error message to chat
+}
+
+// Handle image response
+async function handleImageResponse(client, from, sender, message, quoted) {
+    const imageData = await getAIImageResponse(message);
+    
+    if (imageData && imageData.url) {
+        const imageBuffer = await downloadMedia(imageData.url);
+        if (imageBuffer) {
+            await client.sendMessage(from, {
+                image: imageBuffer,
+                caption: `🖼️ ${imageData.text}`
+            }, { 
+                quoted: quoted 
+            });
+            await saveConversation(sender, message, imageData.text, 'image', imageData.url);
+            return;
+        }
+    }
+    
+    console.error('Image generation failed for message:', message);
+    // Don't send error message to chat
+}
+
+// Handle vision analysis - SIMPLIFIED: Use direct image URL
+async function handleVisionAnalysis(client, message, from, sender, quoted) {
+    try {
+        const imageUrl = getImageUrl(message);
+        
+        if (!imageUrl) {
+            console.error('No image found for vision analysis');
+            return;
+        }
+
+        const question = message.imageMessage.caption || "What's in this image?";
+        const visionResponse = await getAIVisionResponse(imageUrl, question);
+        
+        if (visionResponse) {
+            await client.sendMessage(from, { 
+                text: `🔍 Vision Analysis:\n\n${visionResponse}`
+            }, { 
+                quoted: quoted 
+            });
+            await saveConversation(sender, question, visionResponse, 'vision', imageUrl);
+        } else {
+            console.error('Vision analysis failed for image:', imageUrl);
+            // Don't send error message to chat
+        }
+    } catch (error) {
+        console.error('Vision analysis error:', error);
+        // Don't send error message to chat
+    }
+}
+
+//==========================================================================================================
+//========================================================================================================================
+
+// API call to Keith AI Text
+/*async function getAIResponse(message, userJid) {
     try {
         const history = await getConversationHistory(userJid, 5);
         
@@ -787,7 +1123,7 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
         console.error('Vision analysis error:', error);
         // Don't send error message to chat
     }
-}
+}*/
 
 //========================================================================================================================
 // Auto Social Download Function
