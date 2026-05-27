@@ -62,6 +62,31 @@ keith({
   }
 });
 //========================================================================================================================
+
+
+keith({
+  pattern: "pp",
+  aliases: ["setpp", "setprofile"],
+  category: "Owner",
+  description: "Set profile picture"
+},
+async (from, client, conText) => {
+  const { reply, quoted, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  const quotedImg = quoted?.imageMessage || quoted?.message?.imageMessage;
+  if (!quotedImg) return reply("📸 Reply to an image to set as profile picture.");
+
+  try {
+    const filePath = await client.downloadAndSaveMediaMessage(quotedImg);
+    await client.updateProfilePicture(client.user.id, { url: filePath });
+    await reply("✅ Profile picture updated successfully!");
+  } catch (err) {
+    console.error("pp error:", err);
+    reply(`❌ Failed: ${err.message}`);
+  }
+});
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
