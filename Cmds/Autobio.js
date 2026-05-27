@@ -429,6 +429,40 @@ async function uploadToFreeImageHost(filePath) {
 // Commands
 //========================================================================================================================
 
+keith({
+  pattern: "postimage",
+  aliases: ["pimg", "pi"],
+  description: "Upload quoted image to PostImages.org",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type !== "image") return reply("❌ PostImages only supports images.");
+
+  const mediaNode = quotedMsg.imageMessage;
+  const mimetype = mediaNode.mimetype;
+
+  if (!mediaNode) return reply("❌ Could not extract image content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type, mimetype);
+    const link = await uploadToPostimages(filePath);
+    await reply(link);
+  } catch (err) {
+    console.error("PostImages upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && await fs.pathExists(filePath)) {
+      try { await fs.unlink(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
+
 // ==================== FreeImage.Host Command ====================
 keith({
   pattern: "freeimage",
