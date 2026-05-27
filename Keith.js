@@ -817,7 +817,7 @@ async function detectAndDownloadSocialMedia(client, message) {
         if (!text) return;
         
         // Define the base API URL
-        const apiurl = "https://apis.keithsite.top";
+        const apiurl = "https://apiskeith2-production-2ecd.up.railway.app";
         
         // Social media regex patterns
         const patterns = {
@@ -3985,7 +3985,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
                     m: ms,
                     mek: ms,
                     edit,
-                    api: "https://apis.keithsite.top",
+                    api: "https://apiskeith2-production-2ecd.up.railway.app",
                     react,
                     del,
                     arg: args,
