@@ -8,6 +8,11 @@ const { keith } = require('../commandHandler');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+      
+//========================================================================================================================
+// From Download.js
+
 keith({
   pattern: "play",
   aliases: ["ytmp3", "ytmp3doc", "audiodoc", "yta"],
@@ -22,15 +27,12 @@ async (from, client, conText) => {
   try {
     let videoUrl;
     let videoTitle;
-    let videoThumbnail;
 
-    // Check if input is a YouTube URL
     if (q.match(/(youtube\.com|youtu\.be)/i)) {
       videoUrl = q;
       const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i)?.[1];
       if (!videoId) return;
       videoTitle = "YouTube Audio";
-      videoThumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
     } else {
       const searchResponse = await axios.get(`${api}/search/yts?query=${encodeURIComponent(q)}`);
       const videos = searchResponse.data?.result;
@@ -39,7 +41,6 @@ async (from, client, conText) => {
       const firstVideo = videos[0];
       videoUrl = firstVideo.url;
       videoTitle = firstVideo.title;
-      videoThumbnail = firstVideo.thumbnail;
     }
 
     const downloadResponse = await axios.get(`${api}/download/audio?url=${encodeURIComponent(videoUrl)}`);
@@ -48,44 +49,22 @@ async (from, client, conText) => {
 
     const fileName = `${videoTitle}.mp3`.replace(/[^\w\s.-]/gi, '');
 
-    const contextInfo = {
-      externalAdReply: {
-        title: videoTitle,
-        body: 'Powered by Keith API',
-        mediaType: 1,
-        sourceUrl: videoUrl,
-        thumbnailUrl: videoThumbnail,
-        renderLargerThumbnail: false
-      }
-    };
-
-    // Send audio stream
     await client.sendMessage(from, {
       audio: { url: downloadUrl },
       mimetype: "audio/mpeg",
-      fileName,
-      contextInfo
+      fileName
     }, { quoted: mek });
 
-    // Send document stream
     await client.sendMessage(from, {
       document: { url: downloadUrl },
       mimetype: "audio/mpeg",
-      fileName,
-      contextInfo: {
-        ...contextInfo,
-        externalAdReply: {
-          ...contextInfo.externalAdReply,
-          body: 'Document version - Powered by Keith API'
-        }
-      }
+      fileName
     }, { quoted: mek });
 
   } catch (error) {
     console.error("Error during download process:", error);
   }
 });
-//========================================================================================================================
 //========================================================================================================================
 
 
