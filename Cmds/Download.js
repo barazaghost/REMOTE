@@ -15,7 +15,7 @@ const { keith } = require('../commandHandler');
 
 keith({
   pattern: "play",
-  aliases: ["ytmp3", "ytmp3doc", "audiodoc", "yta"],
+  aliases: ["ytmp3", "ytmp3doc", "audiodoc", "yta", "song"],
   category: "Downloader",
   description: "Download Video from Youtube"
 },
@@ -66,7 +66,7 @@ async (from, client, conText) => {
   }
 });
 //========================================================================================================================
-
+// From Download.js
 
 keith({
   pattern: "video",
@@ -82,15 +82,12 @@ async (from, client, conText) => {
   try {
     let videoUrl;
     let videoTitle;
-    let videoThumbnail;
 
-    // Check if input is a YouTube URL
     if (q.match(/(youtube\.com|youtu\.be)/i)) {
       videoUrl = q;
       const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i)?.[1];
       if (!videoId) return;
-      videoTitle = "YouTube Audio";
-      videoThumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+      videoTitle = "YouTube Video";
     } else {
       const searchResponse = await axios.get(`${api}/search/yts?query=${encodeURIComponent(q)}`);
       const videos = searchResponse.data?.result;
@@ -99,7 +96,6 @@ async (from, client, conText) => {
       const firstVideo = videos[0];
       videoUrl = firstVideo.url;
       videoTitle = firstVideo.title;
-      videoThumbnail = firstVideo.thumbnail;
     }
 
     const downloadResponse = await axios.get(`${api}/download/mp4?url=${encodeURIComponent(videoUrl)}`);
@@ -108,37 +104,16 @@ async (from, client, conText) => {
 
     const fileName = `${videoTitle}.mp4`.replace(/[^\w\s.-]/gi, '');
 
-    const contextInfo = {
-      externalAdReply: {
-        title: videoTitle,
-        body: 'Powered by Keith API',
-        mediaType: 1,
-        sourceUrl: videoUrl,
-        thumbnailUrl: videoThumbnail,
-        renderLargerThumbnail: false
-      }
-    };
-
-    // Send audio stream
     await client.sendMessage(from, {
       video: { url: downloadUrl },
       mimetype: "video/mp4",
-      fileName,
-      contextInfo
+      fileName
     }, { quoted: mek });
 
-    // Send document stream
     await client.sendMessage(from, {
       document: { url: downloadUrl },
       mimetype: "video/mp4",
-      fileName,
-      contextInfo: {
-        ...contextInfo,
-        externalAdReply: {
-          ...contextInfo.externalAdReply,
-          body: 'Document version - Powered by Keith API'
-        }
-      }
+      fileName
     }, { quoted: mek });
 
   } catch (error) {
