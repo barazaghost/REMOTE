@@ -1157,7 +1157,9 @@ async function detectAndDownloadSocialMedia(client, message) {
         
         // Social media regex patterns
         const patterns = {
-            tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/@[\w.-]+\/video\/\d+|vt\.tiktok\.com\/[\w]+|vm\.tiktok\.com\/[\w]+|tiktok\.com\/t\/[\w]+)/i,
+           // tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/@[\w.-]+\/video\/\d+|vt\.tiktok\.com\/[\w]+|vm\.tiktok\.com\/[\w]+|tiktok\.com\/t\/[\w]+)/i,
+          //  tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/(?:@[\w.-]+\/video\/\d+|t\/[\w-]+|v\/\d+)|(?:vm|vt)\.tiktok\.com\/[\w-]+)/i,
+            tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/(?:@[\w.-]+\/video\/\d+|t\/[\w-]+|v\/\d+)|(?:vm|vt)\.tiktok\.com\/[\w-]+)/i,
             instagram: /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com\/(?:reel|p|tv)\/[\w-]+)/i,
             facebook: /(?:https?:\/\/)?(?:www\.)?(?:facebook\.com\/(?:watch\?v=\d+|share\/[\w]+\/[\w]+|reel\/\d+)|fb\.watch\/[\w]+)/i,
             youtube: /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=[\w-]+|youtu\.be\/[\w-]+|youtube\.com\/shorts\/[\w-]+)/i,
