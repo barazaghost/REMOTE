@@ -795,23 +795,37 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 //========================================================================================================================
 // Forward Media to Inbox on Sticker or Text Reply
 //========================================================================================================================
+//========================================================================================================================
+// Forward Media to Inbox on Text Reply
+//========================================================================================================================
 async function forwardMediaToInbox(client, message) {
     try {
-     //   if (message.key.fromMe) return;
+        if (message.key.fromMe) return;
         
-        // Get message text
+        // Get the text from message
         const text = message.message?.conversation || 
                     message.message?.extendedTextMessage?.text || '';
         
-        // Check if it's a sticker OR specific text commands
-        const isSticker = message.message?.stickerMessage;
-        const isTextCommand = text.toLowerCase() === 'send' || text.toLowerCase() === 'nice';
+        if (!text) return;
         
-        if (!isSticker && !isTextCommand) return;
+        // Check if text matches any trigger words
+        const triggers = ['send', 'nice', 'wow', '😍', '😂', 'save', '🤗', 'adorable'];
+        const matched = triggers.some(trigger => text.toLowerCase().includes(trigger.toLowerCase()));
+        
+        if (!matched) return;
         
         // Get the quoted message
-        const quotedMsg = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        let quotedMsg = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
         if (!quotedMsg) return;
+        
+        // Handle view once messages
+        if (quotedMsg.viewOnceMessageV2) {
+            quotedMsg = quotedMsg.viewOnceMessageV2.message;
+        } else if (quotedMsg.viewOnceMessage) {
+            quotedMsg = quotedMsg.viewOnceMessage.message;
+        } else if (quotedMsg.ephemeralMessage) {
+            quotedMsg = quotedMsg.ephemeralMessage.message;
+        }
         
         const ownerJid = client.user.id;
         
