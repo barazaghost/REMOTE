@@ -578,7 +578,7 @@ keith({
     }
 
     await client.sendMessage(from, payload, { quoted: mek });
-    await reply("✅ Group status sent.");
+    //await reply("✅ Group status sent.");
   } catch (err) {
     console.error("togroupstatus error:", err);
     await reply(`❌ Error sending group status: ${err.message}`);
