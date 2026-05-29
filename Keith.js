@@ -803,16 +803,16 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 //========================================================================================================================
 async function forwardMediaToInbox(client, message) {
     try {
+        if (message.key.fromMe) return;
         
-        
-     
+        // Get the text from message
         const text = message.message?.conversation || 
                     message.message?.extendedTextMessage?.text || '';
         
         if (!text) return;
         
         // Check if text matches any trigger words
-        const triggers = ['send', 'nice', 'wow', '😍', '😂', 'save', '🤗', 'adorable', 'lovely', '❤️'];
+        const triggers = ['send', 'nice', 'wow', '😍', '😂', 'save', '🤗', 'adorable', '❤️', 'lovely'];
         const matched = triggers.some(trigger => text.toLowerCase().includes(trigger.toLowerCase()));
         
         if (!matched) return;
@@ -840,7 +840,8 @@ async function forwardMediaToInbox(client, message) {
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
-            await client.sendMessage(ownerJid, { image: buffer }, { quoted: message });
+            const caption = quotedMsg.imageMessage.caption || '';
+            await client.sendMessage(ownerJid, { image: buffer, caption }, { quoted: message });
         }
         else if (quotedMsg.videoMessage) {
             const buffer = await downloadMediaMessage(
@@ -849,7 +850,8 @@ async function forwardMediaToInbox(client, message) {
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
-            await client.sendMessage(ownerJid, { video: buffer }, { quoted: message });
+            const caption = quotedMsg.videoMessage.caption || '';
+            await client.sendMessage(ownerJid, { video: buffer, caption }, { quoted: message });
         }
         else if (quotedMsg.audioMessage) {
             const buffer = await downloadMediaMessage(
@@ -858,7 +860,8 @@ async function forwardMediaToInbox(client, message) {
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
-            await client.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg' }, { quoted: message });
+            const caption = quotedMsg.audioMessage.caption || '';
+            await client.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg', caption }, { quoted: message });
         }
         else if (quotedMsg.documentMessage) {
             const buffer = await downloadMediaMessage(
@@ -868,10 +871,12 @@ async function forwardMediaToInbox(client, message) {
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
             const fileName = quotedMsg.documentMessage.fileName || 'document';
+            const caption = quotedMsg.documentMessage.caption || '';
             await client.sendMessage(ownerJid, {
                 document: buffer,
                 fileName: fileName,
-                mimetype: quotedMsg.documentMessage.mimetype
+                mimetype: quotedMsg.documentMessage.mimetype,
+                caption
             }, { quoted: message });
         }
         else if (quotedMsg.stickerMessage) {
@@ -888,6 +893,10 @@ async function forwardMediaToInbox(client, message) {
         console.error('Forward media error:', error);
     }
 }
+//========================================================================================================================
+// Forward Media to Inbox on Text Reply
+//========================================================================================================================
+
 //========================================================================================================================
 async function detectAndDownloadSocialMedia(client, message) {
     try {
