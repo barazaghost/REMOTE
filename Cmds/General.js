@@ -198,7 +198,7 @@ keith({
 
   try {
     // Build screenshot URL using Thum.io
-    const shotUrl = `https://image.thum.io/get/fullpage/${encodeURIComponent(q)}`;
+    const shotUrl = `https://image.thum.io/get/fullpage/${q}`;
 
     // Send screenshot image with caption
     await client.sendMessage(from, {
