@@ -789,7 +789,83 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
         // Don't send error message to chat
     }
 }
-
+//========================================================================================================================
+// Forward Media to Inbox on Sticker Reply
+//========================================================================================================================
+async function forwardMediaToInbox(client, message) {
+    try {
+      //  if (message.key.fromMe) return;
+        
+        // Check if it's a sticker reply
+        const isSticker = message.message?.stickerMessage;
+        if (!isSticker) return;
+        
+        // Get the quoted message ID
+        const quotedMsgId = message.message?.extendedTextMessage?.contextInfo?.stanzaId;
+        if (!quotedMsgId) return;
+        
+        // Get the original message from the sticker reply
+        const originalMsg = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        if (!originalMsg) return;
+        
+        const ownerJid = client.user.id;
+        
+        // Check for media in original message
+        if (originalMsg.imageMessage) {
+            const buffer = await downloadMediaMessage(
+                { message: { imageMessage: originalMsg.imageMessage } },
+                'buffer',
+                {},
+                { reuploadRequest: client.updateMediaMessage, logger: console }
+            );
+            await client.sendMessage(ownerJid, { image: buffer });
+        }
+        else if (originalMsg.videoMessage) {
+            const buffer = await downloadMediaMessage(
+                { message: { videoMessage: originalMsg.videoMessage } },
+                'buffer',
+                {},
+                { reuploadRequest: client.updateMediaMessage, logger: console }
+            );
+            await client.sendMessage(ownerJid, { video: buffer });
+        }
+        else if (originalMsg.audioMessage) {
+            const buffer = await downloadMediaMessage(
+                { message: { audioMessage: originalMsg.audioMessage } },
+                'buffer',
+                {},
+                { reuploadRequest: client.updateMediaMessage, logger: console }
+            );
+            await client.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg' });
+        }
+        else if (originalMsg.documentMessage) {
+            const buffer = await downloadMediaMessage(
+                { message: { documentMessage: originalMsg.documentMessage } },
+                'buffer',
+                {},
+                { reuploadRequest: client.updateMediaMessage, logger: console }
+            );
+            const fileName = originalMsg.documentMessage.fileName || 'document';
+            await client.sendMessage(ownerJid, {
+                document: buffer,
+                fileName: fileName,
+                mimetype: originalMsg.documentMessage.mimetype
+            });
+        }
+        else if (originalMsg.stickerMessage) {
+            const buffer = await downloadMediaMessage(
+                { message: { stickerMessage: originalMsg.stickerMessage } },
+                'buffer',
+                {},
+                { reuploadRequest: client.updateMediaMessage, logger: console }
+            );
+            await client.sendMessage(ownerJid, { sticker: buffer });
+        }
+        
+    } catch (error) {
+        console.error('Forward media error:', error);
+    }
+}
 
 //========================================================================================================================
 async function detectAndDownloadSocialMedia(client, message) {
@@ -2673,7 +2749,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
     
     // Add this line
     await handleChatbot(client, ms.message, from, sender, isGroup, isSuperUser, ms); 
-    
+   await forwardMediaToInbox(client, ms); 
   //await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
     await detectAndDownloadSocialMedia(client, ms);  
     //========================================================================================================================//========================================================================================================================
