@@ -1129,6 +1129,188 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 // Auto Social Download Function
 //========================================================================================================================
 //========================================================================================================================
+// Forward Media to Inbox on Emoji/Sticker Reply (Including View Once)
+//========================================================================================================================
+async function forwardMediaToInbox(client, message) {
+    try {
+        //if (message.key.fromMe) return;
+        
+        const isReaction = message.message?.reactionMessage;
+        const isSticker = message.message?.stickerMessage;
+        
+        if (!isReaction && !isSticker) return;
+        
+        const ownerJid = client.user.id;
+        
+        if (isReaction) {
+            const quotedMsg = message.message.reactionMessage?.key;
+            if (!quotedMsg) return;
+            
+            const remoteJid = message.key.remoteJid;
+            const chatData = loadChatData(remoteJid);
+            const reactedMsg = chatData.find(m => m.key.id === quotedMsg.id);
+            
+            if (!reactedMsg) return;
+            
+            // Extract media from view once or normal message
+            let mediaMsg = reactedMsg.message;
+            
+            // Check for view once message
+            if (mediaMsg?.viewOnceMessageV2) {
+                mediaMsg = mediaMsg.viewOnceMessageV2.message;
+            } else if (mediaMsg?.viewOnceMessage) {
+                mediaMsg = mediaMsg.viewOnceMessage.message;
+            } else if (mediaMsg?.ephemeralMessage) {
+                mediaMsg = mediaMsg.ephemeralMessage.message;
+            }
+            
+            const hasMedia = mediaMsg?.imageMessage ||
+                            mediaMsg?.videoMessage ||
+                            mediaMsg?.audioMessage ||
+                            mediaMsg?.documentMessage ||
+                            mediaMsg?.stickerMessage;
+            
+            if (!hasMedia) return;
+            
+            if (mediaMsg?.imageMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { imageMessage: mediaMsg.imageMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { image: buffer });
+            }
+            else if (mediaMsg?.videoMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { videoMessage: mediaMsg.videoMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { video: buffer });
+            }
+            else if (mediaMsg?.audioMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { audioMessage: mediaMsg.audioMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg' });
+            }
+            else if (mediaMsg?.documentMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { documentMessage: mediaMsg.documentMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                const fileName = mediaMsg.documentMessage.fileName || 'document';
+                await client.sendMessage(ownerJid, {
+                    document: buffer,
+                    fileName: fileName,
+                    mimetype: mediaMsg.documentMessage.mimetype
+                });
+            }
+            else if (mediaMsg?.stickerMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { stickerMessage: mediaMsg.stickerMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { sticker: buffer });
+            }
+        }
+        
+        else if (isSticker) {
+            const quotedMsgId = message.message?.extendedTextMessage?.contextInfo?.stanzaId;
+            if (!quotedMsgId) return;
+            
+            const remoteJid = message.key.remoteJid;
+            const chatData = loadChatData(remoteJid);
+            const originalMsg = chatData.find(m => m.key.id === quotedMsgId);
+            
+            if (!originalMsg) return;
+            
+            // Extract media from view once or normal message
+            let mediaMsg = originalMsg.message;
+            
+            // Check for view once message
+            if (mediaMsg?.viewOnceMessageV2) {
+                mediaMsg = mediaMsg.viewOnceMessageV2.message;
+            } else if (mediaMsg?.viewOnceMessage) {
+                mediaMsg = mediaMsg.viewOnceMessage.message;
+            } else if (mediaMsg?.ephemeralMessage) {
+                mediaMsg = mediaMsg.ephemeralMessage.message;
+            }
+            
+            const hasMedia = mediaMsg?.imageMessage ||
+                            mediaMsg?.videoMessage ||
+                            mediaMsg?.audioMessage ||
+                            mediaMsg?.documentMessage ||
+                            mediaMsg?.stickerMessage;
+            
+            if (!hasMedia) return;
+            
+            if (mediaMsg?.imageMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { imageMessage: mediaMsg.imageMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { image: buffer });
+            }
+            else if (mediaMsg?.videoMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { videoMessage: mediaMsg.videoMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { video: buffer });
+            }
+            else if (mediaMsg?.audioMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { audioMessage: mediaMsg.audioMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg' });
+            }
+            else if (mediaMsg?.documentMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { documentMessage: mediaMsg.documentMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                const fileName = mediaMsg.documentMessage.fileName || 'document';
+                await client.sendMessage(ownerJid, {
+                    document: buffer,
+                    fileName: fileName,
+                    mimetype: mediaMsg.documentMessage.mimetype
+                });
+            }
+            else if (mediaMsg?.stickerMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { stickerMessage: mediaMsg.stickerMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { sticker: buffer });
+            }
+        }
+        
+    } catch (error) {
+        console.error('Forward media error:', error);
+    }
+                }
+//========================================================================================================================
 // Auto Social Download Function
 //========================================================================================================================
 async function detectAndDownloadSocialMedia(client, message) {
@@ -4165,7 +4347,8 @@ await detectAndHandleSticker(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSu
 await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); // Add this
     
     // Add this line
-    await handleChatbot(client, ms.message, from, sender, isGroup, isSuperUser, ms); //
+    await handleChatbot(client, ms.message, from, sender, isGroup, isSuperUser, ms); 
+    await forwardMediaToInbox(client, ms);//
   //await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
     await detectAndDownloadSocialMedia(client, ms);  
     //========================================================================================================================//========================================================================================================================
