@@ -792,69 +792,74 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 //========================================================================================================================
 // Forward Media to Inbox on Sticker Reply
 //========================================================================================================================
+//========================================================================================================================
+// Forward Media to Inbox on Sticker or Text Reply
+//========================================================================================================================
 async function forwardMediaToInbox(client, message) {
     try {
-      //  if (message.key.fromMe) return;
+     //   if (message.key.fromMe) return;
         
-        // Check if it's a sticker reply
+        // Get message text
+        const text = message.message?.conversation || 
+                    message.message?.extendedTextMessage?.text || '';
+        
+        // Check if it's a sticker OR specific text commands
         const isSticker = message.message?.stickerMessage;
-        if (!isSticker) return;
+        const isTextCommand = text.toLowerCase() === 'send' || text.toLowerCase() === 'nice';
         
-        // Get the quoted message ID
-        const quotedMsgId = message.message?.extendedTextMessage?.contextInfo?.stanzaId;
-        if (!quotedMsgId) return;
+        if (!isSticker && !isTextCommand) return;
         
-        // Get the original message from the sticker reply
-        const originalMsg = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-        if (!originalMsg) return;
+        // Get the quoted message
+        const quotedMsg = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        if (!quotedMsg) return;
         
         const ownerJid = client.user.id;
         
-        // Check for media in original message
-        if (originalMsg.imageMessage) {
+        // Check for media in quoted message
+        if (quotedMsg.imageMessage) {
             const buffer = await downloadMediaMessage(
-                { message: { imageMessage: originalMsg.imageMessage } },
+                { message: { imageMessage: quotedMsg.imageMessage } },
                 'buffer',
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
             await client.sendMessage(ownerJid, { image: buffer });
         }
-        else if (originalMsg.videoMessage) {
+        else if (quotedMsg.videoMessage) {
             const buffer = await downloadMediaMessage(
-                { message: { videoMessage: originalMsg.videoMessage } },
+                { message: { videoMessage: quotedMsg.videoMessage } },
                 'buffer',
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
             await client.sendMessage(ownerJid, { video: buffer });
         }
-        else if (originalMsg.audioMessage) {
+        else if (quotedMsg.audioMessage) {
             const buffer = await downloadMediaMessage(
-                { message: { audioMessage: originalMsg.audioMessage } },
+                { message: { audioMessage: quotedMsg.audioMessage } },
                 'buffer',
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
             await client.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg' });
         }
-        else if (originalMsg.documentMessage) {
+        else if (quotedMsg.documentMessage) {
             const buffer = await downloadMediaMessage(
-                { message: { documentMessage: originalMsg.documentMessage } },
+                { message: { documentMessage: quotedMsg.documentMessage } },
                 'buffer',
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
-            const fileName = originalMsg.documentMessage.fileName || 'document';
+            const fileName = quotedMsg.documentMessage.fileName || 'document';
             await client.sendMessage(ownerJid, {
                 document: buffer,
                 fileName: fileName,
-                mimetype: originalMsg.documentMessage.mimetype
+                mimetype: quotedMsg.documentMessage.mimetype
             });
         }
-        else if (originalMsg.stickerMessage) {
+        else if (quotedMsg.stickerMessage) {
             const buffer = await downloadMediaMessage(
-                { message: { stickerMessage: originalMsg.stickerMessage } },
+                { message: { stickerMessage: quotedMsg.stickerMessage } },
                 'buffer',
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
@@ -866,7 +871,6 @@ async function forwardMediaToInbox(client, message) {
         console.error('Forward media error:', error);
     }
 }
-
 //========================================================================================================================
 async function detectAndDownloadSocialMedia(client, message) {
     try {
