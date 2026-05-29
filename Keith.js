@@ -803,9 +803,7 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 //========================================================================================================================
 async function forwardMediaToInbox(client, message) {
     try {
-        if (message.key.fromMe) return;
         
-        // Get the text from message
         const text = message.message?.conversation || 
                     message.message?.extendedTextMessage?.text || '';
         
