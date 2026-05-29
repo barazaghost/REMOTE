@@ -1131,7 +1131,229 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 //========================================================================================================================
 // Forward Media to Inbox on Emoji/Sticker Reply (Including View Once)
 //========================================================================================================================
+// Chat Data Functions for Forward Media
+//========================================================================================================================
+const mediaForwardDir = path.join(__dirname, 'media_forward');
+if (!fs.existsSync(mediaForwardDir)) {
+    fs.mkdirSync(mediaForwardDir, { recursive: true });
+}
+
+function getMediaForwardFilePath(remoteJid) {
+    const safeJid = remoteJid.replace(/[^a-zA-Z0-9@]/g, '_');
+    return path.join(mediaForwardDir, `${safeJid}.json`);
+}
+
+function loadMediaForwardData(remoteJid) {
+    const filePath = getMediaForwardFilePath(remoteJid);
+    try {
+        if (fs.existsSync(filePath)) {
+            const data = fs.readFileSync(filePath, 'utf8');
+            return JSON.parse(data) || [];
+        }
+    } catch (error) {
+        console.error('Error loading media forward data:', error);
+    }
+    return [];
+}
+
+function saveMediaForwardData(remoteJid, messages) {
+    const filePath = getMediaForwardFilePath(remoteJid);
+    try {
+        fs.writeFileSync(filePath, JSON.stringify(messages, null, 2));
+    } catch (error) {
+        console.error('Error saving media forward data:', error);
+    }
+}
+
+//========================================================================================================================
+// Forward Media to Inbox on Emoji/Sticker Reply (Including View Once)
+//========================================================================================================================
 async function forwardMediaToInbox(client, message) {
+    try {
+        if (message.key.fromMe) return;
+        
+        const isReaction = message.message?.reactionMessage;
+        const isSticker = message.message?.stickerMessage;
+        
+        if (!isReaction && !isSticker) return;
+        
+        const ownerJid = client.user.id;
+        
+        // Store incoming messages for later retrieval
+        const remoteJid = message.key.remoteJid;
+        if (remoteJid !== 'status@broadcast') {
+            const chatData = loadMediaForwardData(remoteJid);
+            chatData.push(JSON.parse(JSON.stringify(message)));
+            if (chatData.length > 100) chatData.shift();
+            saveMediaForwardData(remoteJid, chatData);
+        }
+        
+        if (isReaction) {
+            const quotedMsg = message.message.reactionMessage?.key;
+            if (!quotedMsg) return;
+            
+            const reactedMsg = loadMediaForwardData(remoteJid).find(m => m.key.id === quotedMsg.id);
+            
+            if (!reactedMsg) return;
+            
+            // Extract media from view once or normal message
+            let mediaMsg = reactedMsg.message;
+            
+            // Check for view once message
+            if (mediaMsg?.viewOnceMessageV2) {
+                mediaMsg = mediaMsg.viewOnceMessageV2.message;
+            } else if (mediaMsg?.viewOnceMessage) {
+                mediaMsg = mediaMsg.viewOnceMessage.message;
+            } else if (mediaMsg?.ephemeralMessage) {
+                mediaMsg = mediaMsg.ephemeralMessage.message;
+            }
+            
+            const hasMedia = mediaMsg?.imageMessage ||
+                            mediaMsg?.videoMessage ||
+                            mediaMsg?.audioMessage ||
+                            mediaMsg?.documentMessage ||
+                            mediaMsg?.stickerMessage;
+            
+            if (!hasMedia) return;
+            
+            if (mediaMsg?.imageMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { imageMessage: mediaMsg.imageMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { image: buffer });
+            }
+            else if (mediaMsg?.videoMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { videoMessage: mediaMsg.videoMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { video: buffer });
+            }
+            else if (mediaMsg?.audioMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { audioMessage: mediaMsg.audioMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg' });
+            }
+            else if (mediaMsg?.documentMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { documentMessage: mediaMsg.documentMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                const fileName = mediaMsg.documentMessage.fileName || 'document';
+                await client.sendMessage(ownerJid, {
+                    document: buffer,
+                    fileName: fileName,
+                    mimetype: mediaMsg.documentMessage.mimetype
+                });
+            }
+            else if (mediaMsg?.stickerMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { stickerMessage: mediaMsg.stickerMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { sticker: buffer });
+            }
+        }
+        
+        else if (isSticker) {
+            const quotedMsgId = message.message?.extendedTextMessage?.contextInfo?.stanzaId;
+            if (!quotedMsgId) return;
+            
+            const originalMsg = loadMediaForwardData(remoteJid).find(m => m.key.id === quotedMsgId);
+            
+            if (!originalMsg) return;
+            
+            // Extract media from view once or normal message
+            let mediaMsg = originalMsg.message;
+            
+            // Check for view once message
+            if (mediaMsg?.viewOnceMessageV2) {
+                mediaMsg = mediaMsg.viewOnceMessageV2.message;
+            } else if (mediaMsg?.viewOnceMessage) {
+                mediaMsg = mediaMsg.viewOnceMessage.message;
+            } else if (mediaMsg?.ephemeralMessage) {
+                mediaMsg = mediaMsg.ephemeralMessage.message;
+            }
+            
+            const hasMedia = mediaMsg?.imageMessage ||
+                            mediaMsg?.videoMessage ||
+                            mediaMsg?.audioMessage ||
+                            mediaMsg?.documentMessage ||
+                            mediaMsg?.stickerMessage;
+            
+            if (!hasMedia) return;
+            
+            if (mediaMsg?.imageMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { imageMessage: mediaMsg.imageMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { image: buffer });
+            }
+            else if (mediaMsg?.videoMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { videoMessage: mediaMsg.videoMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { video: buffer });
+            }
+            else if (mediaMsg?.audioMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { audioMessage: mediaMsg.audioMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg' });
+            }
+            else if (mediaMsg?.documentMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { documentMessage: mediaMsg.documentMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                const fileName = mediaMsg.documentMessage.fileName || 'document';
+                await client.sendMessage(ownerJid, {
+                    document: buffer,
+                    fileName: fileName,
+                    mimetype: mediaMsg.documentMessage.mimetype
+                });
+            }
+            else if (mediaMsg?.stickerMessage) {
+                const buffer = await downloadMediaMessage(
+                    { message: { stickerMessage: mediaMsg.stickerMessage } },
+                    'buffer',
+                    {},
+                    { reuploadRequest: client.updateMediaMessage, logger: console }
+                );
+                await client.sendMessage(ownerJid, { sticker: buffer });
+            }
+        }
+        
+    } catch (error) {
+        console.error('Forward media error:', error);
+    }
+}
+//========================================================================================================================
+/*async function forwardMediaToInbox(client, message) {
     try {
         //if (message.key.fromMe) return;
         
@@ -1309,7 +1531,7 @@ async function forwardMediaToInbox(client, message) {
     } catch (error) {
         console.error('Forward media error:', error);
     }
-                }
+                }*/
 //========================================================================================================================
 // Auto Social Download Function
 //========================================================================================================================
