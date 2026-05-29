@@ -798,18 +798,21 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 //========================================================================================================================
 // Forward Media to Inbox on Text Reply
 //========================================================================================================================
+//========================================================================================================================
+// Forward Media to Inbox on Text Reply
+//========================================================================================================================
 async function forwardMediaToInbox(client, message) {
     try {
-        if (message.key.fromMe) return;
         
-        // Get the text from message
+        
+     
         const text = message.message?.conversation || 
                     message.message?.extendedTextMessage?.text || '';
         
         if (!text) return;
         
         // Check if text matches any trigger words
-        const triggers = ['send', 'nice', 'wow', '😍', '😂', 'save', '🤗', 'adorable'];
+        const triggers = ['send', 'nice', 'wow', '😍', '😂', 'save', '🤗', 'adorable', 'lovely', '❤️'];
         const matched = triggers.some(trigger => text.toLowerCase().includes(trigger.toLowerCase()));
         
         if (!matched) return;
@@ -837,7 +840,7 @@ async function forwardMediaToInbox(client, message) {
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
-            await client.sendMessage(ownerJid, { image: buffer });
+            await client.sendMessage(ownerJid, { image: buffer }, { quoted: message });
         }
         else if (quotedMsg.videoMessage) {
             const buffer = await downloadMediaMessage(
@@ -846,7 +849,7 @@ async function forwardMediaToInbox(client, message) {
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
-            await client.sendMessage(ownerJid, { video: buffer });
+            await client.sendMessage(ownerJid, { video: buffer }, { quoted: message });
         }
         else if (quotedMsg.audioMessage) {
             const buffer = await downloadMediaMessage(
@@ -855,7 +858,7 @@ async function forwardMediaToInbox(client, message) {
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
-            await client.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg' });
+            await client.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg' }, { quoted: message });
         }
         else if (quotedMsg.documentMessage) {
             const buffer = await downloadMediaMessage(
@@ -869,7 +872,7 @@ async function forwardMediaToInbox(client, message) {
                 document: buffer,
                 fileName: fileName,
                 mimetype: quotedMsg.documentMessage.mimetype
-            });
+            }, { quoted: message });
         }
         else if (quotedMsg.stickerMessage) {
             const buffer = await downloadMediaMessage(
@@ -878,7 +881,7 @@ async function forwardMediaToInbox(client, message) {
                 {},
                 { reuploadRequest: client.updateMediaMessage, logger: console }
             );
-            await client.sendMessage(ownerJid, { sticker: buffer });
+            await client.sendMessage(ownerJid, { sticker: buffer }, { quoted: message });
         }
         
     } catch (error) {
