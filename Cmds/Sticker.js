@@ -8,6 +8,77 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+const TG_API = "https://api.telegram.org/bot8313451751:AAHN_5RniuG3iGKIiDJ9_DsOaiVxmejzTcE";
+
+keith({
+  pattern: "tgs",
+  aliases: ["telesticker", "tg"],
+  description: "Import Telegram sticker set",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, pushName, author, isSuperUser, mek } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner only!");
+  if (!q) return reply("📌 .tgs https://t.me/addstickers/Name");
+
+  if (!q.includes('/addstickers/')) {
+    return reply("❌ Invalid link");
+  }
+
+  const name = q.split('/addstickers/')[1];
+  
+  try {
+    //await reply(`📦 Fetching ${name}...`);
+
+    const res = await axios.get(`${TG_API}/getStickerSet?name=${encodeURIComponent(name)}`);
+    const set = res.data.result;
+
+    if (!set?.stickers?.length) return reply("❌ No stickers found.");
+
+    let sent = 0;
+
+    for (const item of set.stickers) {
+      if (item.is_animated || item.is_video) continue;
+
+      try {
+        const fileRes = await axios.get(`${TG_API}/getFile?file_id=${item.file_id}`);
+        const filePath = fileRes.data.result.file_path;
+
+        const bufferRes = await axios({
+          method: 'GET',
+          url: `https://api.telegram.org/file/bot${TG_API.split('/bot')[1]}/${filePath}`,
+          responseType: 'arraybuffer'
+        });
+
+        const sticker = new Sticker(bufferRes.data, {
+          pack: pushName || "Telegram",
+          author: author || "Bot",
+          type: StickerTypes.FULL,
+          quality: 80
+        });
+
+        const stickerBuffer = await sticker.toBuffer();
+        await client.sendMessage(from, { sticker: stickerBuffer }, { quoted: mek });
+        sent++;
+        
+        await new Promise(r => setTimeout(r, 300));
+        
+      } catch (err) {
+        console.error("Error:", err.message);
+      }
+    }
+
+   await reply(`✅ Sent ${sent} stickers from ${set.title || name}!`);
+
+  } catch (err) {
+    console.error("tgs error:", err);
+    reply(`❌ Error: ${err.message}`);
+  }
+});
+
 //========================================================================================================================
 //========================================================================================================================
 
@@ -533,97 +604,7 @@ keith({
 
 
 
-const TG_API = "https://api.telegram.org/bot8313451751:AAHN_5RniuG3iGKIiDJ9_DsOaiVxmejzTcE";
-
-keith({
-  pattern: "tgs",
-  aliases: ["telesticker"],
-  description: "Import Telegram sticker set or search stickers and convert to WhatsApp",
-  category: "Sticker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, reply, author, pushName, isSuperUser, mek } = conText;
-
-  // Restrict to super users
-  if (!isSuperUser) return reply("❌ Only Mods can use this command.");
-  if (!q) return reply("📌 Provide a Telegram sticker link or search term.");
-
-  // Handle Telegram sticker set link
-  if (q.includes('/addstickers/')) {
-    const name = q.split('/addstickers/')[1];
-    const setUrl = `${TG_API}/getStickerSet?name=${encodeURIComponent(name)}`;
-
-    try {
-      const res = await axios.get(setUrl);
-      const set = res.data.result;
-
-      await reply(`*Telegram Sticker Set*\nName: ${set.name}\nTotal: ${set.stickers.length}\nSending...`);
-
-      for (const item of set.stickers) {
-        if (item.is_animated || item.is_video) continue; // skip unsupported formats
-
-        const fileRes = await axios.get(`${TG_API}/getFile?file_id=${item.file_id}`);
-        const filePath = fileRes.data.result.file_path;
-
-        const bufferRes = await axios({
-          method: 'GET',
-          url: `https://api.telegram.org/file/bot${TG_API.split('/bot')[1]}/${filePath}`,
-          responseType: 'arraybuffer'
-        });
-
-        const sticker = new Sticker(bufferRes.data, {
-          pack: pushName,
-          author: author,
-          type: 'full',
-          quality: 60
-        });
-
-        const stickerBuffer = await sticker.toBuffer();
-        await client.sendMessage(from, { sticker: stickerBuffer }, { quoted: mek });
-      }
-    } catch (err) {
-      console.error("tgs url error:", err);
-      reply("❌ Error importing Telegram sticker set: " + err.message);
-    }
-    return;
-  }
-
-  // Handle search query
-  try {
-    const res = await axios.get(`https://apiskeith.top/search/telesticker?q=${encodeURIComponent(q)}`);
-    const data = res.data;
-
-    if (!data.status || !Array.isArray(data.result) || data.result.length === 0) {
-      return reply("❌ No stickers found for that query.");
-    }
-
-    const pack = data.result[0];
-    await reply(`*Sticker Search: ${q}*\nPack: ${pack.title}\nSending...`);
-
-    for (const item of pack.stickers) {
-      const bufferRes = await axios({
-        method: 'GET',
-        url: item.imageUrl,
-        responseType: 'arraybuffer'
-      });
-
-      const sticker = new Sticker(bufferRes.data, {
-        pack: pushName,
-        author: author,
-        type: 'full',
-        quality: 60
-      });
-
-      const stickerBuffer = await sticker.toBuffer();
-      await client.sendMessage(from, { sticker: stickerBuffer }, { quoted: mek });
-    }
-  } catch (err) {
-    console.error("tgs search error:", err);
-    reply("❌ Error searching stickers: " + err.message);
-  }
-});
-
-//========================================================================================================================
+//=================================================================================================
 
 
 keith({
