@@ -102,6 +102,28 @@ async (from, client, conText) => {
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+keith({
+  pattern: "createcall",
+  aliases: ["videocall", "createcallink"],
+  category: "Owner",
+  description: "Create WhatsApp video call link"
+}, async (from, client, conText) => {
+  const { reply, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner only!");
+
+  try {
+    const token = await client.createCallLink('video');
+    if (!token) return reply("❌ Failed to create call link.");
+    
+    const link = `https://call.whatsapp.com/video/${token}`;
+    await client.sendMessage(from, { text: link, linkPreview: true }, { quoted: mek });
+    
+  } catch (err) {
+    await reply(`❌ ${err.message}`);
+  }
+});
+
 //========================================================================================================================
 //========================================================================================================================
 
