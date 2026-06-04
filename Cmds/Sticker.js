@@ -2,20 +2,71 @@
 const { keith } = require('../commandHandler');
 const axios = require('axios');
 const { Sticker, StickerTypes } = require('wa-sticker-formatter');
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
+const fs = require('fs');
+const { execSync } = require('child_process');
+const os = require('os');
+const path = require('path');
+const sharp = require('sharp');
 
+let ffmpegPath;
+try {
+  ffmpegPath = require('ffmpeg-static');
+} catch {
+  ffmpegPath = 'ffmpeg';
+}
 
 const TG_API = "https://api.telegram.org/bot8313451751:AAHN_5RniuG3iGKIiDJ9_DsOaiVxmejzTcE";
+
+const makeVideoSticker = async (inputBuffer, pushName, author) => {
+  const id = Date.now();
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `tg_video_${id}.mp4`);
+  const processedPath = path.join(tmpDir, `tg_stk_${id}.mp4`);
+  
+  fs.writeFileSync(inputPath, inputBuffer);
+  
+  try {
+    execSync(
+      `"${ffmpegPath}" -y -i "${inputPath}" -t 6 ` +
+      `-vf "scale=512:512:force_original_aspect_ratio=increase,fps=10,` +
+      `crop=min(iw\\,ih):min(iw\\,ih),scale=512:512" ` +
+      `-an -c:v libx264 -crf 28 -preset ultrafast "${processedPath}"`,
+      { timeout: 30000, stdio: 'pipe' }
+    );
+    
+    const sticker = new Sticker(fs.readFileSync(processedPath), {
+      pack: pushName || "Telegram",
+      author: author || "Bot",
+      type: StickerTypes.FULL,
+      quality: 40,
+    });
+    
+    const buf = await sticker.toBuffer();
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(processedPath); } catch {}
+    return buf;
+    
+  } catch (err) {
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(processedPath); } catch {}
+    throw err;
+  }
+};
+
+const makeImageSticker = async (inputBuffer, pushName, author) => {
+  const sticker = new Sticker(inputBuffer, {
+    pack: pushName || "Telegram",
+    author: author || "Bot",
+    type: StickerTypes.FULL,
+    quality: 80
+  });
+  return await sticker.toBuffer();
+};
 
 keith({
   pattern: "tgs",
   aliases: ["telesticker", "tg"],
-  description: "Import Telegram sticker set",
+  description: "Import Telegram sticker set (supports video stickers too)",
   category: "Sticker",
   filename: __filename
 }, async (from, client, conText) => {
@@ -31,7 +82,7 @@ keith({
   const name = q.split('/addstickers/')[1];
   
   try {
-    //await reply(`📦 Fetching ${name}...`);
+    await reply(`📦 Fetching ${name}...`);
 
     const res = await axios.get(`${TG_API}/getStickerSet?name=${encodeURIComponent(name)}`);
     const set = res.data.result;
@@ -39,13 +90,13 @@ keith({
     if (!set?.stickers?.length) return reply("❌ No stickers found.");
 
     let sent = 0;
+    let skipped = 0;
 
     for (const item of set.stickers) {
-      if (item.is_animated || item.is_video) continue;
-
       try {
         const fileRes = await axios.get(`${TG_API}/getFile?file_id=${item.file_id}`);
         const filePath = fileRes.data.result.file_path;
+        const extension = path.extname(filePath).toLowerCase();
 
         const bufferRes = await axios({
           method: 'GET',
@@ -53,31 +104,58 @@ keith({
           responseType: 'arraybuffer'
         });
 
-        const sticker = new Sticker(bufferRes.data, {
-          pack: pushName || "Telegram",
-          author: author || "Bot",
-          type: StickerTypes.FULL,
-          quality: 80
-        });
+        let stickerBuffer;
+        
+        // Handle video stickers
+        if (extension === '.mp4' || extension === '.webm' || item.is_video) {
+          try {
+            stickerBuffer = await makeVideoSticker(bufferRes.data, pushName, author);
+          } catch (err) {
+            console.error("Video sticker conversion failed:", err.message);
+            skipped++;
+            continue;
+          }
+        } 
+        // Handle animated stickers (TGS - Lottie)
+        else if (extension === '.tgs' || item.is_animated) {
+          // Skip TGS for now (requires additional conversion)
+          skipped++;
+          continue;
+        }
+        // Handle static/webp stickers
+        else {
+          stickerBuffer = await makeImageSticker(bufferRes.data, pushName, author);
+        }
 
-        const stickerBuffer = await sticker.toBuffer();
         await client.sendMessage(from, { sticker: stickerBuffer }, { quoted: mek });
         sent++;
-        
         await new Promise(r => setTimeout(r, 300));
         
       } catch (err) {
-        console.error("Error:", err.message);
+        console.error("Error on sticker:", err.message);
+        skipped++;
       }
     }
 
-   await reply(`✅ Sent ${sent} stickers from ${set.title || name}!`);
+    let replyMsg = `✅ Sent ${sent} stickers from ${set.title || name}!`;
+    if (skipped > 0) {
+      replyMsg += `\n⚠️ Skipped ${skipped} animated/TGS stickers (not supported)`;
+    }
+    await reply(replyMsg);
 
   } catch (err) {
     console.error("tgs error:", err);
     reply(`❌ Error: ${err.message}`);
   }
 });
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+
+
 
 //========================================================================================================================
 //========================================================================================================================
