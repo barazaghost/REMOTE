@@ -149,6 +149,118 @@ keith({
   }
 });
 //========================================================================================================================
+keith({
+  pattern: "sticker",
+  aliases: ["stik", "s", "stikpack"],
+  description: "Create sticker from quoted image or video",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { quotedMsg, pushName, author, mek, reply } = conText;
+
+  if (!quotedMsg) return reply("❌ Quote an image or a short video.");
+
+  let media;
+  let isVideo = false;
+
+  if (quotedMsg.imageMessage) {
+    media = quotedMsg.imageMessage;
+  } else if (quotedMsg.videoMessage) {
+    media = quotedMsg.videoMessage;
+    isVideo = true;
+  } else {
+    return reply("❌ That is neither an image nor a short video.");
+  }
+
+  if (isVideo) {
+    const sizeMB = (media.fileLength || 0) / (1024 * 1024);
+    const seconds = media.seconds || 0;
+    if (sizeMB > 8) return reply(`❌ Video too large (${sizeMB.toFixed(1)} MB). Max is 8 MB.`);
+    if (seconds > 10) return reply(`❌ Video too long (${seconds}s). Max is 10 seconds.`);
+  }
+
+  const result = await client.downloadAndSaveMediaMessage(media);
+  let stickerBuf;
+
+  try {
+    if (isVideo) {
+      const makeSticker = async (inputPath, fps, quality) => {
+        const id = Date.now();
+        const tmpDir = os.tmpdir();
+        const processedPath = path.join(tmpDir, `stk_${id}_${fps}fps.mp4`);
+        
+        try {
+          execSync(
+            `"${ffmpegPath}" -y -i "${inputPath}" -t 6 ` +
+            `-vf "scale=512:512:force_original_aspect_ratio=increase,fps=${fps},` +
+            `crop=min(iw\\,ih):min(iw\\,ih),scale=512:512" ` +
+            `-an -c:v libx264 -crf 28 -preset ultrafast "${processedPath}"`,
+            { timeout: 30000, stdio: 'pipe' }
+          );
+        } catch (e) {
+          fs.copyFileSync(inputPath, processedPath);
+        }
+        
+        const sticker = new Sticker(fs.readFileSync(processedPath), {
+          pack: pushName || "Sticker",
+          author: author || "Bot",
+          type: StickerTypes.FULL,
+          quality: quality,
+        });
+        
+        const buf = await sticker.toBuffer();
+        try { fs.unlinkSync(processedPath); } catch {}
+        return buf;
+      };
+
+      try {
+        stickerBuf = await makeSticker(result, 10, 40);
+        if (!stickerBuf || stickerBuf.length < 500) throw new Error('Output buffer empty');
+
+        if (stickerBuf.length > 950 * 1024) {
+          const retryBuf = await makeSticker(result, 5, 25);
+          if (retryBuf && retryBuf.length >= 500) stickerBuf = retryBuf;
+        }
+
+        if (stickerBuf.length > 1024 * 1024) {
+          return reply(`❌ Sticker too large (${(stickerBuf.length / 1024 / 1024).toFixed(2)} MB). Try a shorter clip.`);
+        }
+      } catch (videoErr) {
+        return reply(`❌ Video sticker failed.\n${videoErr.message}`);
+      }
+    } else {
+      // Get image metadata
+      const metadata = await sharp(result).metadata();
+      const { width, height } = metadata;
+      
+      // Determine best fit for 512x512
+      let resizeOptions;
+      if (width === height) {
+        // Perfect square
+        resizeOptions = { width: 512, height: 512, fit: 'cover' };
+      } else if (width > height) {
+        // Landscape - fit to width
+        resizeOptions = { width: 512, height: 512, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } };
+      } else {
+        // Portrait - fit to height
+        resizeOptions = { width: 512, height: 512, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } };
+      }
+      
+      stickerBuf = await sharp(result)
+        .resize(512, 512, resizeOptions)
+        .webp({ quality: 85 })
+        .toBuffer();
+    }
+
+    await client.sendMessage(from, { sticker: stickerBuf }, { quoted: mek });
+    
+  } catch (err) {
+    console.error("sticker error:", err);
+    await reply(`❌ Failed: ${err.message}`);
+  } finally {
+    try { fs.unlinkSync(result); } catch {}
+  }
+});
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -731,159 +843,3 @@ keith({
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
-
-
-//========================================================================================================================
-// From Sticker.js
-
-/*keith({
-  pattern: "circle",
-  description: "Quote a sticker and resend it with your packname and author",
-  category: "Sticker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { quotedMsg, pushName, author, mek, reply } = conText;
-
-  if (!quotedMsg?.stickerMessage) {
-    return reply("❌ Quote a sticker to restick.");
-  }
-
-  try {
-    const media = quotedMsg.stickerMessage;
-    const result = await client.downloadAndSaveMediaMessage(media);
-
-    const sticker = new Sticker(result, {
-      pack: pushName,
-      author: pushName,
-      type: StickerTypes.CIRCLE,
-      categories: ["🤩", "🎉"],
-      id: "restick-123",
-      quality: 70,
-      background: "transparent"
-    });
-
-    const buffer = await sticker.toBuffer();
-    await client.sendMessage(from, { sticker: buffer }, { quoted: mek });
-  } catch (err) {
-    console.error("take error:", err);
-    await reply("❌ Failed to restick the quoted sticker.");
-  }
-});
-//========================================================================================================================
-// From Sticker.js
-
-keith({
-  pattern: "round",
-  aliases: ["rounded"],
-  description: "Quote a sticker and resend it with your packname and author",
-  category: "Sticker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { quotedMsg, pushName, author, mek, reply } = conText;
-
-  if (!quotedMsg?.stickerMessage) {
-    return reply("❌ Quote a sticker to restick.");
-  }
-
-  try {
-    const media = quotedMsg.stickerMessage;
-    const result = await client.downloadAndSaveMediaMessage(media);
-
-    const sticker = new Sticker(result, {
-      pack: pushName,
-      author: pushName,
-      type: StickerTypes.ROUNDED,
-      categories: ["🤩", "🎉"],
-      id: "restick-123",
-      quality: 70,
-      background: "transparent"
-    });
-
-    const buffer = await sticker.toBuffer();
-    await client.sendMessage(from, { sticker: buffer }, { quoted: mek });
-  } catch (err) {
-    console.error("take error:", err);
-    await reply("❌ Failed to restick the quoted sticker.");
-  }
-});*/
-//========================================================================================================================
-//=======================
-//========================================================================================================================
-//=======================
-//========================================================================================================================
-keith({
-  pattern: "take",
-  aliases: ["restick", "grabsticker"],
-  description: "Quote a sticker and resend it with your packname and author",
-  category: "Sticker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { quotedMsg, pushName, author, mek, reply } = conText;
-
-  if (!quotedMsg?.stickerMessage) {
-    return reply("❌ Quote a sticker to restick.");
-  }
-
-  try {
-    const media = quotedMsg.stickerMessage;
-    const result = await client.downloadAndSaveMediaMessage(media);
-
-    const sticker = new Sticker(result, {
-      pack: pushName,
-      type: StickerTypes.FULL,
-      categories: ["🤩", "🎉"],
-      id: "restick-123",
-      quality: 70,
-      background: "transparent"
-    });
-
-    const buffer = await sticker.toBuffer();
-    await client.sendMessage(from, { sticker: buffer }, { quoted: mek });
-  } catch (err) {
-    console.error("take error:", err);
-    await reply("❌ Failed to restick the quoted sticker.");
-  }
-});
-//========================================================================================================================
-//=======================
-keith({
-  pattern: "sticker",
-  aliases: ["stik", "s", "stikpack"],
-  description: "Create sticker from quoted image or video",
-  category: "Sticker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { quotedMsg, pushName, author, mek, reply } = conText;
-
-  if (!quotedMsg) return reply("❌ Quote an image or a short video.");
-
-  let media;
-  if (quotedMsg.imageMessage) {
-    media = quotedMsg.imageMessage;
-  } else if (quotedMsg.videoMessage) {
-    media = quotedMsg.videoMessage;
-  } else {
-    return reply("❌ That is neither an image nor a short video.");
-  }
-
-  try {
-    const result = await client.downloadAndSaveMediaMessage(media);
-
-    const sticker = new Sticker(result, {
-      pack: pushName,
-      author: author,
-      type: StickerTypes.FULL,
-      categories: ["🤩", "🎉"],
-      id: "12345",
-      quality: 70,
-      background: "transparent"
-    });
-
-    const buffer = await sticker.toBuffer();
-    await client.sendMessage(from, { sticker: buffer }, { quoted: mek });
-  } catch (err) {
-    console.error("sticker error:", err);
-    await reply("❌ Failed to generate sticker.");
-  }
-});
-//=======================
