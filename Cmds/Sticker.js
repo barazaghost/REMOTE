@@ -263,6 +263,80 @@ keith({
 });
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "tovideo",
+  aliases: ["mp4", "tovid", "sticker2video"],
+  description: "Convert animated sticker to video",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { reply, quotedMsg, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner only!");
+
+  if (!quotedMsg) {
+    return reply("📎 Reply to an *animated sticker* with .tovideo");
+  }
+
+  const mime = quotedMsg.stickerMessage?.mimetype || '';
+  if (!/webp/.test(mime)) {
+    return reply("⚠️ That's not a sticker.");
+  }
+
+  try {
+    
+
+    const buffer = await client.downloadMediaMessage(quotedMsg);
+    
+    const image = sharp(buffer, { animated: true });
+    const metadata = await image.metadata();
+    const pages = metadata.pages || 1;
+    
+    if (pages <= 1) {
+      return reply("⚠️ This is a *static* sticker, not animated!");
+    }
+
+    const id = Date.now();
+    const tmpDir = os.tmpdir();
+    const framesDir = path.join(tmpDir, `frames_${id}`);
+    const outputPath = path.join(tmpDir, `video_${id}.mp4`);
+    
+    fs.mkdirSync(framesDir, { recursive: true });
+
+    for (let i = 0; i < pages; i++) {
+      const frameBuf = await sharp(buffer, { animated: false, page: i })
+        .png()
+        .toBuffer();
+      const framePath = path.join(framesDir, `frame_${String(i).padStart(4, '0')}.png`);
+      fs.writeFileSync(framePath, frameBuf);
+    }
+
+    try {
+      execSync(
+        `"${ffmpegPath}" -y -framerate 15 -i "${framesDir}/frame_%04d.png" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -pix_fmt yuv420p -movflags faststart "${outputPath}"`,
+        { timeout: 60000, stdio: 'pipe' }
+      );
+    } catch (e) {
+      return reply('❌ ffmpeg error');
+    }
+
+    if (!fs.existsSync(outputPath)) {
+      return reply('❌ Failed');
+    }
+
+    const videoBuffer = fs.readFileSync(outputPath);
+    await client.sendMessage(from, { video: videoBuffer }, { quoted: mek });
+
+    try { fs.rmSync(framesDir, { recursive: true, force: true }); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
+
+  } catch (err) {
+    console.error("tovideo error:", err);
+    reply(`❌ Error: ${err.message}`);
+  }
+});
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
