@@ -1856,7 +1856,9 @@ client.ev.on('call', async (callData) => {
 
         const callId = callData[0].id;
         const callerId = callData[0].from;
+        const isGroup   = callData[0].isGroup;
         
+        if (isGroup) return;
         // Skip if it's the bot itself
         if (callerId === client.user.id) return;
 
