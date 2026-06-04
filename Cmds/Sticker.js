@@ -288,7 +288,7 @@ keith({
   try {
     
 
-    const buffer = await client.downloadMediaMessage(quotedMsg);
+    const buffer = await client.downloadAndSaveMediaMessage(quotedMsg);
     
     const image = sharp(buffer, { animated: true });
     const metadata = await image.metadata();
