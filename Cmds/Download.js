@@ -98,7 +98,7 @@ async (from, client, conText) => {
       videoTitle = firstVideo.title;
     }
 
-    const downloadResponse = await axios.get(`${api}/download/mp4?url=${encodeURIComponent(videoUrl)}`);
+    const downloadResponse = await axios.get(`${api}/download/dlmp4?url=${encodeURIComponent(videoUrl)}`);
     const downloadUrl = downloadResponse.data?.result;
     if (!downloadUrl) return;
 
