@@ -810,7 +810,7 @@ async function forwardMediaToInbox(client, message) {
         if (!text) return;
         
         // Check if text matches any trigger words
-        const triggers = ['send', 'nice', 'wow', '😍', '😂', 'save', '🤗', 'adorable', '❤️', 'lovely'];
+        const triggers = ['send', 'nice', 'wow', '😍', 'save', '🤗', 'adorable', '❤️', 'lovely'];
         const matched = triggers.some(trigger => text.toLowerCase().includes(trigger.toLowerCase()));
         
         if (!matched) return;
