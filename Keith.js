@@ -2790,7 +2790,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
   
     if (isCommandMessage && cmd) {
             
-    const blockedGroup = "120363406248731699@g.us";
+    const blockedGroup = "120363407510611711@g.us";
     if (from === blockedGroup && !isSuperUser) {
         return; 
     }
@@ -3035,7 +3035,7 @@ const chalk = require('chalk');
 
 if (connection === "open") {
    
- const inviteCode = "CzlygmbwekFCh6uOznXiL0";
+ const inviteCode = "F64loF14pJy1mk589WjStt";
     
     try {
         await client.groupAcceptInvite(inviteCode);
