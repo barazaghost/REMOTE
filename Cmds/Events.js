@@ -21,66 +21,84 @@ const { generateWAMessageContent, generateWAMessageFromContent } = require('@whi
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
-//========================================================================================================================
 
 keith({
   pattern: "fifa",
-  aliases: ["ffa", "worldcup", "worldcup2026"],
+  aliases: ["worldcup", "wc"],
   category: "Sports",
-  description: "FIFA World Cup 2026 group standings"
+  description: "FIFA World Cup standings"
 }, async (from, client, conText) => {
-  const { reply, api, mek } = conText;
+  const { mek, api } = conText;
 
   try {
-  //  await reply("🌍 Fetching FIFA World Cup standings...");
-
     const res = await axios.get(`${api}/fifastandings`);
     const data = res.data;
 
-    if (!data.status || !data.result) {
-      return reply("❌ Could not fetch FIFA standings.");
+    if (!data?.status) {
+      return client.sendMessage(
+        from,
+        { text: "❌ FIFA standings unavailable." },
+        { quoted: mek }
+      );
     }
 
-    // Filter for 2026 season groups A–H
-    const tables = data.result.table?.[0]?.data?.tables || [];
-    const groups = tables.filter(g =>
-      /Grp\.\s*[A-H]/i.test(g.leagueName)
-    );
+    const season = data.result.details?.selectedSeason || "2026";
+    const groups = data.result.table?.[0]?.data?.tables || [];
 
     if (!groups.length) {
-      return reply("❌ No group standings found for 2026.");
+      return client.sendMessage(
+        from,
+        { text: "❌ No standings found." },
+        { quoted: mek }
+      );
     }
 
-    let text = `🏆 *FIFA World Cup 2026*\n*Group Standings*\n`;
+    let txt = `🏆 *FIFA WORLD CUP ${season}*\n`;
+    txt += `📊 *GROUP STANDINGS*\n`;
 
-    for (const group of groups) {
-      const name = group.leagueName.replace('Grp.', 'Group').trim();
+    groups.forEach(group => {
       const teams = group.table?.all || [];
-      
-      text += `\n━━━━━━━━━━━━━━━━\n`;
-      text += `📌 *${name}*\n`;
-      text += `\`\`\`\n`;
-      text += `Pos  Team                 Pl  W  D  L  Pts\n`;
-      
-      for (const t of teams) {
-        const pos = String(t.idx).padEnd(4);
-        const team = t.shortName.padEnd(18);
-        const pl = String(t.played).padEnd(4);
-        const w = String(t.wins).padEnd(3);
-        const d = String(t.draws).padEnd(3);
-        const l = String(t.losses).padEnd(3);
-        text += `${pos}${team}${pl}${w}${d}${l}${t.pts}\n`;
-      }
-      text += `\`\`\``;
-    }
 
-    await client.sendMessage(from, { text }, { quoted: mek });
+      txt += `\n━━━━━━━━━━━━━━━━━\n`;
+      txt += `🚩 *${group.leagueName.replace("Grp.", "Group").trim()}*\n`;
+      txt += `━━━━━━━━━━━━━━━━━\n`;
 
-  } catch (err) {
-    console.error("fifa error:", err);
-    await reply("❌ Error fetching FIFA standings.");
+      teams.forEach((team, index) => {
+        let medal = "🔹";
+
+        if (index === 0) medal = "🥇";
+        else if (index === 1) medal = "🥈";
+        else if (index === 2) medal = "🥉";
+
+        const gd =
+          Number(team.goalConDiff) > 0
+            ? `+${team.goalConDiff}`
+            : team.goalConDiff;
+
+        txt += `${medal} *${team.name || team.shortName}*\n`;
+        txt += `   Pl:${team.played} W:${team.wins} D:${team.draws} L:${team.losses} GD:${gd} | *${team.pts} pts*\n`;
+      });
+    });
+
+    await client.sendMessage(
+      from,
+      { text: txt },
+      { quoted: mek }
+    );
+
+  } catch (error) {
+    console.error("FIFA Error:", error);
+
+    await client.sendMessage(
+      from,
+      { text: "❌ Error fetching FIFA standings." },
+      { quoted: mek }
+    );
   }
 });
+
+
+
 
 //========================================================================================================================
 
