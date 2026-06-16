@@ -15,6 +15,9 @@ try {
 } catch {
   ffmpegPath = 'ffmpeg';
 }
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
 
 const TG_API = "https://api.telegram.org/bot8313451751:AAHN_5RniuG3iGKIiDJ9_DsOaiVxmejzTcE";
 
@@ -150,7 +153,109 @@ keith({
   }
 });
 //========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
 
+
+function isAnimatedWebp(buffer) {
+  if (!buffer || buffer.length < 50) return false;
+  const header = buffer.toString('hex', 0, 200);
+  return header.includes('414e494d') || header.includes('616e696d');
+}
+
+keith({
+  pattern: "tovideo",
+  aliases: ["tomp4", "tovid", "mp4", "stickertomp4"],
+  description: "Convert animated sticker to video",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { reply, quotedMsg, mek, isSuperUser } = conText;
+
+  
+  if (!quotedMsg) {
+    return reply(`📌 *Convert Sticker to Video*
+    
+Reply to an animated sticker with .tovideo
+
+*Aliases:* .tomp4, .tovid, .stickertomp4`);
+  }
+
+  const stickerMsg = quotedMsg.stickerMessage;
+  if (!stickerMsg) {
+    return reply("❌ Reply to a sticker!");
+  }
+
+  try {
+    //await reply("🎬 Processing sticker...");
+
+    const buffer = await downloadMediaMessage(
+      { message: { stickerMessage: stickerMsg } },
+      'buffer',
+      {},
+      { reuploadRequest: client.updateMediaMessage, logger: console }
+    );
+
+    const isAnimated = isAnimatedWebp(buffer);
+
+    if (!isAnimated) {
+      const pngBuffer = await sharp(buffer).png().toBuffer();
+      await client.sendMessage(from, {
+        image: pngBuffer,
+        caption: "✅ Static sticker converted to image!"
+      }, { quoted: mek });
+      return;
+    }
+
+  //  await reply("⏳ Converting animated sticker to video...");
+
+    // Extract frames from animated WebP
+    const metadata = await sharp(buffer, { animated: true }).metadata();
+    const pages = metadata.pages || 1;
+
+    const id = Date.now();
+    const tmpDir = os.tmpdir();
+    const framesDir = path.join(tmpDir, `frames_${id}`);
+    const outputPath = path.join(tmpDir, `video_${id}.mp4`);
+    
+    fs.mkdirSync(framesDir, { recursive: true });
+
+    // Extract each frame
+    for (let i = 0; i < pages; i++) {
+      const frameBuf = await sharp(buffer, { animated: false, page: i })
+        .png()
+        .toBuffer();
+      const framePath = path.join(framesDir, `frame_${String(i).padStart(4, '0')}.png`);
+      fs.writeFileSync(framePath, frameBuf);
+    }
+
+    // Convert frames to video
+    execSync(
+      `"${ffmpegPath}" -y -framerate 15 -i "${framesDir}/frame_%04d.png" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -pix_fmt yuv420p -movflags faststart "${outputPath}"`,
+      { timeout: 60000, stdio: 'pipe' }
+    );
+
+    if (!fs.existsSync(outputPath)) {
+      return reply('❌ Output file not created');
+    }
+
+    const videoBuffer = fs.readFileSync(outputPath);
+    await client.sendMessage(from, { video: videoBuffer }, { quoted: mek });
+
+    // Cleanup
+    try { fs.rmSync(framesDir, { recursive: true, force: true }); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
+
+ //   await reply("✅ Sticker converted to video successfully!");
+
+  } catch (err) {
+    console.error("tovideo error:", err);
+    reply(`❌ Error: ${err.message}`);
+  }
+});
+//========================================================================================================================
+//========================================================================================================================
 
 keith({
   pattern: "sticker",
@@ -161,7 +266,7 @@ keith({
 }, async (from, client, conText) => {
   const { quotedMsg, pushName, author, mek, reply, isSuperUser } = conText;
 
-  if (!isSuperUser) return reply("❌ Owner only!");
+  //if (!isSuperUser) return reply("❌ Owner only!");
 
   if (!quotedMsg) return reply("❌ Quote an image or a short video.");
 
