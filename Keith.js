@@ -2627,6 +2627,7 @@ client.ev.on("messages.upsert", async ({ messages }) => {
     const finalSuperUsers = Array.from(superUserSet);
 
     const isSuperUser = finalSuperUsers.includes(standardizeJid(sender));
+    if (isGroup) global.trackMessage(from, sender);
 
     const text = ms.message?.conversation || 
                 ms.message?.extendedTextMessage?.text || 
@@ -3026,6 +3027,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
                     sourceUrl: botSettings.gurl || gurl,
                     isSuperAdmin,
                     prefix: currentPrefix,
+                    activeUsers: global.getActiveUsers ? (jid) => global.getActiveUsers(jid) : null,
                     timeZone: botSettings.timezone || timezone,
                     // Add settings functions for commands to update settings
                     updateSettings,
