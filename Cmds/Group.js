@@ -13,6 +13,79 @@ const fs = require('fs');
 //========================================================================================================================
 //========================================================================================================================
 //======================================================================================l==================================
+
+keith({
+    pattern: "listonline",
+    aliases: ["listactive", "activeusers", "online", "topactive"],
+    category: "Group",
+    description: "Show most active users in the group by message count"
+}, async (from, client, conText) => {
+    const { reply, isGroup, isAdmin, isBotAdmin, groupInfo, activeUsers, sender, isSuperUser, mek } = conText;
+
+    if (!isGroup) {
+        return reply("❌ This command only works in groups!");
+    }
+
+    if (!isSuperUser) {
+        return reply("👑 Only group admins can use this command!");
+    }
+
+
+    try {
+        
+        const users = activeUsers ? activeUsers(from, 15) : [];
+        
+        if (!users || users.length === 0) {
+            return reply(`📊 *No active users found yet!*
+
+Members need to send messages first for tracking to build up.
+
+💡 *Tip:* Active users are tracked based on message count.`);
+        }
+
+        const groupName = groupInfo?.subject || 'This Group';
+        const totalParticipants = groupInfo?.participants?.length || 0;
+        
+        let message = `📊 *ACTIVE USERS — ${groupName}*\n`;
+        message += `👥 *Total Members:* ${totalParticipants}\n`;
+        message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+        let medalEmojis = ['🥇', '🥈', '🥉'];
+        let mentions = [];
+
+        for (let i = 0; i < users.length; i++) {
+            const { jid, count } = users[i];
+            const medal = i < 3 ? medalEmojis[i] : '🔹';
+            
+            // Get participant info if available
+            const participant = groupInfo?.participants?.find(p => p.id === jid);
+            let displayName;
+            
+            if (participant?.pn) {
+                displayName = participant.pn;
+            } else if (participant?.name) {
+                displayName = participant.name;
+            } else {
+                displayName = jid.split('@')[0];
+            }
+            
+            message += `${medal} ${i + 1}. @${displayName} — *${count} messages*\n`;
+            mentions.push(jid);
+        }
+
+        message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
+        message += `📈 *Total Active users:* ${users.length}`;
+
+        await client.sendMessage(from, {
+            text: message,
+            mentions: mentions
+        }, { quoted: mek });
+
+    } catch (err) {
+        console.error("listonline error:", err);
+        await reply(`❌ Error: ${err.message}`);
+    }
+});
 //========================================================================================================================
 //========================================================================================================================
 keith({
