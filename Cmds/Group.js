@@ -33,7 +33,7 @@ keith({
 
     try {
         
-        const users = activeUsers ? activeUsers(from, 15) : [];
+        const users = activeUsers ? activeUsers(from, 30) : [];
         
         if (!users || users.length === 0) {
             return reply(`📊 *No active users found yet!*
