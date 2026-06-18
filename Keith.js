@@ -174,6 +174,38 @@ async function initializeDatabases() {
 }
 
 initializeDatabases().catch(console.error);
+
+
+//========================================================================================================================
+// Active User Tracking
+//========================================================================================================================
+if (!global.activeUserStore) global.activeUserStore = new Map();
+
+global.trackMessage = function (groupJid, userJid) {
+    if (!groupJid || !userJid) return;
+    if (!global.activeUserStore.has(groupJid)) global.activeUserStore.set(groupJid, new Map());
+    const group = global.activeUserStore.get(groupJid);
+    group.set(userJid, (group.get(userJid) || 0) + 1);
+};
+
+global.getActiveUsers = function (groupJid, limit = 15) {
+    const group = global.activeUserStore.get(groupJid);
+    if (!group || group.size === 0) return [];
+    return [...group.entries()]
+        .map(([jid, count]) => ({ jid, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+};
+
+global.resetActiveUsers = function (groupJid) {
+    if (groupJid) {
+        global.activeUserStore.delete(groupJid);
+    } else {
+        global.activeUserStore.clear();
+    }
+};
+//========================================================================================================================
+
 //========================================================================================================================
 const plugins = commands.filter(cmd => !cmd.dontAddCommandList).length;
 
