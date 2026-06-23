@@ -12,6 +12,59 @@ const fs = require('fs');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+//const { keith } = require('../commandHandler');
+
+keith({
+  pattern: "addmetaai",
+  aliases: ["addmeta", "metaaidd"],
+  category: "Group",
+  description: "Add Meta AI bot to the group"
+}, async (from, client, conText) => {
+  const { reply, isSuperUser, isGroup, mek } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner only command!");
+  if (!isGroup) return reply("❌ This command only works in groups!");
+
+  try {
+    const result = await client.groupParticipantsUpdate(
+      from,
+      ['867051314767696@bot'],
+      'add'
+    );
+
+    console.log(result);
+    reply("✅ Meta AI added to the group!");
+  } catch (err) {
+    console.error("addmetaai error:", err);
+    reply(`❌ Error: ${err.message}`);
+  }
+});
+
+keith({
+  pattern: "removemetaai",
+  aliases: ["delmetaai", "removemeta", "delmeta"],
+  category: "Group",
+  description: "Remove Meta AI bot from the group"
+}, async (from, client, conText) => {
+  const { reply, isSuperUser, isGroup, mek } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner only command!");
+  if (!isGroup) return reply("❌ This command only works in groups!");
+
+  try {
+    const result = await client.groupParticipantsUpdate(
+      from,
+      ['867051314767696@bot'],
+      'remove'
+    );
+
+    console.log(result);
+    reply("✅ Meta AI removed from the group!");
+  } catch (err) {
+    console.error("removemetaai error:", err);
+    reply(`❌ Error: ${err.message}`);
+  }
+});
 //======================================================================================l==================================
 
 keith({
