@@ -140,8 +140,227 @@ keith({
     }
   }
 });
-//========================================================================================================================
+
+
+
+
+// ========================================================================
+// RC - Remove Clothes / AI Clothing Removal
+// ========================================================================
+async function removeClothes(buffer, prompt = 'nude') {
+    if (!Buffer.isBuffer(buffer)) throw new Error('Image buffer is required.');
+    
+    const aesEncrypt = (data, key, iv) => {
+        const cipher = crypto.createCipheriv('aes-128-cbc', Buffer.from(key, 'utf8'), Buffer.from(iv, 'utf8'));
+        return cipher.update(data, 'utf8', 'base64') + cipher.final('base64');
+    };
+    
+    const genRandom = (len) => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        return Array.from(crypto.randomBytes(len), byte => chars[byte % chars.length]).join('');
+    };
+    
+    const t = Math.floor(Date.now() / 1000).toString();
+    const nonce = crypto.randomUUID();
+    const tempAesKey = genRandom(16);
+    const secret_key = crypto.publicEncrypt({
+        key: `-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDa2oPxMZe71V4dw2r8rHWt59gH\nW5INRmlhepe6GUanrHykqKdlIB4kcJiu8dHC/FJeppOXVoKz82pvwZCmSUrF/1yr\nrnmUDjqUefDu8myjhcbio6CnG5TtQfwN2pz3g6yHkLgp8cFfyPSWwyOCMMMsTU9s\nsnOjvdDb4wiZI8x3UwIDAQAB\n-----END PUBLIC KEY-----`,
+        padding: crypto.constants.RSA_PKCS1_PADDING,
+    }, Buffer.from(tempAesKey)).toString('base64');
+    
+    const userId = genRandom(64).toLowerCase();
+    const instance = axios.create({
+        baseURL: 'https://apiv1.deepfakemaker.io/api',
+        params: {
+            app_id: 'ai_df',
+            t, nonce, secret_key,
+            sign: aesEncrypt(`ai_df:NHGNy5YFz7HeFb:${t}:${nonce}:${secret_key}`, tempAesKey, tempAesKey),
+        },
+        headers: {
+            'access-control-allow-credentials': 'true',
+            'content-type': 'application/json',
+            'user-agent': 'Mozilla/5.0 (Android 15; Mobile; SM-F958; rv:130.0) Gecko/130.0 Firefox/130.0',
+            'referer': 'https://deepfakemaker.io/ai-clothes-remover/'
+        }
+    });
+    
+    const { data: file } = await instance.post('/user/v2/upload-sign', {
+        filename: genRandom(32) + '_' + Date.now() + '.jpg',
+        hash: crypto.createHash('sha256').update(buffer).digest('hex'),
+        user_id: userId
+    });
+    
+    await axios.put(file.data.url, buffer, {
+        headers: {
+            'content-type': 'image/jpeg',
+            'content-length': buffer.length
+        }
+    });
+    
+    const { data: cf } = await axios.post('https://cf.rynekoo.eu.cc/action', {
+        url: 'https://deepfakemaker.io/ai-clothes-remover/',
+        mode: 'turnstile-min',
+        siteKey: '0x4AAAAAAB6PHmfUkQvGufDI'
+    });
+    
+    if (!cf?.data?.token) throw new Error('Failed to get cf token.');
+    
+    const { data: task } = await instance.post('/img/v2/free/clothes/remover/task', {
+        prompt,
+        image: 'https://cdn.deepfakemaker.io/' + file.data.object_name,
+        platform: 'clothes_remover',
+        user_id: userId
+    }, {
+        headers: { token: cf.data.token }
+    });
+    
+    while (true) {
+        const { data } = await instance.get('/img/v2/free/clothes/remover/task', {
+            params: { user_id: userId, ...task.data }
+        });
+        
+        if (data.msg === 'success') return data.data.generate_url;
+        await new Promise(resolve => setTimeout(resolve, 2500));
+    }
+}
+
 keith({
+  pattern: "rc",
+  aliases: ["undress", "nude", "removeclothes"],
+  category: "Ai",
+  description: "AI clothing removal (owner only)"
+}, async (from, client, conText) => {
+  const { q, mek, quoted, quotedMsg, reply, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+  
+  if (!quotedMsg || !quoted?.imageMessage) {
+    return reply("📷 Reply to an image with .rc");
+  }
+
+  try {
+    await reply("🔄 Processing image...");
+    
+    const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
+    const buffer = fs.readFileSync(filePath);
+    fs.unlinkSync(filePath);
+    
+    const prompt = q ? q.trim().toLowerCase() : 'nude';
+    const validPrompts = ['nude', 'bikini', 'topless', 'underwear', 'naked', 'swimsuit', 'lingerie'];
+    
+    if (!validPrompts.includes(prompt)) {
+      console.log(`⚠️ Using default prompt: nude`);
+    }
+
+    const result = await removeClothes(buffer, validPrompts.includes(prompt) ? prompt : 'nude');
+    
+    await client.sendMessage(from, {
+      image: { url: result },
+      caption: `🖼️ AI Processed Image\n📝 Prompt: ${prompt}`
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("RC Error:", error);
+    reply(`❌ Error: ${error.message}`);
+  }
+});
+
+// ========================================================================
+// Image to Video (Nanobana)
+// ========================================================================
+/*const NANO_COOKIE = "__Host-authjs.csrf-token=30520470455c3e13eaed1f36a6d404badce7ea465230c2c98e0471bb72646a4e%7C3e869582574ac97763adf0b3d383e68275475d375f1926fd551aa712e4adbd24; __Secure-authjs.callback-url=https%3A%2F%2Fwww.nanobana.net%2F%23generator; g_state={\"i_l\":0,\"i_ll\":1769401024886,\"i_b\":\"VKxqLQ5eJ0B2gQmnduZzPCwsZ1q418d0cjhhXWlbxTU\",\"i_e\":{\"enable_itp_optimization\":0}}; __Secure-authjs.session-token=eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwia2lkIjoiSWRmbEhwMk0teEF1V3l6Nkg1bHZrRHdOc0ZiM3BBOHVvMjNjaXhaZ1MxT1hHWUFNUUc0MGY0bW5XZnFtdWZyWnFYbHM2SFZILUZncDlvaUk5dTdIbHcifQ..lasLfR5B2_Rf2Q_F3K6fgw.Tro9GauoZdTk0Dtt_Dt6HJK5eG_OZoP66i6LKgtDzaj6v42BIhO-Hre144rB3wYfFQovDVKXyxAGG8WyP5FW_H3WTJP-it5Sm8xfmj7WWSbAzXGXPOcw-782yVRqLAK4cxuNNGVYCNJhOxLnKEAh_3bRBUHpkDmDfsnC8z5FmTtURhA32n-KiMW5zcPKKhY6haApLrOfJ3Y31NxjzVRDa-T-1vjTITsyFBsZW_WaFY8OHRz7giNl-rKbfm-OKEd_nvU0NqdnEUS_LBYN-5b7u5f1buYMdIt8M2g6YIaYwhdXIGZ-x9HpJz2API7NrhKN5tTwaN6UMPFq4ZSfEdYEWipfmUMacv5oGfW7AmaAWMoVvYs5tudzI00D_M0GE3A5F20fLFRMRgDOsI3cs5-e0TzGOTobv3D7UGau8XCrxX5exf5L6Q1C15A6xwtPpRJu1cOg1BlnOXf0gueF4sAAcg._Bl87onRhLiZFFuzC-e1_udKFzuUFVAfhW4FfmtUufE";
+
+const NANO_HEADERS = {
+  "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+  "origin": "https://www.nanobana.net",
+  "referer": "https://www.nanobana.net/",
+  "cookie": NANO_COOKIE
+};
+
+async function uploadImage(buffer) {
+  const { ext, mime } = await fileTypeFromBuffer(buffer) || { ext: "jpg", mime: "image/jpeg" };
+  const form = new FormData();
+  form.append("file", buffer, { filename: `image.${ext}`, contentType: mime });
+
+  const res = await axios.post(`https://www.nanobana.net/api/upload/image`, form, {
+    headers: { ...NANO_HEADERS, ...form.getHeaders() }
+  });
+  if (!res.data.url) throw new Error("❌ Upload failed");
+  return res.data.url;
+}
+
+async function generateVideo(prompt, imageUrl) {
+  const res = await axios.post(`https://www.nanobana.net/api/sora2/image-to-video/generate`, {
+    prompt,
+    image_urls: [imageUrl],
+    aspect_ratio: "portrait",
+    n_frames: "10",
+    remove_watermark: true
+  }, { headers: NANO_HEADERS });
+
+  if (!res.data.taskId) throw new Error("❌ Failed to create task");
+  return res.data.taskId;
+}
+
+async function waitForVideo(taskId, prompt) {
+  for (let i = 0; i < 120; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    const res = await axios.get(
+      `https://www.nanobana.net/api/sora2/image-to-video/task/${taskId}?save=1&prompt=${encodeURIComponent(prompt)}`,
+      { headers: NANO_HEADERS }
+    );
+    if (res.data.status === "completed") return res.data.saved?.[0]?.url;
+    if (res.data.status === "failed") throw new Error(res.data.provider_raw?.data?.failMsg || "❌ Generation failed");
+  }
+  throw new Error("⏳ Timeout waiting for video");
+}
+
+keith({
+  pattern: "img2video",
+  aliases: ["imagevideo", "imagetovid", "i2v"],
+  category: "Ai",
+  description: "Convert image to video using AI"
+}, async (from, client, conText) => {
+  const { q, mek, quoted, quotedMsg, reply, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+  
+  if (!quotedMsg || !quoted?.imageMessage) {
+    return reply("📷 Reply to an image with .img2video <prompt>");
+  }
+
+  if (!q) {
+    return reply("❌ Provide a prompt!\nExample: .img2video make it move like waves");
+  }
+
+  try {
+    await reply("🔄 Processing image...");
+
+    const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
+    const buffer = fs.readFileSync(filePath);
+    fs.unlinkSync(filePath);
+
+    await reply("📤 Uploading image...");
+    const imageUrl = await uploadImage(buffer);
+
+    await reply("🎬 Generating video... (may take 1-2 minutes)");
+    const taskId = await generateVideo(q, imageUrl);
+    
+    const videoUrl = await waitForVideo(taskId, q);
+    
+    await client.sendMessage(from, {
+      video: { url: videoUrl },
+      caption: `🎥 *AI Generated Video*\n📝 *Prompt:* ${q}`
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("img2video error:", error);
+    reply(`❌ Error: ${error.message}`);
+  }
+});
+
+//========================================================================================================================
+/*keith({
   pattern: "rc",
   aliases: ["undress", "nude", "removeclothes"],
   category: "ai",
