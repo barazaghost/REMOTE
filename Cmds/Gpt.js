@@ -141,7 +141,7 @@ keith({
   }
 });
 //========================================================================================================================
-/*keith({
+keith({
   pattern: "rc",
   aliases: ["undress", "nude", "removeclothes"],
   category: "ai",
@@ -288,7 +288,7 @@ snOjvdDb4wiZI8x3UwIDAQAB
     
     let cfToken;
     try {
-      const cfResponse = await axios.post('https://x1st-cf.hf.space/action', {  
+      const cfResponse = await axios.post('https:/cf.rynekoo.eu.cc/action', {  
         url: 'https://deepfakemaker.io/ai-clothes-remover/',  
         mode: 'turnstile-min',  
         siteKey: '0x4AAAAAAB6PHmfUkQvGufDI'  
@@ -378,7 +378,7 @@ snOjvdDb4wiZI8x3UwIDAQAB
 //========================================================================================================================
 
 
-const API = "https://www.nanobana.net/api";
+/*const API = "https://www.nanobana.net/api";
 const COOKIE = "__Host-authjs.csrf-token=30520470455c3e13eaed1f36a6d404badce7ea465230c2c98e0471bb72646a4e%7C3e869582574ac97763adf0b3d383e68275475d375f1926fd551aa712e4adbd24; __Secure-authjs.callback-url=https%3A%2F%2Fwww.nanobana.net%2F%23generator; g_state={\"i_l\":0,\"i_ll\":1769401024886,\"i_b\":\"VKxqLQ5eJ0B2gQmnduZzPCwsZ1q418d0cjhhXWlbxTU\",\"i_e\":{\"enable_itp_optimization\":0}}; __Secure-authjs.session-token=eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwia2lkIjoiSWRmbEhwMk0teEF1V3l6Nkg1bHZrRHdOc0ZiM3BBOHVvMjNjaXhaZ1MxT1hHWUFNUUc0MGY0bW5XZnFtdWZyWnFYbHM2SFZILUZncDlvaUk5dTdIbHcifQ..lasLfR5B2_Rf2Q_F3K6fgw.Tro9GauoZdTk0Dtt_Dt6HJK5eG_OZoP66i6LKgtDzaj6v42BIhO-Hre144rB3wYfFQovDVKXyxAGG8WyP5FW_H3WTJP-it5Sm8xfmj7WWSbAzXGXPOcw-782yVRqLAK4cxuNNGVYCNJhOxLnKEAh_3bRBUHpkDmDfsnC8z5FmTtURhA32n-KiMW5zcPKKhY6haApLrOfJ3Y31NxjzVRDa-T-1vjTITsyFBsZW_WaFY8OHRz7giNl-rKbfm-OKEd_nvU0NqdnEUS_LBYN-5b7u5f1buYMdIt8M2g6YIaYwhdXIGZ-x9HpJz2API7NrhKN5tTwaN6UMPFq4ZSfEdYEWipfmUMacv5oGfW7AmaAWMoVvYs5tudzI00D_M0GE3A5F20fLFRMRgDOsI3cs5-e0TzGOTobv3D7UGau8XCrxX5exf5L6Q1C15A6xwtPpRJu1cOg1BlnOXf0gueF4sAAcg._Bl87onRhLiZFFuzC-e1_udKFzuUFVAfhW4FfmtUufE";
 
 const HEADERS = {
