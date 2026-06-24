@@ -97,7 +97,7 @@ async function processImage(imageBuffer, prompt) {
 }
 
 keith({
-  pattern: "imageedit",
+  pattern: "imageedit2",
   aliases: ["nanobananapro", "nabpro", "editimg"],
   category: "Ai",
   description: "Edit a quoted image with a prompt (PhotoEditor AI)",
@@ -223,6 +223,146 @@ async function removeClothes(buffer, prompt = 'nude') {
         await new Promise(resolve => setTimeout(resolve, 2500));
     }
 }
+
+
+// ========================================================================
+// ========================================================================
+
+const AGENT = "Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36";
+const SALT = "hackers_become_a_little_stinkier_every_time_they_hack";
+
+const md5 = s => crypto.createHash("md5").update(s).digest("hex");
+const reverse = s => s.split("").reverse().join("");
+const generateRandomIP = () => Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 254)).join(".");
+
+function getMime(ext) {
+    const mimes = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp"
+    };
+    return mimes[ext.toLowerCase()] || "application/octet-stream";
+}
+
+function genKEY() {
+    const r = String(Math.floor(Math.random() * 1e11));
+    const h1 = reverse(md5(AGENT + r + SALT));
+    const h2 = reverse(md5(AGENT + h1));
+    const h3 = reverse(md5(AGENT + h2));
+    return `tryit-${r}-${h3}`;
+}
+
+async function editImage(buffer, prompt) {
+    let lastError = "request failed";
+    
+    for (let i = 0; i < 6; i++) {
+        const form = new FormData();
+        form.append("image", buffer, { filename: "image.jpg", contentType: "image/jpeg" });
+        form.append("text", prompt);
+        form.append("image_generator_version", "standard");
+        
+        try {
+            const response = await axios.post("https://api.deepai.org/api/image-editor", form, {
+                headers: {
+                    ...form.getHeaders(),
+                    'accept': '*/*',
+                    'origin': 'https://deepai.org',
+                    'referer': 'https://deepai.org/',
+                    'user-agent': AGENT,
+                    'api-key': genKEY(),
+                    'x-forwarded-for': generateRandomIP()
+                },
+                timeout: 60000
+            });
+            
+            const json = response.data;
+            if (json?.output_url) {
+                // Download the edited image
+                const imageResponse = await axios.get(json.output_url, { responseType: 'arraybuffer' });
+                return { 
+                    success: true, 
+                    buffer: Buffer.from(imageResponse.data), 
+                    url: json.output_url,
+                    id: json.id 
+                };
+            }
+            lastError = json?.status || `HTTP ${response.status}`;
+        } catch (e) {
+            lastError = e.message;
+        }
+    }
+    return { success: false, error: lastError };
+}
+
+// ========================================================================
+// ========================================================================
+
+keith({
+    pattern: "imageedit",
+    aliases: ["deepai", "dimage", "editai"],
+    category: "Ai",
+    description: "Edit image using DeepAI (remove objects, add elements)"
+}, async (from, client, conText) => {
+    const { q, mek, quoted, quotedMsg, reply, isSuperUser } = conText;
+
+    if (!isSuperUser) return reply("❌ Owner Only Command!");
+    
+    if (!quotedMsg || !quoted?.imageMessage) {
+        return reply(`📌 *DeepAI Image Editor*
+        
+Edit images using AI - remove objects, add elements, or change style.
+
+*Usage:*
+Reply to an image with: .deepedit remove the person
+.deepedit make it look like a painting
+
+*Examples:*
+.deepedit remove the background
+.deepedit add a sunset
+.deepedit make it cartoon style`);
+    }
+
+    if (!q) {
+        return reply("❌ Provide a prompt!\nExample: .deepedit remove the person");
+    }
+
+    let tempFilePath = null;
+
+    try {
+        await reply(`🖼️ Processing image with AI...\n📝 Prompt: ${q}`);
+
+        tempFilePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
+        const buffer = fs.readFileSync(tempFilePath);
+        
+        // Check file size (max 10MB)
+        if (buffer.length > 10 * 1024 * 1024) {
+            return reply("❌ Image too large! Max 10MB.");
+        }
+
+        const result = await editImage(buffer, q);
+        
+        if (!result.success) {
+            return reply(`❌ Error: ${result.error}`);
+        }
+
+        await client.sendMessage(from, {
+            image: result.buffer,
+            caption: `✅ *Image Edited!*\n📝 *Prompt:* ${q}\n🆔 *ID:* ${result.id || 'N/A'}`
+        }, { quoted: mek });
+
+    } catch (err) {
+        console.error("deepedit error:", err);
+        await reply(`❌ Error: ${err.message}`);
+    } finally {
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
+            try { fs.unlinkSync(tempFilePath); } catch {}
+        }
+    }
+});
+
+// ========================================================================
+// ========================================================================
 
 keith({
   pattern: "rc",
