@@ -486,6 +486,139 @@ async function uploadToKappa(filePath) {
   }
 }
 
+
+// Add this after your other upload functions
+// ==================== Shz.al Upload Function ====================
+async function uploadToShz(filePath, expire = "1d") {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+
+  // Parse expire time
+  function parseExpireToSeconds(expire = "7d") {
+    const text = String(expire).trim().toLowerCase();
+    const match = text.match(/^(\d+(?:\.\d+)?)(s|m|h|d)?$/);
+
+    if (!match) return 7 * 86400;
+
+    const value = Number(match[1]);
+    const unit = match[2] || "s";
+
+    const seconds = {
+      s: value,
+      m: value * 60,
+      h: value * 3600,
+      d: value * 86400
+    }[unit];
+
+    return Math.min(Math.floor(seconds), 90 * 86400);
+  }
+
+  function secondsToExpire(seconds) {
+    if (seconds % 86400 === 0) return `${seconds / 86400}d`;
+    if (seconds % 3600 === 0) return `${seconds / 3600}h`;
+    if (seconds % 60 === 0) return `${seconds / 60}m`;
+    return `${seconds}s`;
+  }
+
+  function getNormalUrl(url) {
+    const parsed = new URL(url);
+    const name = parsed.pathname.replace(/^\/+/, "");
+    return `https://shz.al/d/${name}`;
+  }
+
+  const expireSeconds = parseExpireToSeconds(expire);
+  const finalExpire = secondsToExpire(expireSeconds);
+
+  const form = new FormData();
+  form.append("c", fs.createReadStream(filePath), {
+    filename: path.basename(filePath)
+  });
+  form.append("e", finalExpire);
+
+  const { data } = await axios.post('https://shz.al', form, {
+    headers: {
+      ...form.getHeaders(),
+      "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36",
+      "Accept": "*/*",
+      "Origin": "https://shz.al",
+      "Referer": "https://shz.al/"
+    },
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity
+  });
+
+  const parsedData = typeof data === "string" ? JSON.parse(data) : data;
+  
+  if (parsedData?.url) {
+    return getNormalUrl(parsedData.url);
+  } else {
+    throw new Error("Shz.al upload failed: " + JSON.stringify(parsedData));
+  }
+}
+
+// ==================== Shz.al Command ====================
+keith({
+  pattern: "shz",
+  aliases: ["shzal", "shzupload"],
+  description: "Upload quoted media to Shz.al with custom expiry",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply, args } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type === "unknown") return reply("❌ Unsupported media type.");
+
+  let mediaNode;
+  let mimetype = '';
+  
+  if (type === "image") {
+    mediaNode = quotedMsg.imageMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "video") {
+    mediaNode = quotedMsg.videoMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "audio") {
+    mediaNode = quotedMsg.audioMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "sticker") {
+    mediaNode = quotedMsg.stickerMessage;
+    mimetype = mediaNode.mimetype || 'image/webp';
+  }
+  else if (type === "document") {
+    mediaNode = quotedMsg.documentMessage;
+    mimetype = mediaNode.mimetype;
+  }
+
+  if (!mediaNode) return reply("❌ Could not extract media content.");
+
+  // Get custom expiry from args (optional)
+  const expire = args?.[0] || "1d";
+  
+  // Validate expiry format
+  const validExpire = /^(\d+(?:\.\d+)?)(s|m|h|d)?$/.test(expire);
+  if (!validExpire) {
+    return reply("❌ Invalid expiry format. Use: 30s, 5m, 2h, 1d (max 90d)");
+  }
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type, mimetype);
+    const link = await uploadToShz(filePath, expire);
+    await reply(link); // Only returns the URL
+  } catch (err) {
+    console.error("Shz.al upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && await fs.pathExists(filePath)) {
+      try { await fs.unlink(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
 // ==================== Kappa.lol Command ====================
 keith({
   pattern: "kappa",
