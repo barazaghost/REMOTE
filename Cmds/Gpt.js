@@ -12,6 +12,8 @@ const fs = require("fs");
 const FormData = require("form-data");
 const crypto = require('crypto');
 
+
+
 const { fileTypeFromBuffer } = require("file-type");
 //========================================================================================================================
 //========================================================================================================================
@@ -95,6 +97,208 @@ async function processImage(imageBuffer, prompt) {
   const resultRes = await axios.get(resultUrl, { responseType: "arraybuffer" });
   return Buffer.from(resultRes.data);
 }
+
+
+//========================================================================================================================
+//========================================================================================================================
+
+
+
+const API = "https://remusic.ai/api/v1/ai-music/music";
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0";
+
+const STYLES = {
+    genre: ["Pop", "Rock", "Hip-Hop", "R&B", "Jazz", "Classical", "Electronic", "EDM", "Lo-fi", "Ambient", "Reggae", "Country", "Folk", "Metal", "Blues", "Funk", "Soul", "Disco", "House", "Techno", "Trap", "Drum and Bass", "K-Pop", "J-Pop", "Latin", "Afrobeat", "Cinematic", "Orchestral", "Acoustic", "Punk", "Gospel", "Indie", "Synthwave", "Bossa Nova"],
+    mood: ["Calm", "Happy", "Sad", "Energetic", "Romantic", "Epic", "Dark", "Dreamy", "Uplifting", "Melancholic", "Chill", "Aggressive", "Peaceful", "Nostalgic", "Mysterious", "Hopeful", "Sensual", "Playful", "Angry", "Triumphant"],
+    vocal: ["Male Vocal", "Female Vocal", "Duet", "Choir", "Soft Vocal", "Powerful Vocal", "Rap", "Whisper"],
+    tempo: ["Slow", "Mid-tempo", "Upbeat", "Fast"]
+};
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const freshGa = () => `GA1.1.${Math.floor(Math.random() * 9e9 + 1e9)}.${Math.floor(Date.now() / 1000)}`;
+const randIP = () => Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 254)).join(".");
+
+function headers() {
+    return {
+        "accept": "application/json, text/plain, */*",
+        "content-type": "application/json",
+        "origin": "https://remusic.ai",
+        "referer": "https://remusic.ai/ai-music-generator",
+        "user-agent": UA,
+        "cookie": `_ga=${freshGa()}; anonymous_user_id=${crypto.randomUUID()}`,
+        "x-forwarded-for": randIP()
+    };
+}
+
+function pick(row) {
+    return {
+        id: row.song_id,
+        title: row.title || null,
+        status: row.status,
+        audio: row.audio_url || null,
+        image: row.image_url || row.cover_url || null,
+        duration: row.duration || null,
+        tags: row.tags || null,
+        lyrics: row.lyrics || null,
+        description: row.description || null
+    };
+}
+
+async function createJob(body, maxRetries) {
+    let last = "create failed";
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const res = await axios.post(API, body, { headers: headers(), timeout: 30000 });
+            const json = res.data;
+            if (json && json.code === 100000 && Array.isArray(json.data) && json.data.length) return json.data;
+            last = json ? `${json.code}: ${json.message}` : `http ${res.status}`;
+        } catch (e) {
+            last = e.message;
+        }
+        await sleep(600);
+    }
+    throw new Error(last);
+}
+
+async function pollJob(id, onProgress) {
+    for (let i = 0; i < 70; i++) {
+        await sleep(5000);
+        try {
+            const res = await axios.get(`${API}/${id}`, { headers: headers(), timeout: 15000 });
+            const json = res.data;
+            const row = Array.isArray(json?.data) ? json.data[0] : json?.data;
+            if (!row) continue;
+            if (onProgress) onProgress(row.percentage ?? 0, row.status);
+            if (row.status === "success" && row.audio_url) return row;
+            if (["failed", "error", "fail"].includes(row.status)) throw new Error("Generation failed");
+        } catch (e) {
+            if (e.message === "Generation failed") throw e;
+        }
+    }
+    throw new Error("Generation timeout");
+}
+
+async function generateMusic(prompt, options = {}) {
+    const {
+        styles = [],
+        title = null,
+        lyrics = null,
+        mv = "v4",
+        supplier = 10,
+        maxRetries = 6,
+        onProgress = null
+    } = options;
+
+    const tags = (Array.isArray(styles) ? styles : [styles]).filter(Boolean).join(", ");
+    const custom = !!(title || lyrics);
+
+    const body = custom
+        ? { mode: 2, supplier, mv, is_instrumental: false, is_public: true, prompt: String(prompt || tags || title), title: title || "", tags, lyrics: lyrics || "" }
+        : { mode: 1, supplier, mv, is_instrumental: false, is_public: true, prompt: tags ? `${prompt}, ${tags}` : String(prompt) };
+
+    const jobs = await createJob(body, maxRetries);
+    const songs = await Promise.all(jobs.map(j => pollJob(j.song_id, onProgress).then(pick).catch(() => ({ id: j.song_id, status: "failed", audio: null }))));
+
+    return {
+        ok: songs.some(s => s.audio),
+        prompt: String(prompt || ""),
+        styles: tags || null,
+        mode: custom ? "custom" : "simple",
+        count: songs.length,
+        songs
+    };
+}
+//========================================================================================================================
+//========================================================================================================================
+
+keith({
+    pattern: "aimusic",
+    aliases: ["songgen", "genmusic", "aimusicgen"],
+    category: "Ai",
+    description: "Generate AI music from text prompt"
+}, async (from, client, conText) => {
+    const { q, reply, mek, isSuperUser } = conText;
+
+    if (!isSuperUser) return reply("❌ Owner only!");
+
+    if (!q) {
+        return reply(`📌 *AI Music Generator*
+        
+Generate music using AI from text description.
+
+*Usage:*
+.aimusic sad piano music
+
+*With styles:*
+.aimusic calm jazz | Jazz,Calm,Chill
+
+*Examples:*
+.aimusic epic orchestral
+.aimusic romantic love song | Romantic,Slow,Vocal
+
+*Styles:*
+🎵 Genre: Pop, Rock, Hip-Hop, Jazz, Classical, Electronic, EDM, Lo-fi, Ambient, Reggae, Country, Metal, Blues, Soul, Disco, House, Techno, Trap, K-Pop, Latin, Afrobeat, Cinematic, Orchestral, Acoustic, Punk, Gospel, Indie, Synthwave, Bossa Nova
+
+😊 Mood: Calm, Happy, Sad, Energetic, Romantic, Epic, Dark, Dreamy, Uplifting, Melancholic, Chill, Peaceful, Mysterious, Hopeful, Sensual, Playful
+
+🎤 Vocal: Male Vocal, Female Vocal, Duet, Choir, Soft Vocal, Powerful Vocal, Rap, Whisper
+
+⏱️ Tempo: Slow, Mid-tempo, Upbeat, Fast`);
+    }
+
+    await reply(`🎵 Generating AI music for: "${q}"...\n⏳ This may take 1-2 minutes.`);
+
+    try {
+        let prompt = q;
+        let styles = [];
+
+        // Check if styles specified with |
+        if (q.includes('|')) {
+            const parts = q.split('|').map(s => s.trim());
+            prompt = parts[0];
+            if (parts[1]) {
+                styles = parts[1].split(',').map(s => s.trim());
+            }
+        }
+
+        const result = await generateMusic(prompt, {
+            styles: styles,
+            onProgress: (percent, status) => {
+                console.log(`⏳ Progress: ${percent}% - ${status}`);
+            }
+        });
+
+        if (!result.ok) {
+            return reply("❌ Failed to generate music. Please try again with different prompt.");
+        }
+
+        // Find first successful song
+        const song = result.songs.find(s => s.audio);
+        if (!song) {
+            return reply("❌ No audio generated. Please try again.");
+        }
+
+        // Send the audio
+        await client.sendMessage(from, {
+            audio: { url: song.audio },
+            mimetype: 'audio/mpeg',
+            ptt: false,
+           // caption: `🎵 *AI Generated Music*\n📝 *Prompt:* ${result.prompt}\n${song.title ? `📌 *Title:* ${song.title}\n` : ''}${song.duration ? `⏱️ *Duration:* ${song.duration}s\n` : ''}${song.tags ? `🏷️ *Tags:* ${song.tags}` : ''}`
+        }, { quoted: mek });
+
+        // Send additional info if there are more songs
+        const totalSongs = result.songs.filter(s => s.audio).length;
+        if (totalSongs > 1) {
+            await reply(`✅ Generated ${totalSongs} songs. Check the audio above!`);
+        }
+
+    } catch (err) {
+        console.error("aimusic error:", err);
+        await reply(`❌ Error: ${err.message}`);
+    }
+});
+//========================================================================================================================
+//========================================================================================================================
 
 keith({
   pattern: "imageedit2",
