@@ -2,16 +2,41 @@ const { keith } = require('../commandHandler');
 const fs = require('fs');
 const axios = require('axios');
 const path = require('path');
+const os = require('os');
 
-const jidsPath = path.join(__dirname, '..', 'jids.json');
-let statusJidList = [];
-try {
-  const allJids = JSON.parse(fs.readFileSync(jidsPath, 'utf-8'));
-  // ✅ Only keep contacts ending with @s.whatsapp.net
-  statusJidList = allJids.filter(jid => typeof jid === "string" && jid.endsWith('@s.whatsapp.net'));
-} catch (err) {
-  console.error('Error reading jids.json:', err);
+//========================================================================================================================
+// Robust jids.json loader — tries multiple paths, works on Heroku + local
+//========================================================================================================================
+
+function loadJids() {
+  // Try these locations in order
+  const candidates = [
+    path.join(__dirname, '..', 'jids.json'),          // normal: commands/../jids.json
+    path.join(process.cwd(), 'jids.json'),             // Heroku: root of app
+    path.join(process.cwd(), 'data', 'jids.json'),     // optional: data/ subfolder
+    path.join(__dirname, 'jids.json'),                 // same folder as this file
+  ];
+
+  for (const filePath of candidates) {
+    try {
+      if (fs.existsSync(filePath)) {
+        const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        const jids = raw.filter(jid => typeof jid === 'string' && jid.endsWith('@s.whatsapp.net'));
+        console.log(`✅ Loaded ${jids.length} JIDs from: ${filePath}`);
+        return jids;
+      }
+    } catch (err) {
+      console.warn(`⚠️ Could not read ${filePath}:`, err.message);
+    }
+  }
+
+  console.error('❌ jids.json not found in any expected location.');
+  return [];
 }
+
+//========================================================================================================================
+// reshare — Post quoted image/video as WhatsApp status
+//========================================================================================================================
 
 keith({
   pattern: "reshare",
@@ -22,34 +47,36 @@ keith({
 }, async (from, client, conText) => {
   const { mek, quoted, quotedMsg, reply, isSuperUser } = conText;
 
-  if (!isSuperUser) {
-    return reply("❌ Owner Only Command!");
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+  if (!quotedMsg) return reply("❌ Please quote an image or video message to post.");
+
+  // Load jids fresh at runtime (handles Heroku env where module-load paths differ)
+  const statusJidList = loadJids();
+  if (statusJidList.length === 0) {
+    return reply("❌ No valid contacts found in jids.json. Check that the file exists and has @s.whatsapp.net entries.");
   }
 
-  if (!quotedMsg) return reply("❌ Please quote an image or video message to post.");
-  if (statusJidList.length === 0) return reply("❌ No valid @s.whatsapp.net contacts configured for private status.");
+  const tmpDir = os.tmpdir(); // ✅ Use system temp dir — always writable on Heroku
 
   try {
-    const tmpDir = path.join(__dirname, "..", "tmp");
-    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-
     const sendStatus = async (media, type) => {
-      const filePath = await client.downloadAndSaveMediaMessage(media, path.join(tmpDir, `${type}-${Date.now()}`));
+      const filePath = await client.downloadAndSaveMediaMessage(
+        media,
+        path.join(tmpDir, `${type}-${Date.now()}`)
+      );
       const caption = media.caption || "";
-
-      const statusOptions = {
-        statusJidList,
-        backgroundColor: '#000000'
-      };
 
       await client.sendMessage("status@broadcast", {
         [type]: { url: filePath },
         ...(caption && { caption }),
         mimetype: media.mimetype,
         ...(type === 'video' && { seconds: media.seconds })
-      }, statusOptions);
+      }, {
+        statusJidList,
+        backgroundColor: '#000000'
+      });
 
-      fs.unlinkSync(filePath);
+      try { fs.unlinkSync(filePath); } catch {}
       return reply(`✅ ${type.charAt(0).toUpperCase() + type.slice(1)} posted to ${statusJidList.length} contacts.`);
     };
 
@@ -58,18 +85,21 @@ keith({
     }
 
     if (quoted?.videoMessage) {
-      if (quoted.videoMessage.seconds > 30) {
-        return reply("⚠️ Video status must be 30 seconds or shorter.");
-      }
+      if (quoted.videoMessage.seconds > 30) return reply("⚠️ Video must be 30 seconds or shorter.");
       return await sendStatus(quoted.videoMessage, "video");
     }
 
-    return reply("⚠️ Only image or video messages are supported for status updates.");
+    return reply("⚠️ Only image or video messages are supported.");
+
   } catch (err) {
-    console.error("tostatus error:", err);
-    return reply("❌ Failed to post status. Error: " + err.message);
+    console.error("reshare error:", err);
+    return reply("❌ Failed to post status: " + err.message);
   }
 });
+
+//========================================================================================================================
+// jidcount — Show number of loaded JIDs + which file was found
+//========================================================================================================================
 
 keith({
   pattern: "jidcount",
@@ -80,15 +110,25 @@ keith({
 }, async (from, client, conText) => {
   const { reply, isSuperUser } = conText;
 
-  if (!isSuperUser) {
-    return reply("❌ Owner Only Command!");
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  // Load fresh so it reflects any runtime changes to jids.json
+  const statusJidList = loadJids();
+
+  const candidates = [
+    path.join(__dirname, '..', 'jids.json'),
+    path.join(process.cwd(), 'jids.json'),
+    path.join(process.cwd(), 'data', 'jids.json'),
+    path.join(__dirname, 'jids.json'),
+  ];
+
+  let foundPath = 'not found';
+  for (const p of candidates) {
+    if (fs.existsSync(p)) { foundPath = p; break; }
   }
 
-  try {
-    const total = statusJidList.length;
-    return reply(`📌 Total saved JIDs: *${total}*`);
-  } catch (err) {
-    console.error("jidcount error:", err);
-    return reply("❌ Failed to read JIDs. Error: " + err.message);
-  }
+  return reply(
+    `📌 Total saved JIDs: *${statusJidList.length}*\n` +
+    `📂 File: \`${foundPath}\``
+  );
 });
