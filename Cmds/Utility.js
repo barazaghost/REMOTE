@@ -1,72 +1,75 @@
+
 const { keith } = require('../commandHandler');
 const fs = require('fs');
-const { exec, execFile } = require('child_process');
+const { execSync } = require('child_process');
 const axios = require('axios');
 const path = require('path');
+const os = require('os');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-const mime = require('mime-types');
+const sharp = require('sharp');
 
 //========================================================================================================================
-// Helper Functions
+// ffmpeg-static (same as sticker.js — works on Heroku, Railway, etc.)
+//========================================================================================================================
+
+let ffmpegPath;
+try {
+  ffmpegPath = require('ffmpeg-static');
+} catch {
+  ffmpegPath = 'ffmpeg';
+}
+
+//========================================================================================================================
+// Helper: Download media to buffer
 //========================================================================================================================
 
 async function downloadMediaBuffer(client, mediaMsg, type) {
-  const buffer = await downloadMediaMessage(
+  return await downloadMediaMessage(
     { message: { [type + 'Message']: mediaMsg } },
     'buffer',
     {},
-    { 
+    {
       reuploadRequest: client.updateMediaMessage,
-      logger: console 
+      logger: console
     }
   );
-  return buffer;
 }
 
-async function toPtt(buffer) {
-  const tempDir = path.join(__dirname, 'temp');
-  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+//========================================================================================================================
+// Helper: Convert any audio buffer to WhatsApp PTT (ogg/opus)
+//========================================================================================================================
 
-  const timestamp = Date.now();
-  const inputPath = path.join(tempDir, `ptt_in_${timestamp}.tmp`);
-  const outputPath = path.join(tempDir, `ptt_out_${timestamp}.ogg`);
+async function toPtt(buffer) {
+  const id = Date.now();
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `ptt_in_${id}.tmp`);
+  const outputPath = path.join(tmpDir, `ptt_out_${id}.ogg`);
 
   fs.writeFileSync(inputPath, buffer);
 
   const cleanup = () => {
-    try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath); } catch {}
-    try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch {}
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
   };
 
-  return new Promise((resolve, reject) => {
-    execFile('ffmpeg', [
-      '-y', '-i', inputPath,
-      '-c:a', 'libopus',
-      '-b:a', '64k',
-      '-ar', '48000',
-      '-ac', '1',
-      '-f', 'ogg',
-      outputPath
-    ], { timeout: 120000 }, (err) => {
-      if (err) {
-        cleanup();
-        return reject(err);
-      }
-      try {
-        const out = fs.readFileSync(outputPath);
-        cleanup();
-        resolve(out);
-      } catch (e) { cleanup(); reject(e); }
-    });
-  });
+  try {
+    execSync(
+      `"${ffmpegPath}" -y -i "${inputPath}" -c:a libopus -b:a 64k -ar 48000 -ac 1 -f ogg "${outputPath}"`,
+      { timeout: 120000, stdio: 'pipe' }
+    );
+    const out = fs.readFileSync(outputPath);
+    cleanup();
+    return out;
+  } catch (err) {
+    cleanup();
+    throw err;
+  }
 }
 
 //========================================================================================================================
-// toptt Command
+// loop — Repeat audio or video N times
+//========================================================================================================================
 
-//========================================================================================================================
-// 5. Loop Command (Repeat Media)
-//========================================================================================================================
 keith({
   pattern: "loop",
   aliases: ["repeat"],
@@ -75,181 +78,153 @@ keith({
   filename: __filename
 }, async (from, client, conText) => {
   const { q, quotedMsg, mek, reply, keithRandom } = conText;
-  
+
   let loops = 2;
-  if (q && !isNaN(parseInt(q))) {
-    loops = Math.min(parseInt(q), 10);
-  }
-  
+  if (q && !isNaN(parseInt(q))) loops = Math.min(parseInt(q), 10);
+
   const media = quotedMsg?.videoMessage || quotedMsg?.audioMessage;
-  if (!media) {
-    return reply("📌 Reply to an audio or video to loop it.\nUsage: .loop 3 (loops 3 times)");
-  }
-  
+  if (!media) return reply("📌 Reply to an audio or video to loop it.\nUsage: .loop 3");
+
   const isVideo = !!quotedMsg.videoMessage;
   const type = isVideo ? 'video' : 'audio';
-  const inputExt = isVideo ? '.mp4' : '.mp3';
-  const outputExt = isVideo ? '.mp4' : '.mp3';
-  
+  const ext = isVideo ? '.mp4' : '.mp3';
+  const id = Date.now();
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `loop_in_${id}${ext}`);
+  const outputPath = path.join(tmpDir, `loop_out_${id}${ext}`);
+
   try {
     const buffer = await downloadMediaBuffer(client, media, type);
-    const inputPath = keithRandom(inputExt);
-    const outputPath = keithRandom(outputExt);
-    
     fs.writeFileSync(inputPath, buffer);
-    
-    exec(`ffmpeg -stream_loop ${loops} -i ${inputPath} -c copy ${outputPath}`, async (err) => {
-      fs.unlinkSync(inputPath);
-      if (err) return reply("❌ Failed to loop media.");
-      
-      const outputBuffer = fs.readFileSync(outputPath);
-      const message = isVideo
-        ? { video: outputBuffer, mimetype: "video/mp4" }
-        : { audio: outputBuffer, mimetype: "audio/mpeg" };
-      
-      await client.sendMessage(from, message, { quoted: mek });
-      fs.unlinkSync(outputPath);
-    });
+
+    execSync(
+      `"${ffmpegPath}" -y -stream_loop ${loops - 1} -i "${inputPath}" -c copy "${outputPath}"`,
+      { timeout: 120000, stdio: 'pipe' }
+    );
+
+    const outputBuffer = fs.readFileSync(outputPath);
+    const message = isVideo
+      ? { video: outputBuffer, mimetype: "video/mp4" }
+      : { audio: outputBuffer, mimetype: "audio/mpeg" };
+
+    await client.sendMessage(from, message, { quoted: mek });
   } catch (error) {
     reply(`❌ Error: ${error.message}`);
+  } finally {
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
   }
 });
 
 //========================================================================================================================
-// Image to Video with Audio (More Stable - Resizes Image First)
+// slideshow — Image + audio URL → video
 //========================================================================================================================
+
 keith({
   pattern: "slideshow",
   aliases: ["imgewaudio", "imagewithaudio", "imgaudio"],
-  description: "Convert quoted image to video with audio (audio URL required)",
+  description: "Convert quoted image to video with audio (provide audio URL)",
   category: "Utility",
   filename: __filename
 }, async (from, client, conText) => {
   const { q, quotedMsg, mek, reply, keithRandom } = conText;
 
-  if (!quotedMsg?.imageMessage) {
-    return reply("📌 Reply to an *image* and provide an audio URL.\n\nExample: .img2video https://example.com/song.mp3");
-  }
+  if (!quotedMsg?.imageMessage) return reply("📌 Reply to an *image* and provide an audio URL.\nExample: .slideshow https://example.com/song.mp3");
+  if (!q || !q.startsWith('http')) return reply("🎵 Please provide a valid audio URL.");
 
-  if (!q || !q.startsWith('http')) {
-    return reply("🎵 Please provide a valid audio URL.\n\nExample: .img2video https://example.com/song.mp3");
-  }
+  const id = Date.now();
+  const tmpDir = os.tmpdir();
+  const rawImagePath = path.join(tmpDir, `slide_raw_${id}.jpg`);
+  const resizedImagePath = path.join(tmpDir, `slide_img_${id}.jpg`);
+  const audioPath = path.join(tmpDir, `slide_audio_${id}.mp3`);
+  const outputPath = path.join(tmpDir, `slide_out_${id}.mp4`);
 
-  const audioUrl = q.trim();
-  const outputPath = keithRandom('.mp4');
+  const cleanup = () => {
+    for (const p of [rawImagePath, resizedImagePath, audioPath, outputPath]) {
+      try { fs.unlinkSync(p); } catch {}
+    }
+  };
 
   try {
     await reply("🎬 Processing...");
 
-    // Download image
+    // Download + resize image using sharp
     const imageBuffer = await downloadMediaBuffer(client, quotedMsg.imageMessage, 'image');
-    const imagePath = keithRandom('.jpg');
-    fs.writeFileSync(imagePath, imageBuffer);
-
-    // Resize image first to 480p (smaller = faster, less memory)
-    const resizedImagePath = keithRandom('.jpg');
-    
-    await new Promise((resolve, reject) => {
-      exec(`ffmpeg -i ${imagePath} -vf "scale=640:-2" -frames:v 1 ${resizedImagePath}`, (err) => {
-        fs.unlinkSync(imagePath);
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    const resizedBuffer = await sharp(imageBuffer)
+      .resize({ width: 640, withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    fs.writeFileSync(resizedImagePath, resizedBuffer);
 
     // Download audio
-    const audioResponse = await axios.get(audioUrl, { 
-      responseType: 'arraybuffer',
-      timeout: 60000
-    });
-    const audioBuffer = Buffer.from(audioResponse.data);
-    const audioPath = keithRandom('.mp3');
-    fs.writeFileSync(audioPath, audioBuffer);
+    const audioResponse = await axios.get(q.trim(), { responseType: 'arraybuffer', timeout: 60000 });
+    fs.writeFileSync(audioPath, Buffer.from(audioResponse.data));
 
-    // Get audio duration
-    let audioDuration = 30;
-    await new Promise((resolve) => {
-      exec(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 ${audioPath}`, (err, stdout) => {
-        if (!err && stdout) audioDuration = parseFloat(stdout.trim());
-        resolve();
-      });
-    });
-
-    // Create video
-    await new Promise((resolve, reject) => {
-      exec(`ffmpeg -loop 1 -i ${resizedImagePath} -i ${audioPath} -c:v libx264 -c:a aac -vf "format=yuv420p" -shortest -preset ultrafast -crf 30 -movflags +faststart ${outputPath}`, 
-        { timeout: 90000 }, (err) => {
-          fs.unlinkSync(resizedImagePath);
-          fs.unlinkSync(audioPath);
-          if (err) reject(err);
-          else resolve();
-        });
-    });
+    // Build video
+    execSync(
+      `"${ffmpegPath}" -y -loop 1 -i "${resizedImagePath}" -i "${audioPath}" ` +
+      `-c:v libx264 -c:a aac -vf "format=yuv420p" -shortest -preset ultrafast -crf 30 -movflags +faststart "${outputPath}"`,
+      { timeout: 120000, stdio: 'pipe' }
+    );
 
     const videoBuffer = fs.readFileSync(outputPath);
-    const minutes = Math.floor(audioDuration / 60);
-    const seconds = Math.floor(audioDuration % 60);
-    
     await client.sendMessage(from, {
       video: videoBuffer,
       mimetype: "video/mp4",
-      caption: `🎬 Image to Video\n🎵 Duration: ${minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`}`
+      caption: "🎬 Slideshow created!"
     }, { quoted: mek });
 
-    fs.unlinkSync(outputPath);
-
   } catch (error) {
-    console.error("img2video error:", error);
+    console.error("slideshow error:", error);
     await reply(`❌ Error: ${error.message}`);
+  } finally {
+    cleanup();
   }
 });
+
 //========================================================================================================================
+// toptt — Convert audio to WhatsApp voice note
+//========================================================================================================================
+
 keith({
-    pattern: "toptt",
-    aliases: ['tovoice', 'tovn', 'tovoicenote'],
-    category: "Converter",
-    description: "Convert audio to WhatsApp voice note"
-  },
-  async (from, client, conText) => {
-    const { mek, reply, quoted, quotedMsg } = conText;
+  pattern: "toptt",
+  aliases: ['tovoice', 'tovn', 'tovoicenote'],
+  category: "Converter",
+  description: "Convert audio to WhatsApp voice note"
+}, async (from, client, conText) => {
+  const { mek, reply, quoted, quotedMsg } = conText;
 
-    if (!quotedMsg) {
-      return reply("Please reply to an audio message");
-    }
+  if (!quotedMsg) return reply("Please reply to an audio message");
 
-    const quotedAudio = quoted?.audioMessage || quoted?.message?.audioMessage;
-    
-    if (!quotedAudio) {
-      return reply("The quoted message doesn't contain any audio");
-    }
+  const quotedAudio = quoted?.audioMessage || quoted?.message?.audioMessage;
+  if (!quotedAudio) return reply("The quoted message doesn't contain any audio");
 
-    try {
-      const buffer = await downloadMediaBuffer(client, quotedAudio, 'audio');
-      const convertedBuffer = await toPtt(buffer);
-      
-      await client.sendMessage(from, {
-        audio: convertedBuffer,
-        mimetype: "audio/ogg; codecs=opus",
-        ptt: true
-      });
-      
-    } catch (e) {
-      console.error("Error in toptt command:", e);
-      await reply("Failed to convert to voice note");
-    }
+  try {
+    const buffer = await downloadMediaBuffer(client, quotedAudio, 'audio');
+    const convertedBuffer = await toPtt(buffer);
+
+    await client.sendMessage(from, {
+      audio: convertedBuffer,
+      mimetype: "audio/ogg; codecs=opus",
+      ptt: true
+    }, { quoted: mek });
+
+  } catch (e) {
+    console.error("toptt error:", e);
+    await reply("❌ Failed to convert to voice note");
   }
-);
+});
 
 //========================================================================================================================
-// tts Command
+// tts — Text to speech (PTT)
 //========================================================================================================================
+
 keith({
   pattern: "tts",
   aliases: ["say"],
   category: "tools",
   description: "Convert text or quoted message to PTT audio"
-},
-async (from, client, conText) => {
+}, async (from, client, conText) => {
   const { q, mek, quotedMsg, reply } = conText;
 
   let text;
@@ -257,22 +232,18 @@ async (from, client, conText) => {
     text = q;
   } else if (quotedMsg) {
     text = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text;
-    if (!text) {
-      return reply("❌ Could not extract quoted text.");
-    }
+    if (!text) return reply("❌ Could not extract quoted text.");
   } else {
-    return reply("📌 Reply to a message with text or provide text directly.");
+    return reply("📌 Reply to a message or provide text.");
   }
 
   try {
     const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=id&client=tw-ob`;
-    
     await client.sendMessage(from, {
       audio: { url: ttsUrl },
       mimetype: "audio/mpeg",
       ptt: false
-    });
-
+    }, { quoted: mek });
   } catch (error) {
     console.error("TTS error:", error);
     reply("⚠️ An error occurred while generating speech.");
@@ -280,90 +251,79 @@ async (from, client, conText) => {
 });
 
 //========================================================================================================================
-// tom4a Command
+// tom4a — Send audio as audio/mp4
 //========================================================================================================================
+
 keith({
   pattern: "tom4a",
-  aliases: ["audioextract"],
-  description: "Convert quoted audio or video to MP3",
+  aliases: ["audiom4a"],
+  description: "Send quoted audio or video as M4A",
   category: "Converter",
   filename: __filename
 }, async (from, client, conText) => {
   const { quotedMsg, mek, reply } = conText;
 
-  let mediaType = null;
-  let mediaTypeName = null;
-  
-  if (quotedMsg?.videoMessage) {
-    mediaType = quotedMsg.videoMessage;
-    mediaTypeName = 'video';
-  } else if (quotedMsg?.audioMessage) {
-    mediaType = quotedMsg.audioMessage;
-    mediaTypeName = 'audio';
-  }
-  
-  if (!mediaType) {
-    return reply("❌ Quote an audio or video to convert to MP3.");
-  }
+  let mediaType = null, mediaTypeName = null;
+  if (quotedMsg?.videoMessage) { mediaType = quotedMsg.videoMessage; mediaTypeName = 'video'; }
+  else if (quotedMsg?.audioMessage) { mediaType = quotedMsg.audioMessage; mediaTypeName = 'audio'; }
+  if (!mediaType) return reply("❌ Quote an audio or video.");
 
   try {
     const buffer = await downloadMediaBuffer(client, mediaType, mediaTypeName);
-
-    await client.sendMessage(from, {
-      audio: buffer,
-      mimetype: "audio/mp4"
-    }, { quoted: mek });
-
+    await client.sendMessage(from, { audio: buffer, mimetype: "audio/mp4" }, { quoted: mek });
   } catch (error) {
     console.error("tom4a error:", error);
-    await reply("❌ An error occurred while converting the media.");
+    await reply("❌ An error occurred.");
   }
 });
 
 //========================================================================================================================
-// tomp3 Command
+// tomp3 — Convert audio/video to MP3
 //========================================================================================================================
+
 keith({
   pattern: "tomp3",
-  aliases: ["audioextract"],
   description: "Convert quoted audio or video to MP3",
   category: "Converter",
   filename: __filename
 }, async (from, client, conText) => {
   const { quotedMsg, mek, reply } = conText;
 
-  let mediaType = null;
-  let mediaTypeName = null;
-  
-  if (quotedMsg?.videoMessage) {
-    mediaType = quotedMsg.videoMessage;
-    mediaTypeName = 'video';
-  } else if (quotedMsg?.audioMessage) {
-    mediaType = quotedMsg.audioMessage;
-    mediaTypeName = 'audio';
-  }
-  
-  if (!mediaType) {
-    return reply("❌ Quote an audio or video to convert to MP3.");
-  }
+  let mediaType = null, mediaTypeName = null;
+  if (quotedMsg?.videoMessage) { mediaType = quotedMsg.videoMessage; mediaTypeName = 'video'; }
+  else if (quotedMsg?.audioMessage) { mediaType = quotedMsg.audioMessage; mediaTypeName = 'audio'; }
+  if (!mediaType) return reply("❌ Quote an audio or video.");
+
+  const id = Date.now();
+  const tmpDir = os.tmpdir();
+  const inputExt = mediaTypeName === 'video' ? '.mp4' : '.tmp';
+  const inputPath = path.join(tmpDir, `tomp3_in_${id}${inputExt}`);
+  const outputPath = path.join(tmpDir, `tomp3_out_${id}.mp3`);
 
   try {
     const buffer = await downloadMediaBuffer(client, mediaType, mediaTypeName);
+    fs.writeFileSync(inputPath, buffer);
 
-    await client.sendMessage(from, {
-      audio: buffer,
-      mimetype: "audio/mpeg"
-    }, { quoted: mek });
+    execSync(
+      `"${ffmpegPath}" -y -i "${inputPath}" -vn -c:a libmp3lame -q:a 4 "${outputPath}"`,
+      { timeout: 120000, stdio: 'pipe' }
+    );
 
+    const outputBuffer = fs.readFileSync(outputPath);
+    await client.sendMessage(from, { audio: outputBuffer, mimetype: "audio/mpeg" }, { quoted: mek });
   } catch (error) {
     console.error("tomp3 error:", error);
-    await reply("❌ An error occurred while converting the media.");
+    await reply("❌ An error occurred while converting.");
+  } finally {
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
   }
 });
 
 //========================================================================================================================
-// imgsize Command
+// imgsize — Get image dimensions (uses sharp, no ffmpeg needed)
 //========================================================================================================================
+
 keith({
   pattern: "imgsize",
   aliases: ["imagesize", "dimension"],
@@ -371,99 +331,58 @@ keith({
   category: "Utility",
   filename: __filename
 }, async (from, client, conText) => {
-  const { reply, mek, quoted, quotedMsg, keithRandom } = conText;
+  const { reply, quoted, quotedMsg } = conText;
 
-  if (!quotedMsg || !quoted?.imageMessage) {
-    return reply(`📌 Reply to an *image* to get its dimensions.\nExample: .imgsize`);
-  }
+  if (!quotedMsg || !quoted?.imageMessage) return reply("📌 Reply to an *image*.");
 
-  const tempPath = keithRandom('.jpg');
   try {
     const buffer = await downloadMediaBuffer(client, quoted.imageMessage, 'image');
-    fs.writeFileSync(tempPath, buffer);
-
-    await new Promise((resolve, reject) => {
-      exec(`ffmpeg -i ${tempPath} -f null - 2>&1 | grep -oP 'Stream.*Video:.*\\s\\K\\d+x\\d+'`, async (err, stdout) => {
-        try {
-          fs.unlinkSync(tempPath);
-
-          if (err || !stdout) return reject(new Error("Couldn't detect image dimensions"));
-
-          const dimensions = stdout.trim();
-          await reply(`🖼️ Image dimensions: ${dimensions}`);
-
-          resolve();
-        } catch (error) {
-          reject(error);
-        }
-      });
-    });
+    const { width, height } = await sharp(buffer).metadata();
+    await reply(`🖼️ Image dimensions: ${width}×${height}`);
   } catch (err) {
     reply(`❌ Error: ${err.message}`);
   }
 });
 
 //========================================================================================================================
-// resize Command
+// resize — Resize image using sharp
 //========================================================================================================================
+
 keith({
   pattern: "resize",
   aliases: ["imgresize"],
-  description: "Resize quoted image to specified dimensions (e.g., 300×250)",
+  description: "Resize quoted image (e.g., .resize 300×250)",
   category: "Utility",
   filename: __filename
 }, async (from, client, conText) => {
-  const { q, reply, mek, quoted, quotedMsg, keithRandom } = conText;
+  const { q, reply, mek, quoted, quotedMsg } = conText;
 
-  if (!quotedMsg || !quoted?.imageMessage) {
-    return reply(`📌 Reply to an *image* with dimensions like *300×250* to resize it.\nExample: .resize 300×250`);
-  }
+  if (!quotedMsg || !quoted?.imageMessage) return reply("📌 Reply to an *image*.\nExample: .resize 300×250");
+  if (!q || !q.match(/^\d+[x×]\d+$/i)) return reply("📌 Use format: width×height (e.g., 300×250)");
 
-  if (!q || !q.match(/^\d+×\d+$/)) {
-    return reply(`📌 Provide dimensions in format *width×height* (e.g., 300×250)`);
-  }
-
-  const [width, height] = q.split("×").map(Number);
-
-  if (width <= 0 || height <= 0 || width > 5000 || height > 5000) {
-    return reply(`❌ Invalid dimensions. Please use values between 1 and 5000`);
-  }
-
-  const inputPath = keithRandom('.jpg');
-  const outputPath = keithRandom('.jpg');
+  const [width, height] = q.split(/[x×]/i).map(Number);
+  if (width <= 0 || height <= 0 || width > 5000 || height > 5000) return reply("❌ Use values between 1 and 5000.");
 
   try {
     const buffer = await downloadMediaBuffer(client, quoted.imageMessage, 'image');
-    fs.writeFileSync(inputPath, buffer);
+    const resized = await sharp(buffer)
+      .resize(width, height, { fit: 'fill' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
 
-    await new Promise((resolve, reject) => {
-      exec(`ffmpeg -i ${inputPath} -vf "scale=${width}:${height}" ${outputPath}`, async (error) => {
-        try {
-          fs.unlinkSync(inputPath);
-
-          if (error) return reject(new Error(`Error resizing image: ${error.message}`));
-
-          const imageBuffer = fs.readFileSync(outputPath);
-          await client.sendMessage(from, {
-            image: imageBuffer,
-            caption: `Resized to ${width}×${height}`
-          }, { quoted: mek });
-
-          fs.unlinkSync(outputPath);
-          resolve();
-        } catch (err) {
-          reject(err);
-        }
-      });
-    });
+    await client.sendMessage(from, {
+      image: resized,
+      caption: `✅ Resized to ${width}×${height}`
+    }, { quoted: mek });
   } catch (err) {
     reply(`❌ Error: ${err.message}`);
   }
 });
 
 //========================================================================================================================
-// watermark Command
+// watermark — Add text or image watermark using sharp + ffmpeg
 //========================================================================================================================
+
 const namedColors = {
   black: "000000", white: "ffffff", red: "ff0000", blue: "0000ff", green: "00ff00",
   yellow: "ffff00", pink: "ffc0cb", purple: "800080", orange: "ffa500", gray: "808080",
@@ -473,29 +392,29 @@ const namedColors = {
 keith({
   pattern: "watermark",
   aliases: ["wm", "addwatermark"],
-  description: "Add bold slanted watermark to quoted image (text or image watermark)",
+  description: "Add text watermark to quoted image",
   category: "Utility",
   filename: __filename
 }, async (from, client, conText) => {
-  const { q, reply, mek, quoted, quotedMsg, keithRandom } = conText;
+  const { q, reply, mek, quoted, quotedMsg } = conText;
 
   if (!quotedMsg || !quoted?.imageMessage) {
-    return reply(`📌 Reply to an *image* to add watermark.\nExample: .watermark MyBrand |red,60 (text)\nOr reply with an image and caption .watermark to use another quoted image as watermark`);
+    return reply("📌 Reply to an *image*.\nExample: .watermark MyBrand |red,60");
   }
 
-  const baseImageBuffer = await downloadMediaBuffer(client, quoted.imageMessage, 'image');
-  const baseImagePath = keithRandom('.jpg');
-  fs.writeFileSync(baseImagePath, baseImageBuffer);
-  const outputPath = keithRandom('.jpg');
+  const id = Date.now();
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `wm_in_${id}.jpg`);
+  const outputPath = path.join(tmpDir, `wm_out_${id}.jpg`);
 
   try {
-    if (q) {
-      // Text watermark with optional color + size
-      let [textPart, options] = q.split("|");
-      const watermarkText = textPart.trim().length > 20 ? textPart.trim().substring(0, 20) + "..." : textPart.trim();
+    const baseImageBuffer = await downloadMediaBuffer(client, quoted.imageMessage, 'image');
 
-      let fontColor = "white";
-      let fontSize = 48;
+    if (q) {
+      // Text watermark
+      let [textPart, options] = q.split("|");
+      const watermarkText = textPart.trim().substring(0, 20);
+      let fontColor = "white", fontSize = 48;
 
       if (options) {
         const parts = options.split(",").map(p => p.trim().toLowerCase());
@@ -503,250 +422,207 @@ keith({
         if (parts[1]) fontSize = parseInt(parts[1]) || 48;
       }
 
-      await new Promise((resolve, reject) => {
-        exec(`ffmpeg -i ${baseImagePath} -vf "drawtext=text='${watermarkText}':fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf:fontcolor=${fontColor}:fontsize=${fontSize}:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2" ${outputPath}`,
-          async (error) => {
-            try {
-              fs.unlinkSync(baseImagePath);
-              if (error) return reject(new Error(`Error adding text watermark: ${error.message}`));
+      // Use sharp to write base image then ffmpeg for text overlay
+      fs.writeFileSync(inputPath, baseImageBuffer);
 
-              const imageBuffer = fs.readFileSync(outputPath);
-              await client.sendMessage(from, {
-                image: imageBuffer,
-                caption: `Added watermark: "${watermarkText}" (${fontColor}, size ${fontSize})`
-              }, { quoted: mek });
+      execSync(
+        `"${ffmpegPath}" -y -i "${inputPath}" ` +
+        `-vf "drawtext=text='${watermarkText.replace(/'/g, "\\'")}':` +
+        `fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf:` +
+        `fontcolor=${fontColor}:fontsize=${fontSize}:` +
+        `box=1:boxcolor=black@0.5:boxborderw=5:` +
+        `x=(w-text_w)/2:y=(h-text_h)/2" "${outputPath}"`,
+        { timeout: 60000, stdio: 'pipe' }
+      );
 
-              fs.unlinkSync(outputPath);
-              resolve();
-            } catch (err) {
-              reject(err);
-            }
-          });
-      });
+      const imageBuffer = fs.readFileSync(outputPath);
+      await client.sendMessage(from, {
+        image: imageBuffer,
+        caption: `✅ Watermark: "${watermarkText}" (${fontColor}, size ${fontSize})`
+      }, { quoted: mek });
+
     } else {
-      // Image watermark
-      if (!quotedMsg.quoted || !quotedMsg.quoted.imageMessage) {
-        return reply(`📌 For image watermark, reply to the main image and quote another image as watermark.`);
+      // Image watermark: overlay using sharp composite
+      if (!quotedMsg.quoted?.imageMessage) {
+        return reply("📌 For image watermark, quote the main image and attach a watermark image.");
       }
 
-      const watermarkBuffer = await downloadMediaBuffer(client, quotedMsg.quoted.imageMessage, 'image');
-      const watermarkPath = keithRandom('.png');
-      fs.writeFileSync(watermarkPath, watermarkBuffer);
-      const tempWatermarkPath = keithRandom('.png');
+      const wmBuffer = await downloadMediaBuffer(client, quotedMsg.quoted.imageMessage, 'image');
+      const { width, height } = await sharp(baseImageBuffer).metadata();
 
-      await new Promise((resolve, reject) => {
-        exec(`ffmpeg -i ${baseImagePath} -f null - 2>&1 | grep -oP 'Stream.*Video:.*\\s\\K\\d+x\\d+'`, (err, stdout) => {
-          if (err) return reject(new Error("Couldn't get base image dimensions"));
+      const wmResized = await sharp(wmBuffer)
+        .resize(Math.floor(width / 4), Math.floor(height / 4))
+        .toBuffer();
 
-          const [width, height] = stdout.trim().split('x').map(Number);
-          const wmWidth = Math.floor(width / 4);
-          const wmHeight = Math.floor(height / 4);
+      const composited = await sharp(baseImageBuffer)
+        .composite([{ input: wmResized, gravity: 'southeast' }])
+        .jpeg({ quality: 90 })
+        .toBuffer();
 
-          exec(`ffmpeg -i ${watermarkPath} -vf "scale=${wmWidth}:${wmHeight}" ${tempWatermarkPath}`, (err) => {
-            if (err) return reject(new Error("Couldn't resize watermark image"));
-            resolve();
-          });
-        });
-      });
-
-      await new Promise((resolve, reject) => {
-        exec(`ffmpeg -i ${baseImagePath} -i ${tempWatermarkPath} -filter_complex "overlay=W-w-10:H-h-10" ${outputPath}`,
-          async (error) => {
-            try {
-              fs.unlinkSync(baseImagePath);
-              fs.unlinkSync(watermarkPath);
-              fs.unlinkSync(tempWatermarkPath);
-
-              if (error) return reject(new Error(`Error adding image watermark: ${error.message}`));
-
-              const imageBuffer = fs.readFileSync(outputPath);
-              await client.sendMessage(from, {
-                image: imageBuffer,
-                caption: `Added image watermark (bottom-right corner)`
-              }, { quoted: mek });
-
-              fs.unlinkSync(outputPath);
-              resolve();
-            } catch (err) {
-              reject(err);
-            }
-          });
-      });
+      await client.sendMessage(from, {
+        image: composited,
+        caption: "✅ Image watermark added (bottom-right)"
+      }, { quoted: mek });
     }
   } catch (err) {
     reply(`❌ Error: ${err.message}`);
+  } finally {
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
   }
 });
 
 //========================================================================================================================
-// trim Command
+// trim — Trim audio or video
 //========================================================================================================================
+
 keith({
   pattern: "trim",
-  description: "Trim quoted audio or video using start and end time",
+  description: "Trim quoted audio or video (e.g., .trim 0:10 0:30)",
   category: "Utility",
   filename: __filename
 }, async (from, client, conText) => {
-  const { quotedMsg, q, mek, reply, keithRandom } = conText;
+  const { quotedMsg, q, mek, reply } = conText;
 
-  if (!quotedMsg) {
-    return reply("❌ Reply to an audio or video file with start and end time.\n\nExample: `trim 0:10 0:30`");
-  }
+  if (!quotedMsg) return reply("❌ Reply to an audio or video.\nExample: .trim 0:10 0:30");
 
-  const [startTime, endTime] = q.split(" ").map(t => t.trim());
-  if (!startTime || !endTime) {
-    return reply("⚠️ Invalid format.\n\nExample: `trim 0:10 0:30`");
-  }
+  const parts = (q || '').split(" ").map(t => t.trim()).filter(Boolean);
+  if (parts.length < 2) return reply("⚠️ Invalid format.\nExample: .trim 0:10 0:30");
+  const [startTime, endTime] = parts;
 
-  let mediaType = null;
-  let mediaTypeName = null;
-  
-  if (quotedMsg.audioMessage) {
-    mediaType = quotedMsg.audioMessage;
-    mediaTypeName = 'audio';
-  } else if (quotedMsg.videoMessage) {
-    mediaType = quotedMsg.videoMessage;
-    mediaTypeName = 'video';
-  }
-  
-  if (!mediaType) {
-    return reply("❌ Unsupported media type. Quote an audio or video file.");
-  }
+  let mediaType = null, mediaTypeName = null;
+  if (quotedMsg.audioMessage) { mediaType = quotedMsg.audioMessage; mediaTypeName = 'audio'; }
+  else if (quotedMsg.videoMessage) { mediaType = quotedMsg.videoMessage; mediaTypeName = 'video'; }
+  if (!mediaType) return reply("❌ Unsupported media type.");
+
+  const isAudio = mediaTypeName === 'audio';
+  const ext = isAudio ? '.mp3' : '.mp4';
+  const id = Date.now();
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `trim_in_${id}${ext}`);
+  const outputPath = path.join(tmpDir, `trim_out_${id}${ext}`);
 
   try {
     const buffer = await downloadMediaBuffer(client, mediaType, mediaTypeName);
-    const mediaPath = keithRandom(mediaTypeName === 'audio' ? '.mp3' : '.mp4');
-    fs.writeFileSync(mediaPath, buffer);
-    
-    const isAudio = !!quotedMsg.audioMessage;
-    const outputExt = isAudio ? ".mp3" : ".mp4";
-    const outputPath = keithRandom(outputExt);
+    fs.writeFileSync(inputPath, buffer);
 
-    exec(`ffmpeg -i ${mediaPath} -ss ${startTime} -to ${endTime} -c copy ${outputPath}`, async (err) => {
-      fs.unlinkSync(mediaPath);
-      if (err) {
-        console.error("ffmpeg error:", err);
-        return reply("❌ Trimming failed.");
-      }
+    execSync(
+      `"${ffmpegPath}" -y -i "${inputPath}" -ss ${startTime} -to ${endTime} -c copy "${outputPath}"`,
+      { timeout: 120000, stdio: 'pipe' }
+    );
 
-      const outputBuffer = fs.readFileSync(outputPath);
-      const message = isAudio
-        ? { audio: outputBuffer, mimetype: "audio/mpeg" }
-        : { video: outputBuffer, mimetype: "video/mp4" };
+    const outputBuffer = fs.readFileSync(outputPath);
+    const message = isAudio
+      ? { audio: outputBuffer, mimetype: "audio/mpeg" }
+      : { video: outputBuffer, mimetype: "video/mp4" };
 
-      await client.sendMessage(from, message, { quoted: mek });
-      fs.unlinkSync(outputPath);
-    });
+    await client.sendMessage(from, message, { quoted: mek });
   } catch (error) {
     console.error("trim error:", error);
-    await reply("❌ An error occurred while processing the media.");
+    await reply("❌ Trimming failed.");
+  } finally {
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
   }
 });
 
 //========================================================================================================================
-// volume Command
+// volume — Adjust volume of audio or video
 //========================================================================================================================
+
 keith({
   pattern: "volume",
-  description: "Adjust volume of quoted audio or video",
+  description: "Adjust volume of quoted audio or video (e.g., .volume 1.5)",
   category: "Utility",
   filename: __filename
 }, async (from, client, conText) => {
-  const { quotedMsg, q, mek, reply, keithRandom } = conText;
+  const { quotedMsg, q, mek, reply } = conText;
 
-  if (!q) {
-    return reply("⚠️ Example: volume 1.5");
-  }
+  if (!q) return reply("⚠️ Example: .volume 1.5");
 
-  let mediaType = null;
-  let mediaTypeName = null;
-  
-  if (quotedMsg?.audioMessage) {
-    mediaType = quotedMsg.audioMessage;
-    mediaTypeName = 'audio';
-  } else if (quotedMsg?.videoMessage) {
-    mediaType = quotedMsg.videoMessage;
-    mediaTypeName = 'video';
-  }
-  
-  if (!mediaType) {
-    return reply("❌ Quote an audio or video file to adjust its volume.");
-  }
+  let mediaType = null, mediaTypeName = null;
+  if (quotedMsg?.audioMessage) { mediaType = quotedMsg.audioMessage; mediaTypeName = 'audio'; }
+  else if (quotedMsg?.videoMessage) { mediaType = quotedMsg.videoMessage; mediaTypeName = 'video'; }
+  if (!mediaType) return reply("❌ Quote an audio or video.");
+
+  const isAudio = mediaTypeName === 'audio';
+  const ext = isAudio ? '.mp3' : '.mp4';
+  const id = Date.now();
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `vol_in_${id}${ext}`);
+  const outputPath = path.join(tmpDir, `vol_out_${id}${ext}`);
 
   try {
     const buffer = await downloadMediaBuffer(client, mediaType, mediaTypeName);
-    const mediaPath = keithRandom(mediaTypeName === 'audio' ? '.mp3' : '.mp4');
-    fs.writeFileSync(mediaPath, buffer);
-    
-    const isAudio = !!quotedMsg.audioMessage;
-    const outputExt = isAudio ? ".mp3" : ".mp4";
-    const outputPath = keithRandom(outputExt);
+    fs.writeFileSync(inputPath, buffer);
 
-    exec(`ffmpeg -i ${mediaPath} -filter:a volume=${q} ${outputPath}`, async (err) => {
-      fs.unlinkSync(mediaPath);
-      if (err) {
-        console.error("ffmpeg error:", err);
-        return reply("❌ Volume adjustment failed.");
-      }
+    execSync(
+      `"${ffmpegPath}" -y -i "${inputPath}" -filter:a "volume=${q}" "${outputPath}"`,
+      { timeout: 120000, stdio: 'pipe' }
+    );
 
-      const outputBuffer = fs.readFileSync(outputPath);
-      const message = isAudio
-        ? { audio: outputBuffer, mimetype: "audio/mpeg" }
-        : { video: outputBuffer, mimetype: "video/mp4" };
+    const outputBuffer = fs.readFileSync(outputPath);
+    const message = isAudio
+      ? { audio: outputBuffer, mimetype: "audio/mpeg" }
+      : { video: outputBuffer, mimetype: "video/mp4" };
 
-      await client.sendMessage(from, message, { quoted: mek });
-      fs.unlinkSync(outputPath);
-    });
+    await client.sendMessage(from, message, { quoted: mek });
   } catch (error) {
     console.error("volume error:", error);
-    await reply("❌ An error occurred while processing the media.");
+    await reply("❌ Volume adjustment failed.");
+  } finally {
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
   }
 });
 
 //========================================================================================================================
-// toaudio Command
+// toaudio — Send video/audio as audio/mpeg
 //========================================================================================================================
+
 keith({
   pattern: "toaudio",
-  aliases: ["audioextract"],
-  description: "Convert quoted audio or video to MP3",
+  description: "Extract audio from quoted video or resend audio",
   category: "Converter",
   filename: __filename
 }, async (from, client, conText) => {
   const { quotedMsg, mek, reply } = conText;
 
-  let mediaType = null;
-  let mediaTypeName = null;
-  
-  if (quotedMsg?.videoMessage) {
-    mediaType = quotedMsg.videoMessage;
-    mediaTypeName = 'video';
-  } else if (quotedMsg?.audioMessage) {
-    mediaType = quotedMsg.audioMessage;
-    mediaTypeName = 'audio';
-  }
-  
-  if (!mediaType) {
-    return reply("❌ Quote an audio or video to convert to MP3.");
-  }
+  let mediaType = null, mediaTypeName = null;
+  if (quotedMsg?.videoMessage) { mediaType = quotedMsg.videoMessage; mediaTypeName = 'video'; }
+  else if (quotedMsg?.audioMessage) { mediaType = quotedMsg.audioMessage; mediaTypeName = 'audio'; }
+  if (!mediaType) return reply("❌ Quote an audio or video.");
+
+  const id = Date.now();
+  const tmpDir = os.tmpdir();
+  const inputExt = mediaTypeName === 'video' ? '.mp4' : '.tmp';
+  const inputPath = path.join(tmpDir, `toaudio_in_${id}${inputExt}`);
+  const outputPath = path.join(tmpDir, `toaudio_out_${id}.mp3`);
 
   try {
     const buffer = await downloadMediaBuffer(client, mediaType, mediaTypeName);
+    fs.writeFileSync(inputPath, buffer);
 
-    await client.sendMessage(from, {
-      audio: buffer,
-      mimetype: "audio/mpeg"
-    }, { quoted: mek });
+    execSync(
+      `"${ffmpegPath}" -y -i "${inputPath}" -vn -c:a libmp3lame -q:a 4 "${outputPath}"`,
+      { timeout: 120000, stdio: 'pipe' }
+    );
 
+    const outputBuffer = fs.readFileSync(outputPath);
+    await client.sendMessage(from, { audio: outputBuffer, mimetype: "audio/mpeg" }, { quoted: mek });
   } catch (error) {
     console.error("toaudio error:", error);
-    await reply("❌ An error occurred while converting the media.");
+    await reply("❌ An error occurred while extracting audio.");
+  } finally {
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
   }
 });
 
 //========================================================================================================================
-// toimg Command
+// toimg — Convert sticker to image/video using sharp
 //========================================================================================================================
+
 keith({
   pattern: "toimg",
   aliases: ["sticker2img", "webp2png"],
@@ -756,27 +632,51 @@ keith({
 }, async (from, client, conText) => {
   const { quotedMsg, mek, reply } = conText;
 
-  if (!quotedMsg?.stickerMessage) {
-    return reply("❌ Quote a sticker to convert.");
-  }
+  if (!quotedMsg?.stickerMessage) return reply("❌ Quote a sticker to convert.");
 
   try {
     const buffer = await downloadMediaBuffer(client, quotedMsg.stickerMessage, 'sticker');
     const isAnimated = quotedMsg.stickerMessage.isAnimated || quotedMsg.stickerMessage.isAnimatedSticker;
 
     if (isAnimated) {
+      // Extract frames with sharp, rebuild as mp4 with ffmpeg-static
+      const metadata = await sharp(buffer, { animated: true }).metadata();
+      const pages = metadata.pages || 1;
+
+      const id = Date.now();
+      const tmpDir = os.tmpdir();
+      const framesDir = path.join(tmpDir, `frames_${id}`);
+      const outputPath = path.join(tmpDir, `toimg_out_${id}.mp4`);
+      fs.mkdirSync(framesDir, { recursive: true });
+
+      for (let i = 0; i < pages; i++) {
+        const frameBuf = await sharp(buffer, { animated: false, page: i }).png().toBuffer();
+        fs.writeFileSync(path.join(framesDir, `frame_${String(i).padStart(4, '0')}.png`), frameBuf);
+      }
+
+      execSync(
+        `"${ffmpegPath}" -y -framerate 15 -i "${framesDir}/frame_%04d.png" ` +
+        `-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -pix_fmt yuv420p -movflags faststart "${outputPath}"`,
+        { timeout: 60000, stdio: 'pipe' }
+      );
+
+      const videoBuffer = fs.readFileSync(outputPath);
       await client.sendMessage(from, {
-        video: buffer,
+        video: videoBuffer,
         mimetype: "video/mp4",
         caption: "🎞️ Converted from animated sticker"
       }, { quoted: mek });
+
+      try { fs.rmSync(framesDir, { recursive: true, force: true }); } catch {}
+      try { fs.unlinkSync(outputPath); } catch {}
     } else {
+      // Static sticker → PNG via sharp
+      const pngBuffer = await sharp(buffer).png().toBuffer();
       await client.sendMessage(from, {
-        image: buffer,
+        image: pngBuffer,
         caption: "🖼️ Converted from sticker"
       }, { quoted: mek });
     }
-
   } catch (e) {
     console.error("toimg error:", e);
     await reply("❌ Unable to convert the sticker. " + e.message);
@@ -784,8 +684,9 @@ keith({
 });
 
 //========================================================================================================================
-// amplify Command
+// amplify — Replace video audio with audio from URL
 //========================================================================================================================
+
 keith({
   pattern: "amplify",
   aliases: ["replaceaudio", "mergeaudio"],
@@ -793,52 +694,43 @@ keith({
   category: "Utility",
   filename: __filename
 }, async (from, client, conText) => {
-  const { quotedMsg, q, mek, reply, keithRandom } = conText;
+  const { quotedMsg, q, mek, reply } = conText;
 
-  if (!quotedMsg?.videoMessage) {
-    return reply("❌ Reply to a video file with the audio URL to replace its audio.");
-  }
+  if (!quotedMsg?.videoMessage) return reply("❌ Reply to a video file with an audio URL.");
+  if (!q) return reply("❌ Provide an audio URL.");
 
-  if (!q) {
-    return reply("❌ Provide an audio URL.");
-  }
+  const id = Date.now();
+  const tmpDir = os.tmpdir();
+  const videoPath = path.join(tmpDir, `amp_vid_${id}.mp4`);
+  const ext = (q.trim().split('.').pop().split('?')[0].toLowerCase()) || 'mp3';
+  const audioPath = path.join(tmpDir, `amp_audio_${id}.${ext}`);
+  const outputPath = path.join(tmpDir, `amp_out_${id}.mp4`);
 
   try {
-    const audioUrl = q.trim();
     const videoBuffer = await downloadMediaBuffer(client, quotedMsg.videoMessage, 'video');
-    const videoPath = keithRandom('.mp4');
     fs.writeFileSync(videoPath, videoBuffer);
 
-    const ext = audioUrl.split('.').pop().split('?')[0].toLowerCase();
-    const audioPath = keithRandom(`.${ext}`);
-    const outputPath = keithRandom(".mp4");
+    const response = await axios.get(q.trim(), { responseType: 'arraybuffer', timeout: 60000 });
+    fs.writeFileSync(audioPath, Buffer.from(response.data));
 
-    const response = await axios.get(audioUrl, { responseType: 'arraybuffer' });
-    fs.writeFileSync(audioPath, response.data);
+    execSync(
+      `"${ffmpegPath}" -y -i "${videoPath}" -i "${audioPath}" ` +
+      `-c:v copy -map 0:v:0 -map 1:a:0 -shortest "${outputPath}"`,
+      { timeout: 120000, stdio: 'pipe' }
+    );
 
-    exec(`ffmpeg -i ${videoPath} -i ${audioPath} -c:v copy -map 0:v:0 -map 1:a:0 -shortest ${outputPath}`, async (err) => {
-      fs.unlinkSync(videoPath);
-      fs.unlinkSync(audioPath);
-      if (err) {
-        console.error("ffmpeg error:", err);
-        return reply("❌ Error during audio replacement.");
-      }
+    const videoBufferOut = fs.readFileSync(outputPath);
+    await client.sendMessage(from, {
+      video: videoBufferOut,
+      mimetype: "video/mp4"
+    }, { quoted: mek });
 
-      const videoBufferOut = fs.readFileSync(outputPath);
-      await client.sendMessage(from, {
-        video: videoBufferOut,
-        mimetype: "video/mp4"
-      }, { quoted: mek });
-
-      fs.unlinkSync(outputPath);
-    });
   } catch (error) {
     console.error("amplify error:", error);
     await reply("❌ An error occurred while processing the media.");
+  } finally {
+    try { fs.unlinkSync(videoPath); } catch {}
+    try { fs.unlinkSync(audioPath); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
   }
 });
-
-
-//========================================================================================================================
-// toimg Command
-
