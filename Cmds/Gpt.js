@@ -330,7 +330,7 @@ Reply to an image with: .deepedit remove the person
     let tempFilePath = null;
 
     try {
-        await reply(`🖼️ Processing image with AI...\n📝 Prompt: ${q}`);
+    //    await reply(`🖼️ Processing image with AI...\n📝 Prompt: ${q}`);
 
         tempFilePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
         const buffer = fs.readFileSync(tempFilePath);
@@ -348,7 +348,7 @@ Reply to an image with: .deepedit remove the person
 
         await client.sendMessage(from, {
             image: result.buffer,
-            caption: `✅ *Image Edited!*\n📝 *Prompt:* ${q}\n🆔 *ID:* ${result.id || 'N/A'}`
+          //  caption: `✅ *Image Edited!*\n📝 *Prompt:* ${q}\n🆔 *ID:* ${result.id || 'N/A'}`
         }, { quoted: mek });
 
     } catch (err) {
@@ -379,7 +379,7 @@ keith({
   }
 
   try {
-    await reply("🔄 Processing image...");
+ //   await reply("🔄 Processing image...");
     
     const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
     const buffer = fs.readFileSync(filePath);
@@ -396,7 +396,7 @@ keith({
     
     await client.sendMessage(from, {
       image: { url: result },
-      caption: `🖼️ AI Processed Image\n📝 Prompt: ${prompt}`
+     // caption: `🖼️ AI Processed Image\n📝 Prompt: ${prompt}`
     }, { quoted: mek });
 
   } catch (error) {
