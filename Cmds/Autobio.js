@@ -454,7 +454,93 @@ async function uploadToPone(filePath) {
     throw new Error("Pone.rs upload failed: " + JSON.stringify(data));
   }
 }
+// Add this after your other upload functions
+// ==================== Kappa.lol Upload Function ====================
+async function uploadToKappa(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
 
+  const form = new FormData();
+  form.append("file", fs.createReadStream(filePath), {
+    filename: path.basename(filePath)
+  });
+
+  const { data } = await axios.post('https://kappa.lol/api/upload', form, {
+    headers: {
+      ...form.getHeaders(),
+      "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36",
+      "Accept": "*/*",
+      "Origin": "https://kappa.lol",
+      "Referer": "https://kappa.lol/"
+    },
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity
+  });
+
+  // Handle case where response might be a string
+  const parsedData = typeof data === "string" ? JSON.parse(data) : data;
+  
+  if (parsedData?.link) {
+    return parsedData.link;
+  } else {
+    throw new Error("Kappa.lol upload failed: " + JSON.stringify(parsedData));
+  }
+}
+
+// ==================== Kappa.lol Command ====================
+keith({
+  pattern: "kappa",
+  aliases: ["kappalol", "kappaupload"],
+  description: "Upload quoted media to Kappa.lol",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type === "unknown") return reply("❌ Unsupported media type.");
+
+  let mediaNode;
+  let mimetype = '';
+  
+  if (type === "image") {
+    mediaNode = quotedMsg.imageMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "video") {
+    mediaNode = quotedMsg.videoMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "audio") {
+    mediaNode = quotedMsg.audioMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "sticker") {
+    mediaNode = quotedMsg.stickerMessage;
+    mimetype = mediaNode.mimetype || 'image/webp';
+  }
+  else if (type === "document") {
+    mediaNode = quotedMsg.documentMessage;
+    mimetype = mediaNode.mimetype;
+  }
+
+  if (!mediaNode) return reply("❌ Could not extract media content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type, mimetype);
+    const link = await uploadToKappa(filePath);
+    await reply(link); // Only returns the URL
+  } catch (err) {
+    console.error("Kappa.lol upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && await fs.pathExists(filePath)) {
+      try { await fs.unlink(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
 // ==================== Pone.rs Command ====================
 keith({
   pattern: "pone",
