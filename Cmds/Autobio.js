@@ -426,6 +426,90 @@ async function uploadToFreeImageHost(filePath) {
 }
 
 //========================================================================================================================
+// Add this after your other upload functions
+// ==================== Pone.rs Upload Function ====================
+async function uploadToPone(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error("File does not exist");
+
+  const form = new FormData();
+  form.append("files[]", fs.createReadStream(filePath), {
+    filename: path.basename(filePath)
+  });
+
+  const { data } = await axios.post('https://pone.rs/upload.php', form, {
+    headers: {
+      ...form.getHeaders(),
+      "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36",
+      "accept": "*/*",
+      "origin": "https://pone.rs",
+      "referer": "https://pone.rs/"
+    },
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity
+  });
+
+  if (data?.success && data?.files?.[0]?.url) {
+    return data.files[0].url.replaceAll("\\/", "/");
+  } else {
+    throw new Error("Pone.rs upload failed: " + JSON.stringify(data));
+  }
+}
+
+// ==================== Pone.rs Command ====================
+keith({
+  pattern: "pone",
+  aliases: ["poners", "poneupload"],
+  description: "Upload quoted media to Pone.rs",
+  category: "Uploader",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Please quote an image, video, audio, sticker, or document to upload.");
+
+  const type = getMediaType(quotedMsg);
+  if (type === "unknown") return reply("❌ Unsupported media type.");
+
+  let mediaNode;
+  let mimetype = '';
+  
+  if (type === "image") {
+    mediaNode = quotedMsg.imageMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "video") {
+    mediaNode = quotedMsg.videoMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "audio") {
+    mediaNode = quotedMsg.audioMessage;
+    mimetype = mediaNode.mimetype;
+  }
+  else if (type === "sticker") {
+    mediaNode = quotedMsg.stickerMessage;
+    mimetype = mediaNode.mimetype || 'image/webp';
+  }
+  else if (type === "document") {
+    mediaNode = quotedMsg.documentMessage;
+    mimetype = mediaNode.mimetype;
+  }
+
+  if (!mediaNode) return reply("❌ Could not extract media content.");
+
+  let filePath;
+  try {
+    filePath = await saveMediaToTemp(client, mediaNode, type, mimetype);
+    const link = await uploadToPone(filePath);
+    await reply(link); // Only returns the URL
+  } catch (err) {
+    console.error("Pone.rs upload error:", err);
+    await reply("❌ Failed to upload. Error:\n" + err.message);
+  } finally {
+    if (filePath && await fs.pathExists(filePath)) {
+      try { await fs.unlink(filePath); } catch (e) { console.error("unlink error:", e); }
+    }
+  }
+});
 // Commands
 //========================================================================================================================
 
