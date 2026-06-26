@@ -132,7 +132,7 @@ keith({
 keith({
   pattern: "disappearing",
   aliases: ["updatedisappearing", "ephemeral"],
-  category: "Owner",
+  category: "Privacy",
   description: "Update your WhatsApp default disappearing messages duration"
 },
 async (from, client, conText) => {
@@ -177,7 +177,7 @@ async (from, client, conText) => {
 keith({
   pattern: "groupprivacy",
   aliases: ["updategroupprivacy"],
-  category: "Owner",
+  category: "Privacy",
   description: "Update your WhatsApp Group Add privacy setting"
 },
 async (from, client, conText) => {
@@ -214,7 +214,7 @@ async (from, client, conText) => {
 keith({
   pattern: "readreceipts",
   aliases: ["updatereadreceipts"],
-  category: "Owner",
+  category: "Privacy",
   description: "Update your WhatsApp Read Receipts privacy setting"
 },
 async (from, client, conText) => {
@@ -251,7 +251,7 @@ async (from, client, conText) => {
 keith({
   pattern: "statusprivacy",
   aliases: ["updatestatusprivacy"],
-  category: "Owner",
+  category: "Privacy",
   description: "Update your WhatsApp Status privacy setting"
 },
 async (from, client, conText) => {
@@ -289,7 +289,7 @@ async (from, client, conText) => {
 keith({
   pattern: "profileprivacy",
   aliases: ["updateprofileprivacy"],
-  category: "Owner",
+  category: "Privacy",
   description: "Update your WhatsApp Profile Picture privacy setting"
 },
 async (from, client, conText) => {
@@ -326,7 +326,7 @@ async (from, client, conText) => {
 keith({
   pattern: "updateonline",
   aliases: ["online"],
-  category: "Owner",
+  category: "Privacy",
   description: "Update your WhatsApp Online privacy setting"
 },
 async (from, client, conText) => {
@@ -363,7 +363,7 @@ async (from, client, conText) => {
 keith({
   pattern: "lastseen",
   aliases: ["updatelastseen"],
-  category: "Owner",
+  category: "Privacy",
   description: "Update your WhatsApp Last Seen privacy setting"
 },
 async (from, client, conText) => {
@@ -399,7 +399,7 @@ async (from, client, conText) => {
 keith({
   pattern: "privacy",
   aliases: ["fetchprivacy", "ownersettings"],
-  category: "Owner",
+  category: "Privacy",
   description: "Show your WhatsApp privacy settings"
 },
 async (from, client, conText) => {
@@ -441,7 +441,7 @@ async (from, client, conText) => {
 
 keith({
   pattern: "blocklist",
-  category: "Owner",
+  category: "Privacy",
   aliases: ["listblock", "blacklist"],
   description: "Show list of blocked members and allow unblock by reply"
 },
