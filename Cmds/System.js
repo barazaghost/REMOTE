@@ -272,8 +272,6 @@ keith({
   }
 });
 //========================================================================================================================
-
-
 keith({
   pattern: "restart",
   aliases: ["reboot", "startbot"],
@@ -288,12 +286,36 @@ keith({
   }
 
   try {
-    await reply("*Restarting...*");
+    await reply("♻️ *Restarting bot...*");
 
-    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-    await sleep(3000);
+    // Give the reply time to send before restarting
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
-    process.exit(0);
+    // Try pm2 programmatic restart first (works in Docker, Heroku, local pm2)
+    try {
+      const pm2 = require('pm2');
+      pm2.connect((connectErr) => {
+        if (connectErr) {
+          // pm2 connect failed — fall back to process.exit so pm2-runtime respawns it
+          console.error('pm2 connect error, falling back to process.exit:', connectErr.message);
+          process.exit(0);
+          return;
+        }
+        // Restart the current process by its pm2 id or name
+        pm2.restart(process.env.name || 'index', (restartErr) => {
+          pm2.disconnect();
+          if (restartErr) {
+            console.error('pm2 restart error, falling back to process.exit:', restartErr.message);
+            process.exit(0);
+          }
+        });
+      });
+    } catch (pm2Err) {
+      // pm2 module not available — just exit and let the process manager (pm2-runtime / Docker) respawn
+      console.error('pm2 require failed, falling back to process.exit:', pm2Err.message);
+      process.exit(0);
+    }
+
   } catch (err) {
     console.error("Restart error:", err);
     reply("❌ Failed to restart. Check logs for details.");
