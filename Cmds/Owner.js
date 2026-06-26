@@ -850,7 +850,7 @@ keith({
 
 // From Owner.js
 
-keith({
+/*keith({
   pattern: "save",
   aliases: ["savestatus", "statussave"],
   description: "Retrieve quoted media (image, video, audio)",
@@ -898,10 +898,165 @@ keith({
     console.error("save command error:", err);
     reply("❌ Failed to retrieve media. Try again.");
   }
-});
+});*/
 //========================================================================================================================
 //========================================================================================================================
 
+keith({
+  pattern: "save",
+  aliases: ["savestatus", "statussave"],
+  description: "Retrieve quoted media (image, video, audio) including group status",
+  category: "Owner",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, quoted, quotedMsg, reply } = conText;
+
+  if (!quotedMsg) return reply("📌 Reply to a status message to save.");
+
+  try {
+    // Check for direct media messages
+    if (quoted?.imageMessage) {
+      const caption = quoted.imageMessage.caption || "";
+      const buffer = await downloadMediaMessage(
+        { message: { imageMessage: quoted.imageMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(from, { image: buffer, caption }, { quoted: mek });
+      return;
+    }
+
+    if (quoted?.videoMessage) {
+      const caption = quoted.videoMessage.caption || "";
+      const buffer = await downloadMediaMessage(
+        { message: { videoMessage: quoted.videoMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(from, { video: buffer, caption }, { quoted: mek });
+      return;
+    }
+
+    if (quoted?.audioMessage) {
+      const buffer = await downloadMediaMessage(
+        { message: { audioMessage: quoted.audioMessage } },
+        'buffer',
+        {},
+        { reuploadRequest: client.updateMediaMessage, logger: console }
+      );
+      await client.sendMessage(from, { audio: buffer, mimetype: 'audio/mpeg' }, { quoted: mek });
+      return;
+    }
+
+    // Check for groupStatusMessageV2 (status messages with media)
+    if (quoted?.groupStatusMessageV2?.message) {
+      const statusMsg = quoted.groupStatusMessageV2.message;
+      
+      // Check for video in status
+      if (statusMsg.videoMessage) {
+        const caption = statusMsg.videoMessage.caption || "";
+        const buffer = await downloadMediaMessage(
+          { message: { videoMessage: statusMsg.videoMessage } },
+          'buffer',
+          {},
+          { reuploadRequest: client.updateMediaMessage, logger: console }
+        );
+        await client.sendMessage(from, { video: buffer, caption }, { quoted: mek });
+        return;
+      }
+      
+      // Check for image in status
+      if (statusMsg.imageMessage) {
+        const caption = statusMsg.imageMessage.caption || "";
+        const buffer = await downloadMediaMessage(
+          { message: { imageMessage: statusMsg.imageMessage } },
+          'buffer',
+          {},
+          { reuploadRequest: client.updateMediaMessage, logger: console }
+        );
+        await client.sendMessage(from, { image: buffer, caption }, { quoted: mek });
+        return;
+      }
+      
+      // Check for audio in status
+      if (statusMsg.audioMessage) {
+        const buffer = await downloadMediaMessage(
+          { message: { audioMessage: statusMsg.audioMessage } },
+          'buffer',
+          {},
+          { reuploadRequest: client.updateMediaMessage, logger: console }
+        );
+        await client.sendMessage(from, { audio: buffer, mimetype: 'audio/mpeg' }, { quoted: mek });
+        return;
+      }
+      
+      // Check for document in status
+      if (statusMsg.documentMessage) {
+        const buffer = await downloadMediaMessage(
+          { message: { documentMessage: statusMsg.documentMessage } },
+          'buffer',
+          {},
+          { reuploadRequest: client.updateMediaMessage, logger: console }
+        );
+        await client.sendMessage(from, { 
+          document: buffer, 
+          fileName: statusMsg.documentMessage.fileName || 'document',
+          mimetype: statusMsg.documentMessage.mimetype 
+        }, { quoted: mek });
+        return;
+      }
+    }
+
+    // Check for nested message in status (some versions wrap it differently)
+    if (quoted?.groupStatusMessageV2?.message?.message) {
+      const innerMsg = quoted.groupStatusMessageV2.message.message;
+      
+      if (innerMsg.videoMessage) {
+        const caption = innerMsg.videoMessage.caption || "";
+        const buffer = await downloadMediaMessage(
+          { message: { videoMessage: innerMsg.videoMessage } },
+          'buffer',
+          {},
+          { reuploadRequest: client.updateMediaMessage, logger: console }
+        );
+        await client.sendMessage(from, { video: buffer, caption }, { quoted: mek });
+        return;
+      }
+      
+      if (innerMsg.imageMessage) {
+        const caption = innerMsg.imageMessage.caption || "";
+        const buffer = await downloadMediaMessage(
+          { message: { imageMessage: innerMsg.imageMessage } },
+          'buffer',
+          {},
+          { reuploadRequest: client.updateMediaMessage, logger: console }
+        );
+        await client.sendMessage(from, { image: buffer, caption }, { quoted: mek });
+        return;
+      }
+      
+      if (innerMsg.audioMessage) {
+        const buffer = await downloadMediaMessage(
+          { message: { audioMessage: innerMsg.audioMessage } },
+          'buffer',
+          {},
+          { reuploadRequest: client.updateMediaMessage, logger: console }
+        );
+        await client.sendMessage(from, { audio: buffer, mimetype: 'audio/mpeg' }, { quoted: mek });
+        return;
+      }
+    }
+
+    // If no media found
+    reply("❌ No media found in the quoted message.");
+
+  } catch (err) {
+    console.error("save command error:", err);
+    reply("❌ Failed to retrieve media. Try again.");
+  }
+});
 //========================================================================================================================
 //========================================================================================================================
 
