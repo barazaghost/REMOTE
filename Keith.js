@@ -2849,9 +2849,47 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
             try {
                 KeithLogger.info(`Executing command: ${cmd} from ${pushName} (${sender})`);
 
-                const reply = (teks) => {
-                    client.sendMessage(from, { text: teks }, { quoted: ms });
-                };
+    //========================================================================================================================
+//========================================================================================================================
+
+
+                
+                
+
+                
+                const reply = (teks, options = {}) => {
+    const { asContact, displayName, contactNumber } = options;
+    
+    if (asContact && displayName && contactNumber) {
+        // Send as contact message
+        const contactMsg = {
+            key: { 
+                fromMe: false, 
+                participant: "0@s.whatsapp.net", 
+                remoteJid: "status@broadcast" 
+            },
+            message: {
+                contactMessage: {
+                    displayName: displayName,
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;${displayName};;;;\nFN:${displayName}\nitem1.TEL;waid=${contactNumber}:${contactNumber}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`,
+                },
+            },
+        };
+        
+        return client.sendMessage(from, { 
+            text: teks 
+        }, { 
+            quoted: contactMsg 
+        });
+    }
+    
+    // Default: send as normal text
+    return client.sendMessage(from, { text: teks }, { quoted: ms });
+};
+
+                //========================================================================================================================
+//========================================================================================================================
+
 
                 const react = async (emoji) => {
                     if (typeof emoji !== 'string') return;
@@ -2867,6 +2905,11 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
                     }
                 };
 
+
+                //========================================================================================================================
+//========================================================================================================================
+
+
                 const edit = async (text, message) => {
                     if (typeof text !== 'string') return;
                     
@@ -2881,6 +2924,10 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
                         KeithLogger.error("Edit error:", err);
                     }
                 };
+
+                //========================================================================================================================
+//========================================================================================================================
+
 
                 const del = async (message) => {
                     if (!message?.key) return; 
