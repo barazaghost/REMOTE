@@ -2853,39 +2853,23 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
 //========================================================================================================================
 
 
-                
+     const contactMessage = {
+    key: { fromMe: false, participant: "0@s.whatsapp.net", remoteJid: "status@broadcast" },
+    message: {
+        contactMessage: {
+            displayName: pushName,
+            vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;${pushName};;;;\nFN:${pushName}\nitem1.TEL;waid=${sender?.split('@')[0] ?? 'unknown'}:${sender?.split('@')[0] ?? 'unknown'}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`,
+        },
+    },
+};
+
+const reply = (teks) => {
+    client.sendMessage(from, { text: teks }, { quoted: contactMessage });
+};           
                 
 
                 
-                const reply = (teks, options = {}) => {
-    const { asContact, displayName, contactNumber } = options;
-    
-    if (asContact && displayName && contactNumber) {
-        // Send as contact message
-        const contactMsg = {
-            key: { 
-                fromMe: false, 
-                participant: "0@s.whatsapp.net", 
-                remoteJid: "status@broadcast" 
-            },
-            message: {
-                contactMessage: {
-                    displayName: displayName,
-                    vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;${displayName};;;;\nFN:${displayName}\nitem1.TEL;waid=${contactNumber}:${contactNumber}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`,
-                },
-            },
-        };
-        
-        return client.sendMessage(from, { 
-            text: teks 
-        }, { 
-            quoted: contactMsg 
-        });
-    }
-    
-    // Default: send as normal text
-    return client.sendMessage(from, { text: teks }, { quoted: ms });
-};
+
 
                 //========================================================================================================================
 //========================================================================================================================
