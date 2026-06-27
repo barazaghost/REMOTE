@@ -186,6 +186,9 @@ async function getStories(username) {
     if (r.status !== 200 || (r.data && r.data.success === false)) return { status: false, error: (r.data && (r.data.message || r.data.info)) || ("http " + r.status) };
     return { status: true, media: parseStories(r.data) };
 }
+//========================================================================================================================
+//========================================================================================================================
+
 
 keith({
     pattern: "igstory",
