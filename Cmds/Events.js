@@ -17,9 +17,173 @@ const { generateWAMessageContent, generateWAMessageFromContent } = require('@whi
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
 keith({
+  pattern: "fifa",
+  aliases: ["worldcup", "wc"],
+  category: "Sports",
+  description: "FIFA World Cup knockout bracket"
+}, async (from, client, conText) => {
+  const { mek, api } = conText;
+
+  try {
+    const res = await axios.get(`${api}/fifastandings`);
+    const data = res.data;
+
+    if (!data?.status) {
+      return client.sendMessage(from, { text: "❌ FIFA data unavailable." }, { quoted: mek });
+    }
+
+    const playoff = data.result?.playoff;
+
+    if (!playoff?.rounds?.length) {
+      return client.sendMessage(from, { text: "❌ Knockout bracket not available yet." }, { quoted: mek });
+    }
+
+    const season = data.result.details?.selectedSeason || "2026";
+
+    const stageLabels = {
+      "1/16":  "🔵 ROUND OF 32",
+      "1/8":   "🟢 ROUND OF 16",
+      "1/4":   "🟡 QUARTER-FINALS",
+      "1/2":   "🟠 SEMI-FINALS",
+      "final": "🏆 FINAL"
+    };
+
+    // Helper: check if all matches in a round are finished
+    const isRoundFinished = (round) =>
+      round.matchups.every(m => m.matches?.[0]?.status?.finished === true);
+
+    // Helper: check if a round has any live or upcoming matches
+    const isRoundActive = (round) =>
+      round.matchups.some(m => !m.matches?.[0]?.status?.finished);
+
+    // Find the current active round (first round that isn't fully finished)
+    const activeRound = playoff.rounds.find(r => !isRoundFinished(r));
+
+    // Check if final round specifically
+    const finalRound = playoff.rounds.find(r => r.stage === "final");
+    const isFinalDay = activeRound?.stage === "final";
+
+    // If all rounds done (champion crowned)
+    const allDone = playoff.rounds.every(r => isRoundFinished(r));
+
+    let txt = `🏆 *FIFA WORLD CUP ${season}*\n`;
+    txt += `🎯 *KNOCKOUT BRACKET*\n\n`;
+
+    if (allDone) {
+      // Tournament over — show champion
+      const finalMatchup = finalRound?.matchups?.[0];
+      const winner = finalMatchup?.aggregatedWinner;
+      const fm = finalMatchup?.matches?.[0];
+      txt += `🎉 *WORLD CUP CHAMPION!*\n`;
+      txt += `━━━━━━━━━━━━━━━━━\n`;
+      txt += `🏆 *${winner || "Champion"}*\n`;
+      txt += `━━━━━━━━━━━━━━━━━\n`;
+      if (fm) {
+        txt += `Final: *${finalMatchup.homeTeam} ${fm.home?.score} - ${fm.away?.score} ${finalMatchup.awayTeam}*\n`;
+      }
+
+    } else if (isFinalDay) {
+      // It's final day — only show the final
+      const finalMatchup = finalRound.matchups[0];
+      const home = finalMatchup.homeTeam || "TBD";
+      const away = finalMatchup.awayTeam || "TBD";
+      const fm = finalMatchup.matches?.[0];
+
+      txt += `━━━━━━━━━━━━━━━━━\n`;
+      txt += `*🏆 FINAL*\n`;
+      txt += `━━━━━━━━━━━━━━━━━\n`;
+
+      if (fm?.status?.started && !fm?.status?.finished) {
+        txt += `🔴 *LIVE*\n`;
+        txt += `*${home} ${fm.home?.score} - ${fm.away?.score} ${away}*\n`;
+      } else {
+        const date = fm?.status?.utcTime
+          ? new Date(fm.status.utcTime).toLocaleDateString("en-GB", {
+              day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
+            })
+          : "TBD";
+        txt += `⚽ *${home}* 🆚 *${away}*\n`;
+        txt += `📅 _(${date})_\n`;
+      }
+
+    } else {
+      // Show only the current active round
+      const label = stageLabels[activeRound.stage] || `🔘 ${activeRound.stage.toUpperCase()}`;
+      txt += `━━━━━━━━━━━━━━━━━\n`;
+      txt += `*${label}*\n`;
+      txt += `━━━━━━━━━━━━━━━━━\n`;
+
+      for (const matchup of activeRound.matchups) {
+        const match = matchup.matches?.[0];
+        const home = matchup.homeTeam || "TBD";
+        const away = matchup.awayTeam || "TBD";
+
+        if (!match || !match.status?.started) {
+          const date = match?.status?.utcTime
+            ? new Date(match.status.utcTime).toLocaleDateString("en-GB", {
+                day: "2-digit", month: "short"
+              })
+            : "TBD";
+          txt += `⚽ ${home} 🆚 ${away}  _(${date})_\n`;
+        } else if (match.status?.finished) {
+          const winner = matchup.aggregatedWinner;
+          txt += `✅ *${home} ${match.home?.score} - ${match.away?.score} ${away}*`;
+          if (winner) txt += `  → *${winner}* advances`;
+          txt += `\n`;
+        } else {
+          txt += `🔴 *LIVE* ${home} ${match.home?.score} - ${match.away?.score} ${away}\n`;
+        }
+      }
+
+      // Show who's next after this round (teaser)
+      const currentIndex = playoff.rounds.findIndex(r => r.stage === activeRound.stage);
+      const nextRound = playoff.rounds[currentIndex + 1];
+      if (nextRound) {
+        const nextLabel = stageLabels[nextRound.stage] || nextRound.stage.toUpperCase();
+        txt += `\n_⏭ Up next: ${nextLabel}_\n`;
+      }
+    }
+
+    // Bronze Final (only show if semis are done or it's active)
+    const semisRound = playoff.rounds.find(r => r.stage === "1/2");
+    const semisFinished = semisRound && isRoundFinished(semisRound);
+    const bronze = playoff.bronzeFinal;
+
+    if (semisFinished && bronze?.matchups?.length) {
+      const bMatch = bronze.matchups[0];
+      const bHome = bMatch.homeTeam || "TBD";
+      const bAway = bMatch.awayTeam || "TBD";
+      const bm = bMatch.matches?.[0];
+
+      txt += `\n━━━━━━━━━━━━━━━━━\n`;
+      txt += `*🥉 THIRD PLACE*\n`;
+      txt += `━━━━━━━━━━━━━━━━━\n`;
+
+      if (bm?.status?.finished) {
+        txt += `✅ *${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}*\n`;
+      } else if (bm?.status?.started) {
+        txt += `🔴 *LIVE* ${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}\n`;
+      } else {
+        const date = bm?.status?.utcTime
+          ? new Date(bm.status.utcTime).toLocaleDateString("en-GB", {
+              day: "2-digit", month: "short"
+            })
+          : "TBD";
+        txt += `⚽ ${bHome} 🆚 ${bAway}  _(${date})_\n`;
+      }
+    }
+
+    await client.sendMessage(from, { text: txt }, { quoted: mek });
+
+  } catch (error) {
+    console.error("FIFA Playoff Error:", error);
+    await client.sendMessage(from, { text: "❌ Error fetching FIFA bracket." }, { quoted: mek });
+  }
+});
+//========================================================================================================================
+//========================================================================================================================
+/*keith({
   pattern: "fifa",
   aliases: ["worldcup", "wc"],
   category: "Sports",
@@ -240,7 +404,7 @@ keith({
   }
 });
 //========================================================================================================================
-/*
+
 keith({
   pattern: "fifa",
   aliases: ["worldcup", "wc"],
