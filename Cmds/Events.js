@@ -20,6 +20,126 @@ const { generateWAMessageContent, generateWAMessageFromContent } = require('@whi
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+keith({
+  pattern: "fifa2",
+  aliases: ["worldcup", "wc"],
+  category: "Sports",
+  description: "FIFA World Cup standings & playoff bracket"
+}, async (from, client, conText) => {
+  const { mek, api } = conText;
+
+  try {
+    const res = await axios.get(`${api}/fifastandings`);
+    const data = res.data;
+
+    if (!data?.status) {
+      return client.sendMessage(from, { text: "❌ FIFA standings unavailable." }, { quoted: mek });
+    }
+
+    const result = data.result;
+    const season = result.details?.selectedSeason || "2026";
+    const groups = result.table?.[0]?.data?.tables || [];
+    const playoff = result.playoff;
+
+    // ── GROUP STANDINGS ──────────────────────────────────────────
+    if (!groups.length) {
+      return client.sendMessage(from, { text: "❌ No standings found." }, { quoted: mek });
+    }
+
+    let txt = `🏆 *FIFA WORLD CUP ${season}*\n`;
+    txt += `📊 *GROUP STANDINGS*\n`;
+
+    groups.forEach(group => {
+      const teams = group.table?.all || [];
+      const groupName = group.leagueName.replace("Grp.", "Group").trim();
+
+      txt += `\n━━━━━━━━━━━━━━━━━\n`;
+      txt += `🚩 *${groupName}*\n`;
+      txt += `━━━━━━━━━━━━━━━━━\n`;
+
+      teams.forEach((team, index) => {
+        const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🔹";
+        const gd = Number(team.goalConDiff) > 0 ? `+${team.goalConDiff}` : team.goalConDiff;
+        const qual = team.qualColor === "#2AD572" ? " ✅" : team.qualColor === "#FFD908" ? " 🟡" : "";
+
+        txt += `${medal} *${team.name}*${qual}\n`;
+        txt += `   Pl:${team.played} W:${team.wins} D:${team.draws} L:${team.losses} GD:${gd} | *${team.pts} pts*\n`;
+      });
+    });
+
+    txt += `\n_✅ Qualified  🟡 Possible qualification_\n`;
+
+    // ── PLAYOFF BRACKET ──────────────────────────────────────────
+    if (playoff?.rounds?.length) {
+      const stageLabels = {
+        "1/16": "🔵 ROUND OF 32",
+        "1/8":  "🟢 ROUND OF 16",
+        "1/4":  "🟡 QUARTER-FINALS",
+        "1/2":  "🟠 SEMI-FINALS",
+        "final":"🏆 FINAL"
+      };
+
+      txt += `\n\n━━━━━━━━━━━━━━━━━\n`;
+      txt += `🎯 *KNOCKOUT BRACKET*\n`;
+      txt += `━━━━━━━━━━━━━━━━━`;
+
+      for (const round of playoff.rounds) {
+        const label = stageLabels[round.stage] || `🔘 ${round.stage.toUpperCase()}`;
+        txt += `\n\n*${label}*\n`;
+
+        for (const matchup of round.matchups) {
+          const match = matchup.matches?.[0];
+          const home = matchup.homeTeam || "TBD";
+          const away = matchup.awayTeam || "TBD";
+
+          if (!match || !match.status?.started) {
+            // Not played yet
+            const date = match?.status?.utcTime
+              ? new Date(match.status.utcTime).toLocaleDateString("en-GB", {
+                  day: "2-digit", month: "short"
+                })
+              : "TBD";
+            txt += `⚽ ${home} 🆚 ${away}  _(${date})_\n`;
+          } else if (match.status?.finished) {
+            // Finished
+            const hScore = match.home?.score ?? 0;
+            const aScore = match.away?.score ?? 0;
+            const winner = matchup.aggregatedWinner;
+            txt += `✅ *${home} ${hScore} - ${aScore} ${away}*`;
+            if (winner) txt += `  → *${winner}* advances`;
+            txt += `\n`;
+          } else {
+            // Live
+            const hScore = match.home?.score ?? 0;
+            const aScore = match.away?.score ?? 0;
+            txt += `🔴 *LIVE* ${home} ${hScore} - ${aScore} ${away}\n`;
+          }
+        }
+      }
+
+      // Bronze Final
+      const bronze = playoff.bronzeFinal;
+      if (bronze?.matchups?.length) {
+        txt += `\n*🥉 THIRD PLACE*\n`;
+        const bMatch = bronze.matchups[0];
+        const bHome = bMatch.homeTeam || "TBD";
+        const bAway = bMatch.awayTeam || "TBD";
+        const bm = bMatch.matches?.[0];
+        if (bm?.status?.finished) {
+          txt += `✅ *${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}*\n`;
+        } else {
+          txt += `⚽ ${bHome} 🆚 ${bAway}\n`;
+        }
+      }
+    }
+
+    await client.sendMessage(from, { text: txt }, { quoted: mek });
+
+  } catch (error) {
+    console.error("FIFA Error:", error);
+    await client.sendMessage(from, { text: "❌ Error fetching FIFA standings." }, { quoted: mek });
+  }
+});
 //========================================================================================================================
 
 keith({
