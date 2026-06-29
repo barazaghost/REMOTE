@@ -950,7 +950,7 @@ async function detectAndDownloadSocialMedia(client, message) {
         if (!text) return;
         
         // Define the base API URL
-        const apiurl = "https://apiskeith2-production-2ecd.up.railway.app";
+        const apiurl = "https://ravenn.site";
         
         // Social media regex patterns
         const patterns = {
@@ -959,7 +959,7 @@ async function detectAndDownloadSocialMedia(client, message) {
             tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/(?:@[\w.-]+\/video\/\d+|t\/[\w-]+|v\/\d+)|(?:vm|vt)\.tiktok\.com\/[\w-]+)/i,
             instagram: /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com\/(?:reel|p|tv)\/[\w-]+)/i,
             facebook: /(?:https?:\/\/)?(?:www\.)?(?:facebook\.com\/(?:watch\?v=\d+|share\/[\w]+\/[\w]+|reel\/\d+)|fb\.watch\/[\w]+)/i,
-            youtube: /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=[\w-]+|youtu\.be\/[\w-]+|youtube\.com\/shorts\/[\w-]+)/i,
+          //  youtube: /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=[\w-]+|youtu\.be\/[\w-]+|youtube\.com\/shorts\/[\w-]+)/i,
             twitter: /(?:https?:\/\/)?(?:www\.)?(?:twitter\.com\/[\w]+\/status\/\d+|x\.com\/[\w]+\/status\/\d+)/i
         };
         
@@ -981,7 +981,7 @@ async function detectAndDownloadSocialMedia(client, message) {
             tiktok: `${apiurl}/download/tiktokdl3?url=${encodeURIComponent(url)}`,
             instagram: `${apiurl}/download/instadl?url=${encodeURIComponent(url)}`,
             facebook: `${apiurl}/download/fbdl?url=${encodeURIComponent(url)}`,
-            youtube: `${apiurl}/download/mp4?url=${encodeURIComponent(url)}`,
+         //   youtube: `${apiurl}/download/mp4?url=${encodeURIComponent(url)}`,
             twitter: `${apiurl}/download/twitter?url=${encodeURIComponent(url)}`
         };
         
