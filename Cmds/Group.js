@@ -1154,11 +1154,16 @@ async (from, client, conText) => {
 //========================================================================================================================
 
 
+
+
+
+// From Group.js
+
 keith({
   pattern: "groupname",
-  aliases: ["setsubject", "groupsubject"],
+  aliases: ["setsubject", "groupsubject", "getsubject"],
   category: "group",
-  description: "Update group subject/title"
+  description: "Get or update group subject/title"
 },
 async (from, client, conText) => {
   const { q, reply, isSuperUser, isGroup, isBotAdmin } = conText;
@@ -1166,8 +1171,19 @@ async (from, client, conText) => {
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("❌ This command only works in groups!");
   if (!isBotAdmin) return reply("❌ Bot must be admin to update group subject.");
-  if (!q) return reply("✏️ Provide a new subject text after the command.");
 
+  // If no text provided, REMOVE/DELETE the group name (set to empty)
+  if (!q) {
+    try {
+      await client.groupUpdateSubject(from, "");
+     // return reply(`✅ Group name has been removed/deleted.`);
+    } catch (err) {
+      console.error("Remove group name error:", err);
+      return reply("❌ Failed to remove group name: " + err.message);
+    }
+  }
+
+  // Update group name with new text
   try {
     await client.groupUpdateSubject(from, q.trim());
     reply(`✅ Group subject updated to: *${q.trim()}*`);
