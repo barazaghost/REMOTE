@@ -1039,7 +1039,7 @@ async function detectAndHandleStatusMention(client, message, isBotAdmin, isAdmin
         // Skip if user is admin or super user
         if (isSuperUser) return;
    //     if (isAdmin || isSuperAdmin || isSuperUser) return;
-        
+       if (isAdmin || isSuperAdmin) return; 
 
         // Check for status mention
         if (!isStatusMention(message.message)) return;
@@ -1186,7 +1186,7 @@ async function detectAndHandleAutoBlock(client, message, isSuperUser) {
 
 
 // Anti-Bot detection function
-async function detectAndHandleBot(client, message, isSuperUser) {
+async function detectAndHandleBot(client, message, isSuperUser, isBotAdmin, isAdmin) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -1206,6 +1206,7 @@ async function detectAndHandleBot(client, message, isSuperUser) {
 
         // Skip if user is super user
         if (isSuperUser) return;
+        if (isAdmin || isSuperAdmin) return;
 
         // Check if it's a bot message (3EB0 message ID pattern)
         const msgId = message.key?.id;
@@ -1264,7 +1265,7 @@ async function detectAndHandleBot(client, message, isSuperUser) {
 
 
 //========================================================================================================================
-async function detectAndHandleBadWords(client, message, isSuperUser) {
+async function detectAndHandleBadWords(client, message, isSuperUser, isBotAdmin, isAdmin) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -1292,6 +1293,7 @@ async function detectAndHandleBadWords(client, message, isSuperUser) {
         
         // Skip if user is super user
         if (isSuperUser) return;
+        if (isAdmin || isSuperAdmin) return;
 
         // Get bad words list for this group
         const badWordsList = await getBadWords(from);
@@ -1359,6 +1361,7 @@ async function detectAndHandleSticker(client, message, isBotAdmin, isAdmin, isSu
 
         // Only process if it's a group
         if (!isGroup) return;
+        if (isAdmin || isSuperAdmin) return;
 
         // Check if it's a sticker message
         const isSticker = !!message.message?.stickerMessage;
@@ -1429,7 +1432,7 @@ async function detectAndHandleSticker(client, message, isBotAdmin, isAdmin, isSu
 //========================================================================================================================
 // Anti-Tag detection function
 //========================================================================================================================
-async function detectAndHandleTag(client, message, isSuperUser) {
+async function detectAndHandleTag(client, message, isSuperUser, isBotAdmin, isAdmin) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -1439,6 +1442,7 @@ async function detectAndHandleTag(client, message, isSuperUser) {
 
         // Only process if it's a group
         if (!isGroup) return;
+        
 
         // Get mentioned JIDs from the message
         const mentionedJid = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
@@ -1476,6 +1480,7 @@ async function detectAndHandleTag(client, message, isSuperUser) {
         
         // Skip if user is super user
         if (isSuperUser) return;
+        if (isAdmin || isSuperAdmin) return;
 
         // Check if mentions exceed allowed limit
         const allowedMentions = settings.allowed_mentions || 0;
@@ -1693,6 +1698,7 @@ async function detectAndHandleLinks(client, message, isBotAdmin, isAdmin, isSupe
                     message.message?.imageMessage?.caption || '';
 
         if (!text || !isAnyLink(text)) return;
+        if (isAdmin || isSuperAdmin) return;
 
         // If bot not admin
         /*if (!isBotAdmin) {
