@@ -2804,12 +2804,12 @@ await detectAndHandleAutoBlock(client, ms, isSuperUser);
 
 //await detectAndHandleTag(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
 
-  await detectAndHandleTag(client, ms, isSuperUser);
+  await detectAndHandleTag(client, ms, isSuperUser, isBotAdmin, isAdmin);
   
     
-    await detectAndHandleBot(client, ms, isSuperUser);
+    await detectAndHandleBot(client, ms, isBotAdmin, isAdmin, isSuperUser);
 
-await detectAndHandleBadWords(client, ms, isSuperUser);
+await detectAndHandleBadWords(client, ms, isSuperUser, isBotAdmin, isAdmin);
 
 
 await detectAndHandleSticker(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); //
