@@ -1186,7 +1186,7 @@ async function detectAndHandleAutoBlock(client, message, isSuperUser) {
 
 
 // Anti-Bot detection function
-async function detectAndHandleBot(client, message, isSuperUser, isBotAdmin, isAdmin) {
+async function detectAndHandleBot(client, message, isSuperUser) {
     try {
         if (!message?.message || message.key.fromMe) return;
         
@@ -1206,7 +1206,7 @@ async function detectAndHandleBot(client, message, isSuperUser, isBotAdmin, isAd
 
         // Skip if user is super user
         if (isSuperUser) return;
-        if (isAdmin || isSuperAdmin) return;
+      //  if (isAdmin || isSuperAdmin) return;
 
         // Check if it's a bot message (3EB0 message ID pattern)
         const msgId = message.key?.id;
@@ -2807,7 +2807,7 @@ await detectAndHandleAutoBlock(client, ms, isSuperUser);
   await detectAndHandleTag(client, ms, isSuperUser, isBotAdmin, isAdmin);
   
     
-    await detectAndHandleBot(client, ms, isBotAdmin, isAdmin, isSuperUser);
+    await detectAndHandleBot(client, ms, isSuperUser);
 
 await detectAndHandleBadWords(client, ms, isSuperUser, isBotAdmin, isAdmin);
 
