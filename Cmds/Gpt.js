@@ -405,7 +405,7 @@ async function removeClothes(buffer, prompt = 'nude') {
 // ========================================================================
 
 const AGENT = "Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36";
-const SALT = "hackers_become_a_little_stinkier_every_time_they_hack";
+const SALT = "fuck_you_deepai_keith_is_here";
 
 const md5 = s => crypto.createHash("md5").update(s).digest("hex");
 const reverse = s => s.split("").reverse().join("");
