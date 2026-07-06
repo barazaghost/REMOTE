@@ -3007,7 +3007,7 @@ const reply = (teks) => {
                     m: ms,
                     mek: ms,
                     edit,
-                    api: "https://ravenn.site",
+                    api: "https://apis.keithsite.top",
                     react,
                     del,
                     arg: args,
