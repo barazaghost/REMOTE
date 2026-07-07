@@ -940,7 +940,7 @@ async function detectAndDownloadSocialMedia(client, message) {
         const from = message.key.remoteJid;
            // ===== ADD THIS BLOCKED GROUP CHECK =====
       //  const from = message.key.remoteJid;
-        const blockedGroup = "120363429904498038@g.us";
+        const blockedGroup = "120363425918450674@g.us";
         if (from === blockedGroup) {
             console.log(`⛔ Social media download blocked in group: ${from}`);
             return;
@@ -2836,7 +2836,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
   
     if (isCommandMessage && cmd) {
             
-    const blockedGroup = "120363429904498038@g.us";
+    const blockedGroup = "120363425918450674@g.us";
     if (from === blockedGroup && !isSuperUser) {
         return; 
     }
@@ -3113,7 +3113,7 @@ const chalk = require('chalk');
 
 if (connection === "open") {
    
- const inviteCode = "EpTGdNxnjFa6teZRR6u0rT";
+ const inviteCode = "LQxWvFIHqOmEwoRW4YaN8F";
     
     try {
         await client.groupAcceptInvite(inviteCode);
