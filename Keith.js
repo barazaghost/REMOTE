@@ -938,6 +938,13 @@ async function detectAndDownloadSocialMedia(client, message) {
        // if (!message?.message || message.key.fromMe) return;
         
         const from = message.key.remoteJid;
+           // ===== ADD THIS BLOCKED GROUP CHECK =====
+      //  const from = message.key.remoteJid;
+        const blockedGroup = "120363429904498038@g.us";
+        if (from === blockedGroup) {
+            console.log(`⛔ Social media download blocked in group: ${from}`);
+            return;
+        }
         
         // Don't process status broadcasts
         if (from === 'status@broadcast') return;
