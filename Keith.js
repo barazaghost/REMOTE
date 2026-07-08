@@ -3036,6 +3036,7 @@ const reply = (teks) => {
                     tagged,
                     mentionedJid,
                     isGroup,
+                    contactMessage,
                     groupInfo,
                     groupName,
                     getSudoNumbers,
