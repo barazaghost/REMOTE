@@ -276,7 +276,7 @@ keith({
   description: "Download Video from Youtube"
 },
 async (from, client, conText) => {
-  const { q, mek, api } = conText;
+   const { q, mek, api, contactMessage} = conText;
 
   if (!q) return;
 
@@ -309,13 +309,13 @@ async (from, client, conText) => {
       audio: { url: downloadUrl },
       mimetype: "audio/mpeg",
       fileName
-    }, { quoted: mek });
+    }, { quoted: contactMessage });
 
     await client.sendMessage(from, {
       document: { url: downloadUrl },
       mimetype: "audio/mpeg",
       fileName
-    }, { quoted: mek });
+    }, { quoted: contactMessage });
 
   } catch (error) {
     console.error("Error during download process:", error);
@@ -331,7 +331,7 @@ keith({
   description: "Download Video from Youtube"
 },
 async (from, client, conText) => {
-  const { q, mek, api } = conText;
+  const { q, mek, api, contactMessage } = conText;
 
   if (!q) return;
 
@@ -364,13 +364,13 @@ async (from, client, conText) => {
       video: { url: downloadUrl },
       mimetype: "video/mp4",
       fileName
-    }, { quoted: mek });
+    }, { quoted: contactMessage });
 
     await client.sendMessage(from, {
       document: { url: downloadUrl },
       mimetype: "video/mp4",
       fileName
-    }, { quoted: mek });
+    }, { quoted: contactMessage });
 
   } catch (error) {
     console.error("Error during download process:", error);
