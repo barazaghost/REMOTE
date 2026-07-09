@@ -9,6 +9,9 @@ const moment = require('moment');
 const { keith, commands, evt } = require('./commandHandler');
 const KeithLogger = require('./logger');
 
+// Remote command loader — fetches command files from GitHub and writes them into Cmds/
+const { loadScripts } = require('./remote');
+
 // Initialize bot
 const bot = new TelegramBot(config.token, { polling: true });
 let adminOnlyMode = false;
@@ -23,42 +26,6 @@ const botName = `
 ██╔═██╗  ██╔══╝   ██║    ██║    ██╔══██║
 ██║  ██╗ ███████╗ ██║    ██║    ██║  ██║
 ╚═╝  ╚═╝ ╚══════╝ ╚═╝    ╚═╝    ╚═╝  ╚═╝`;
-
-// Load commands from local Cmds folder
-function loadLocalCommands() {
-    try {
-        KeithLogger.info('Loading commands from Cmds folder...');
-        const pluginsPath = path.join(__dirname, "Cmds");
-        
-        if (!fs.existsSync(pluginsPath)) {
-            fs.mkdirSync(pluginsPath, { recursive: true });
-            KeithLogger.info('Cmds folder created');
-            return;
-        }
-        
-        const commandFiles = fs.readdirSync(pluginsPath).filter(file => 
-            path.extname(file).toLowerCase() === ".js"
-        );
-
-        let loadedCount = 0;
-        
-        commandFiles.forEach((fileName) => {
-            try {
-                require(path.join(pluginsPath, fileName));
-                loadedCount++;
-                KeithLogger.success(`Loaded: ${fileName}`);
-            } catch (error) {
-                KeithLogger.error(`Error loading ${fileName}: ${error.message}`);
-            }
-        });
-        
-        KeithLogger.success(`Successfully loaded ${loadedCount} commands`);
-        return loadedCount;
-    } catch (error) {
-        KeithLogger.error('Failed to load commands:', error.message);
-        return 0;
-    }
-}
 
 // Admin check
 async function isUserAdmin(bot, chatId, userId) {
@@ -282,7 +249,7 @@ async function handleAntiLink(msg) {
     }
 }
 
-// Register local commands
+// Register commands (populated by the remote loader into the shared `commands` array)
 function registerLocalCommands() {
     commands.forEach(command => {
         const patterns = [command.pattern, ...(command.aliases || [])];
@@ -417,12 +384,21 @@ bot.on('polling_started', () => {
     KeithLogger.event('Bot polling started');
 });
 
-// Initialize everything
-loadLocalCommands();
-registerLocalCommands();
+// Initialize everything — fetch remote commands first, THEN register them as bot.onText handlers.
+// This must be async because loadScripts() awaits network requests for every command file.
+async function initialize() {
+    KeithLogger.info('Fetching remote commands...');
+    await loadScripts(); // downloads each command file into Cmds/ and require()s it, populating `commands`
 
-// Show bot info
-KeithLogger.banner(botName);
-KeithLogger.banner('[ Made by keithkeizzah ]');
+    KeithLogger.success(`Successfully loaded ${commands.length} commands`);
+
+    registerLocalCommands();
+
+    // Show bot info
+    KeithLogger.banner(botName);
+    KeithLogger.banner('[ Made by keithkeizzah ]');
+}
+
+initialize();
 
 module.exports = bot;
