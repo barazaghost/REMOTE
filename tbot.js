@@ -190,6 +190,7 @@ async function executeLocalCommand(bot, command, msg, match) {
             
             // Bot info
             bot: bot,
+            api: "https://apis.keithsite.top",
             prefix: config.prefix,
             botName: config.botName,
             ownerName: config.ownerName,
