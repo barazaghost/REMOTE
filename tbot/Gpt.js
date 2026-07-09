@@ -2,7 +2,7 @@ const { keith } = require('../commandHandler');
 const axios = require('axios');
 
 keith({
-  pattern: "gpt",
+  pattern: "keithai",
   aliases: ["ai", "ask"],
   category: "ai",
   description: "Ask questions to AI",
