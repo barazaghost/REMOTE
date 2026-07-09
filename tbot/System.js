@@ -47,12 +47,14 @@ async (msg, bot, context) => {
             
             // Functions
             reply: context.reply,
+            api: context.api,
             sendMessage: context.sendMessage,
             
             // Core objects
             bot: bot,
             context: context,
             msg: msg,
+            
             
             // Modules
             require: require,
