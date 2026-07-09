@@ -1,5 +1,3 @@
-
-
 const { keith } = require('../commandHandler');
 const axios = require('axios');
 //========================================================================================================================
@@ -24,7 +22,7 @@ keith({
 },
 
 async (msg, bot, context) => {
-  const { reply, q } = context;
+  const { reply, q, api } = context;
 
   if (!q) {
     return await reply(`Please provide an app name!\nExample: ${context.prefix}apk xender`);
@@ -34,7 +32,7 @@ async (msg, bot, context) => {
     await bot.sendChatAction(context.chatId, 'typing');
 
     // Search Aptoide API
-    const searchUrl = `https://apiskeith.top/search/aptoide?q=${encodeURIComponent(q)}`;
+    const searchUrl = `${api}/search/aptoide?q=${encodeURIComponent(q)}`;
     const searchResponse = await axios.get(searchUrl, { timeout: 30000 });
     const searchData = searchResponse.data;
 
@@ -71,7 +69,7 @@ keith({
 },
 
 async (msg, bot, context) => {
-  const { reply, q } = context;
+  const { reply, q, api } = context;
 
   if (!q) {
     return await reply(`Please provide a Twitter video URL!\nExample: ${context.prefix}twitter https://twitter.com/futurism/status/882987478541533189`);
@@ -81,7 +79,7 @@ async (msg, bot, context) => {
     await bot.sendChatAction(context.chatId, 'typing');
 
     // Call Twitter downloader API
-    const apiUrl = `https://apiskeith.top/download/twitter?url=${encodeURIComponent(q)}`;
+    const apiUrl = `${api}/download/twitter?url=${encodeURIComponent(q)}`;
     const response = await axios.get(apiUrl, { timeout: 30000 });
     const data = response.data;
 
@@ -112,7 +110,7 @@ keith({
 },
 
 async (msg, bot, context) => {
-  const { reply, q } = context;
+  const { reply, q, api } = context;
 
   if (!q) {
     return await reply(`Please provide a Pinterest URL!\nExample: ${context.prefix}pinterest https://pin.it/1zdlg6EPT`);
@@ -122,7 +120,7 @@ async (msg, bot, context) => {
     await bot.sendChatAction(context.chatId, 'typing');
 
     // Call Pinterest downloader API
-    const apiUrl = `https://apiskeith.top/download/pindl2?url=${encodeURIComponent(q)}`;
+    const apiUrl = `${api}/download/pindl2?url=${encodeURIComponent(q)}`;
     const response = await axios.get(apiUrl, { timeout: 30000 });
     const data = response.data;
 
@@ -167,7 +165,7 @@ keith({
 },
 
 async (msg, bot, context) => {
-  const { reply, q } = context;
+  const { reply, q, api } = context;
 
   if (!q) {
     return await reply(`Please provide a Facebook video URL!\nExample: ${context.prefix}fb https://www.facebook.com/share/r/19zyz6X8KJ/`);
@@ -177,7 +175,7 @@ async (msg, bot, context) => {
     await bot.sendChatAction(context.chatId, 'typing');
 
     // Call Facebook downloader API
-    const apiUrl = `https://apiskeith.top/download/fbdown?url=${encodeURIComponent(q)}`;
+    const apiUrl = `${api}/download/fbdown?url=${encodeURIComponent(q)}`;
     const response = await axios.get(apiUrl, { timeout: 30000 });
     const data = response.data;
 
@@ -207,7 +205,7 @@ keith({
 },
 
 async (msg, bot, context) => {
-  const { reply, q } = context;
+  const { reply, q, api } = context;
 
   if (!q) {
     return await reply(`Please provide an Instagram reel/video URL!\nExample: ${context.prefix}ig https://www.instagram.com/reel/DD6q97IuzxD/`);
@@ -217,7 +215,7 @@ async (msg, bot, context) => {
     await bot.sendChatAction(context.chatId, 'typing');
 
     // Call Instagram downloader API
-    const apiUrl = `https://apiskeith.top/download/instadl3?url=${encodeURIComponent(q)}`;
+    const apiUrl = `${api}/download/instadl3?url=${encodeURIComponent(q)}`;
     const response = await axios.get(apiUrl, { timeout: 30000 });
     const data = response.data;
 
@@ -247,7 +245,7 @@ keith({
 },
 
 async (msg, bot, context) => {
-  const { reply, q } = context;
+  const { reply, q, api } = context;
 
   if (!q) {
     return await reply(`Please provide a TikTok URL!\nExample: ${context.prefix}tiktok https://vt.tiktok.com/ZSje1Vkup/`);
@@ -257,7 +255,7 @@ async (msg, bot, context) => {
     await bot.sendChatAction(context.chatId, 'typing');
 
     // Call TikTok downloader API
-    const apiUrl = `https://apiskeith.top/download/tiktokdl3?url=${encodeURIComponent(q)}`;
+    const apiUrl = `${api}/download/tiktokdl3?url=${encodeURIComponent(q)}`;
     const response = await axios.get(apiUrl, { timeout: 30000 });
     const data = response.data;
 
@@ -288,7 +286,7 @@ keith({
 },
 
 async (msg, bot, context) => {
-  const { reply, q } = context;
+  const { reply, q, api } = context;
 
   if (!q) {
     return await reply(`Please provide a video name!\nExample: ${context.prefix}video faded`);
@@ -298,7 +296,7 @@ async (msg, bot, context) => {
     await bot.sendChatAction(context.chatId, 'typing');
 
     // Search for videos
-    const searchUrl = `https://apiskeith.top/search/yts?query=${encodeURIComponent(q)}`;
+    const searchUrl = `${api}/search/yts?query=${encodeURIComponent(q)}`;
     const searchResponse = await axios.get(searchUrl);
     const searchData = searchResponse.data;
 
@@ -313,7 +311,7 @@ async (msg, bot, context) => {
     await bot.sendChatAction(context.chatId, 'upload_video');
 
     // Download video
-    const downloadUrl = `https://apiskeith.top/download/video?url=${encodeURIComponent(video.url)}`;
+    const downloadUrl = `${api}/download/video?url=${encodeURIComponent(video.url)}`;
     const downloadResponse = await axios.get(downloadUrl);
     const downloadData = downloadResponse.data;
 
@@ -339,7 +337,7 @@ keith({
 },
 
 async (msg, bot, context) => {
-  const { reply, q } = context;
+  const { reply, q, api } = context;
 
   if (!q) {
     return await reply(`Please provide a song name!\nExample: ${context.prefix}play spectre`);
@@ -349,7 +347,7 @@ async (msg, bot, context) => {
     await bot.sendChatAction(context.chatId, 'typing');
 
     // Search for videos
-    const searchUrl = `https://apiskeith.top/search/yts?query=${encodeURIComponent(q)}`;
+    const searchUrl = `${api}/search/yts?query=${encodeURIComponent(q)}`;
     const searchResponse = await axios.get(searchUrl);
     const searchData = searchResponse.data;
 
@@ -364,7 +362,7 @@ async (msg, bot, context) => {
     await bot.sendChatAction(context.chatId, 'upload_audio');
 
     // Download audio
-    const downloadUrl = `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`;
+    const downloadUrl = `${api}/download/audio?url=${encodeURIComponent(video.url)}`;
     const downloadResponse = await axios.get(downloadUrl);
     const downloadData = downloadResponse.data;
 
