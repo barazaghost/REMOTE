@@ -10,7 +10,7 @@ const { keith, commands, evt } = require('./commandHandler');
 const KeithLogger = require('./logger');
 
 // Remote command loader — fetches command files from GitHub and writes them into Cmds/
-const { loadScripts } = require('./remote');
+const { loadScripts } = require('./abcd');
 
 // Initialize bot
 const bot = new TelegramBot(config.token, { polling: true });
