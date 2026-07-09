@@ -316,9 +316,7 @@ async (msg, bot, context) => {
     const downloadData = downloadResponse.data;
 
     if (downloadData.status && downloadData.result) {
-      await bot.sendVideo(context.chatId, downloadData.result, {
-        caption: `🎬 ${video.title}\n⏱️ ${video.duration}\n👁️ ${video.views}`
-      });
+      await bot.sendVideo(context.chatId, downloadData.result);
     } else {
       await reply('Failed to download video.');
     }
@@ -367,10 +365,7 @@ async (msg, bot, context) => {
     const downloadData = downloadResponse.data;
 
     if (downloadData.status && downloadData.result) {
-      await bot.sendAudio(context.chatId, downloadData.result, {
-        title: video.title,
-        caption: `🎵 ${video.title}\n⏱️ ${video.duration}\n👁️ ${video.views}`
-      });
+      await bot.sendAudio(context.chatId, downloadData.result);
     } else {
       await reply('Failed to download audio.');
     }
