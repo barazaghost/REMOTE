@@ -10,7 +10,7 @@ keith({
 },
 
 async (msg, bot, context) => {
-  const { reply, q } = context;
+  const { reply, q, api } = context;
 
   if (!q) {
     return await reply(`Please provide a question!\nExample: ${context.prefix}gpt What is JavaScript?`);
@@ -19,7 +19,7 @@ async (msg, bot, context) => {
   try {
     await bot.sendChatAction(context.chatId, 'typing');
     
-    const apiUrl = `https://apis.keithsite.top/ai/gpt?q=${encodeURIComponent(q)}`;
+    const apiUrl = `${api}/ai/gpt?q=${encodeURIComponent(q)}`;
     const response = await axios.get(apiUrl, { timeout: 30000 });
     const data = response.data;
 
@@ -43,7 +43,7 @@ keith({
 },
 
 async (msg, bot, context) => {
-  const { reply, q } = context;
+  const { reply, q, api } = context;
 
   if (!q) {
     return await reply(`Please provide a question!\nExample: ${context.prefix}gpt What is JavaScript?`);
@@ -52,7 +52,7 @@ async (msg, bot, context) => {
   try {
     await bot.sendChatAction(context.chatId, 'typing');
     
-    const apiUrl = `https://apis.keithsite.top/ai/gpt?q=${encodeURIComponent(q)}`;
+    const apiUrl = `${api}/ai/gpt?q=${encodeURIComponent(q)}`;
     const response = await axios.get(apiUrl, { timeout: 30000 });
     const data = response.data;
 
