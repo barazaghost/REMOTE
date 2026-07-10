@@ -489,7 +489,7 @@ const expiryDisplay = getExpiryDisplay();
 //========================================================================================================================
 // API Base URL Configuration
 //========================================================================================================================
-const apiUrl = 'https://apiskeith2-production-2ecd.up.railway.app';
+const apiUrl = 'https://ravenn.site;
 
 // API call to Keith AI Text
 async function getAIResponse(message, userJid) {
@@ -3014,7 +3014,7 @@ const reply = (teks) => {
                     m: ms,
                     mek: ms,
                     edit,
-                    api: "https://apis.keithsite.top",
+                    api: "https://ravenn.site",
                     react,
                     del,
                     arg: args,
