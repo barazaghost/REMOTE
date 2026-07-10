@@ -489,7 +489,7 @@ const expiryDisplay = getExpiryDisplay();
 //========================================================================================================================
 // API Base URL Configuration
 //========================================================================================================================
-const apiUrl = 'https://ravenn.site';
+const apiUrl = 'https://apiskeith2-production-ec66.up.railway.app';
 
 // API call to Keith AI Text
 async function getAIResponse(message, userJid) {
@@ -957,7 +957,7 @@ async function detectAndDownloadSocialMedia(client, message) {
         if (!text) return;
         
         // Define the base API URL
-        const apiurl = "https://ravenn.site";
+        const apiurl = "https://apiskeith2-production-ec66.up.railway.app";
         
         // Social media regex patterns
         const patterns = {
@@ -3014,7 +3014,7 @@ const reply = (teks) => {
                     m: ms,
                     mek: ms,
                     edit,
-                    api: "https://ravenn.site",
+                    api: "https://apiskeith2-production-ec66.up.railway.app",
                     react,
                     del,
                     arg: args,
