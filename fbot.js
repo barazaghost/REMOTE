@@ -1,4 +1,3 @@
-
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
@@ -8,7 +7,8 @@ const config = require("./set");
 const { commands, events, uniqueCommands } = require("./commandHandler");
 const KeithLogger = require("./logger");
 
-
+// Kept for backward compatibility — cmds/help.js and cmds/cmd.js still read
+// from global.commands directly, so we point it at the same Map commandHandler owns.
 global.commands = commands;
 global.events = events;
 
@@ -20,9 +20,9 @@ const cooldowns = new Map();
 
 const loadEvents = () => {
     try {
-        const files = fs.readdirSync("./lib").filter(file => file.endsWith(".js"));
+        const files = fs.readdirSync("./events").filter(file => file.endsWith(".js"));
         for (const file of files) {
-            require(`./lib/${file}`); 
+            require(`./events/${file}`); // self-registers into `events` via evt()
         }
         console.log(`✅ Loaded ${events.size} event(s)`);
     } catch (err) {
@@ -34,7 +34,7 @@ const loadCommands = () => {
     try {
         const files = fs.readdirSync("./cmds").filter(file => file.endsWith(".js"));
         for (const file of files) {
-            require(`./cmds/${file}`); 
+            require(`./cmds/${file}`); // self-registers into `commands` via keith()
         }
         console.log(`✅ Loaded ${uniqueCommands().length} command(s) (${commands.size} names+aliases)`);
     } catch (err) {
@@ -63,7 +63,7 @@ const detectedURLs = new Set();
 
 const startBot = () => {
     try {
-        login(credentials, async (err, api) => {
+        login(credentials, async (err, client) => {
             if (err) {
                 console.error("❌ Login failed:", err);
                 return;
@@ -71,11 +71,11 @@ const startBot = () => {
 
             try {
                 console.clear();
-                api.setOptions(config.option);
+                client.setOptions(config.option);
                 console.log("🤖 Bot is now online!");
 
                 try {
-                    await api.sendMessage("🤖 Bot has started successfully!", config.ownerID);
+                    await client.sendMessage("🤖 Bot has started successfully!", config.ownerID);
                 } catch (startupMsgError) {
                     KeithLogger.warn(
                         `Could not send startup message to OWNER_ID "${config.ownerID}". ` +
@@ -85,20 +85,25 @@ const startBot = () => {
                 }
 
                 events.forEach((handler) => {
-                    if (handler.onStart) handler.onStart(api);
+                    if (handler.onStart) handler.onStart(client);
                 });
 
-                api.listenMqtt(async (err, event) => {
+                client.listenMqtt(async (err, event) => {
                     if (err) {
                         console.error("❌ Event error:", err);
-                        return api.sendMessage("❌ Error while listening to events.", config.ownerID);
+                        return client.sendMessage("❌ Error while listening to events.", config.ownerID);
                     }
+
+                    // Shortcut for "send this back to wherever the event came from, threaded
+                    // as a reply". Every command gets this instead of building the
+                    // (msg, threadID, messageID) call itself.
+                    const reply = (msg) => client.sendMessage(msg, event.threadID, event.messageID);
 
                     try {
                         KeithLogger.logEvent(event);
 
                         if (events.has(event.type)) {
-                            await events.get(event.type).execute({ api, event });
+                            await events.get(event.type).execute({ client, event });
                         }
 
                         const urlRegex = /(https?:\/\/[^\s]+)/gi;
@@ -111,7 +116,7 @@ const startBot = () => {
                                 detectedURLs.add(key);
 
                                 try {
-                                    await urlCommand.execute({ api, event });
+                                    await urlCommand.execute({ client, event, args: [], reply, keithApi: config.keithApi });
                                 } catch (error) {
                                     console.error("❌ URL command failed:", error);
                                 }
@@ -139,11 +144,11 @@ const startBot = () => {
                                 const isValid = requiredFields.every(field => field in command && command[field]);
                                 if (!isValid || typeof command.execute !== "function") {
                                     console.warn(`⚠️ Command '${commandName}' structure is invalid.`);
-                                    return api.sendMessage(`⚠️ Command '${commandName}' is broken.`, event.threadID);
+                                    return reply(`⚠️ Command '${commandName}' is broken.`);
                                 }
 
                                 if (command.admin && event.senderID !== config.ownerID) {
-                                    return api.sendMessage("❌ This command is restricted to the bot owner.", event.threadID);
+                                    return reply("❌ This command is restricted to the bot owner.");
                                 }
 
                                 const now = Date.now();
@@ -153,22 +158,22 @@ const startBot = () => {
 
                                 if (now - lastUsed < cooldown) {
                                     const wait = ((cooldown - (now - lastUsed)) / 1000).toFixed(1);
-                                    return api.sendMessage(`⏳ Please wait ${wait}s before using '${command.name}' again.`, event.threadID);
+                                    return reply(`⏳ Please wait ${wait}s before using '${command.name}' again.`);
                                 }
 
                                 try {
-                                    await command.execute({ api, event, args });
+                                    await command.execute({ client, event, args, reply, keithApi: config.keithApi });
                                     cooldowns.set(key, now);
                                 } catch (error) {
                                     console.error(`❌ Command '${command.name}' failed:`, error);
-                                    api.sendMessage(`❌ Error while executing '${command.name}'.`, event.threadID);
-                                    api.sendMessage(`❌ Error in '${command.name}':\n${error.message}`, config.ownerID);
+                                    reply(`❌ Error while executing '${command.name}'.`);
+                                    client.sendMessage(`❌ Error in '${command.name}':\n${error.message}`, config.ownerID);
                                 }
                             }
                         }
                     } catch (eventError) {
                         console.error("❌ Error in event handler:", eventError);
-                        api.sendMessage("❌ Critical error during event handling.", config.ownerID);
+                        client.sendMessage("❌ Critical error during event handling.", config.ownerID);
                     }
                 });
             } catch (innerError) {
