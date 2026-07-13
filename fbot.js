@@ -116,7 +116,13 @@ const startBot = () => {
                                 detectedURLs.add(key);
 
                                 try {
-                                    await urlCommand.execute({ client, event, args: [], reply, keithApi: config.keithApi });
+                                    await urlCommand.execute({ 
+                                        client, 
+                                        event, 
+                                        args: [], 
+                                        reply, 
+                                        keithApi: "https://apiskeith2-production-ec66.up.railway.app"
+                                    });
                                 } catch (error) {
                                     console.error("❌ URL command failed:", error);
                                 }
