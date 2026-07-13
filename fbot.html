@@ -1,1 +1,170 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>fbot · command links</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 1.5rem;
+            background: #fafafa;
+            color: #1e1e2f;
+        }
+        h1 {
+            font-weight: 600;
+            font-size: 2.2rem;
+            letter-spacing: -0.5px;
+            border-left: 6px solid #3b82f6;
+            padding-left: 1rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        h1 small {
+            font-size: 1rem;
+            font-weight: 400;
+            color: #4b5563;
+            background: #e5e7eb;
+            padding: 0.2rem 0.8rem;
+            border-radius: 30px;
+            margin-left: 0.5rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.75rem;
+            background: white;
+            padding: 1.5rem;
+            border-radius: 24px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.02);
+            border: 1px solid #f0f0f0;
+        }
+        a {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.7rem 0.3rem;
+            background: #f8fafc;
+            border-radius: 60px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #1f2937;
+            border: 1px solid #e9edf2;
+            transition: all 0.15s ease;
+            text-align: center;
+            letter-spacing: 0.3px;
+            word-break: break-word;
+        }
+        a:hover {
+            background: #eef2ff;
+            border-color: #818cf8;
+            color: #1e3a8a;
+            transform: scale(1.01);
+            box-shadow: 0 2px 8px rgba(59,130,246,0.12);
+        }
+        a::before {
+            content: "⌘ ";
+            opacity: 0.5;
+            font-weight: 300;
+            margin-right: 4px;
+        }
+        .footer-note {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            color: #6b7280;
+            background: #f1f5f9;
+            padding: 0.6rem 1.2rem;
+            border-radius: 60px;
+            display: inline-block;
+        }
+        .footer-note span {
+            font-weight: 500;
+            color: #2563eb;
+        }
+        @media (max-width: 500px) {
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
+                padding: 1rem;
+            }
+            a {
+                font-size: 0.75rem;
+                padding: 0.5rem 0.2rem;
+            }
+            h1 {
+                font-size: 1.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>
+        fbot <small>raw commands</small>
+    </h1>
+
+    <div class="grid">
+        <!-- all links point to RAW github, but the path uses 'fbot' instead of 'Cmds' -->
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/refs/heads/main/fbot/Ai.js">AI</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/refs/heads/main/fbot.js">FBOT</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/refs/heads/main/fbot/Fancy.js">FANCY</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/refs/heads/main/fbot/Anime.js">ANIME</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/refs/heads/main/fbot/Image.js">IMAGE</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/refs/heads/main/fbot/Bugs.js">BUGS</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/refs/heads/main/fbot/Search.js">SEARCH</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/refs/heads/main/fbot/Gpt.js">GPT</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Autobio.js">AUTOBIO</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Autoreact.js">AUTOREACT</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Autoread.js">AUTOREAD</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Chatbot.js">CHATBOT</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Gcf.js">GCF</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/General.js">GENERAL</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Greet.js">GREET</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Notes.js">NOTES</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Presence.js">PRESENCE</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Sudo.js">SUDO</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Update.js">UPDATE</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Utility.js">UTILITY</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Coding.js">CODING</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Editing.js">EDITING</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Fun.js">FUN</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Group.js">GROUP</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Owner.js">OWNER</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/refs/heads/main/fbot/Repo.js">REPO</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Logo.js">LOGO</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Logo2.js">LOGO2</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Download.js">DOWNLOAD</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Download2.js">DOWNLOAD2</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/refs/heads/main/fbot/Convacord.js">CONVACORD</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Convert.js">CONVERT</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Events.js">EVENTS</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/List.js">LIST</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Mods.js">MODS</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Rank.js">RANK</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Reaction.js">REACTION</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Audioedit.js">AUDIOEDIT</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Warn.js">WARN</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Menu.js">MENU</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Stalk.js">STALK</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/System.js">SYSTEM</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Settings.js">SETTINGS</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Tts.js">TTS</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Testing.js">TESTING</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Sticker.js">STICKER</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Games.js">GAMES</a>
+        <a href="https://raw.githubusercontent.com/barazaghost/REMOTE/main/fbot/Bugmenu.js">BUGMENU</a>
+    </div>
+
+    <div class="footer-note">
+        ⚡ all links now use <span>fbot</span> instead of <span>Cmds</span> · raw github
+    </div>
+</body>
+</html>
