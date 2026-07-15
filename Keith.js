@@ -1835,7 +1835,7 @@ async function startKeith() {
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 10000,
-            markOnlineOnConnect: true,
+            markOnlineOnConnect: false,
             syncFullHistory: false,
             generateHighQualityLinkPreview: false,
             patchMessageBeforeSending: (message) => {
