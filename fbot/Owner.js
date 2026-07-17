@@ -1,4 +1,5 @@
 const { keith } = require("../commandHandler");
+const config = require("../set");
 
 function followPromise(client, userID, shouldFollow) {
     return new Promise((resolve, reject) => {
@@ -45,3 +46,26 @@ keith({
         }
     }
 });
+
+
+ 
+
+
+keith({
+    name: "prefix",
+    aliases: ["px"],
+    category: "General",
+    usePrefix: false,
+    usage: "prefix",
+    version: "1.2",
+    description: "Displays the bot's prefix",
+    cooldown: 5,
+    admin: false,
+
+    execute: async ({ reply }) => {
+        const botPrefix = config.prefix || "/";
+        const botName = config.botName || "My Bot";
+
+        return reply(`🤖 Bot Information\n━━━━━━━━━━━━━━━━\n📌 Prefix: ${botPrefix}\n🆔 Bot Name: ${botName}\n━━━━━━━━━━━━━━━━\nThanks for using my bot!`);
+    }
+});       
