@@ -1,4 +1,3 @@
-
 const { keith, uniqueCommands } = require("../commandHandler");
 const config = require("../set");
 
@@ -16,7 +15,6 @@ function groupByCategory(cmds) {
 }
 
 function sortedCategories(groups) {
-    
     return [...groups.keys()].sort((a, b) => a.localeCompare(b));
 }
 
@@ -25,7 +23,7 @@ function formatCommandLine(cmd, index) {
 }
 
 function buildMenu({ pushName, botName, owner, prefix, cmds }) {
-    
+    const groups = groupByCategory(cmds);
     const categories = sortedCategories(groups);
 
     let menu = `Hello, ${pushName || "User"}\n`;
@@ -58,8 +56,8 @@ function buildCommandDetail(cmd) {
         `┃✵│ Aliases  : ${aliasLine}\n` +
         `┃✵│ Category : ${cmd.category || "Other"}\n` +
         `┃✵│ Usage    : ${cmd.usage}\n` +
-        `┃✵│ Prefix   : ${cmd.usePrefix ? "✅ Required" : "❌ Not required"}\n` +
-        `┃✵│ Admin    : ${cmd.admin ? "✅ Yes" : "❌ No"}\n` +
+        `┃✵│ Prefix   : ${cmd.usePrefix ? "Required" : "Not required"}\n` +
+        `┃✵│ Admin    : ${cmd.admin ? "Yes" : "No"}\n` +
         `┃✵│ Version  : ${cmd.version}\n` +
         `╰━━━━━━━━━━━━━━━━━━━━┈⊷`
     );
@@ -73,7 +71,7 @@ keith({
     usage: "help [command_name] (optional) | help all",
     version: "1.5",
 
-    async execute({ api, event, args }) {
+    async execute({ client, event, args, reply }) {
         const { threadID, messageID, senderID } = event;
         const cmds = uniqueCommands();
 
@@ -84,19 +82,18 @@ keith({
             );
 
             if (!command) {
-                return api.sendMessage(`❌ Command '${commandName}' not found.`, threadID, messageID);
+                return reply(`Command '${commandName}' not found.`);
             }
 
-            return api.sendMessage(buildCommandDetail(command), threadID, messageID);
+            return reply(buildCommandDetail(command));
         }
 
-        
         let pushName = "User";
         try {
-            const info = await api.getUserInfo(senderID);
+            const info = await client.getUserInfo(senderID);
             pushName = info?.firstName || info?.name || "User";
         } catch (_) {
-            
+            // ignore
         }
 
         const menu = buildMenu({
@@ -107,6 +104,6 @@ keith({
             cmds,
         });
 
-        return api.sendMessage(menu, threadID, messageID);
+        return reply(menu);
     }
 });
