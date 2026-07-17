@@ -6,6 +6,42 @@ const config = require("../set");
 
 
 keith({
+    name: "promote",
+    aliases: ["makeadmin"],
+    category: "Group",
+    usePrefix: false,
+    admin: true,
+    usage: "promote <@mention> (or reply to their message)",
+    version: "1.0",
+    cooldown: 5,
+
+    execute: async ({ client, event, reply, keithApi }) => {
+        const { threadID, messageID, mentions, messageReply } = event;
+
+        let targetID;
+        if (mentions && Object.keys(mentions).length > 0) {
+            targetID = Object.keys(mentions)[0];
+        } else if (messageReply) {
+            targetID = messageReply.senderID;
+        }
+
+        if (!targetID) {
+            return reply("⚠️ Mention the user, or reply to one of their messages.");
+        }
+
+        try {
+            const result = await client.gcrule("admin", targetID, threadID);
+            if (result && result.type === "error_gc_rule") {
+                return reply(`❌ ${result.error}`);
+            }
+            return reply("✅ User promoted to group admin.");
+        } catch (err) {
+            return reply(`❌ Couldn't promote user: ${err.message}`);
+        }
+    }
+});
+
+keith({
     name: "kick",
     aliases: ["remove"],
     category: "Group",
