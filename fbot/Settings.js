@@ -10,26 +10,28 @@ keith({
     admin: false,
     cooldown: 10,
 
-    execute: async ({ api, event, args }) => {
+    execute: async ({ client, event, args, reply, keithApi }) => {
         const { threadID, messageID, senderID } = event;
         const input = args.join(" ");
 
         if (!input) {
-            return api.sendMessage("⚠️ Usage: theme <name> or theme list", threadID, messageID);
+            return reply("⚠️ Usage: theme <name> or theme list");
         }
 
         try {
-            
+            // NOTE: ws3-fca's theme() inspects the 3rd argument's type to decide whether it's a
+            // callback or an initiatorID string — passing initiatorID here means skipping the
+            // callback slot entirely: theme(name, threadID, initiatorID), NOT a 4th argument.
             if (input.toLowerCase() === "list") {
-                const themes = await api.theme("list", threadID, senderID);
-                const names = themes.slice(0, 40).map(t => `• ${t.name}`).join("\n");
-                return api.sendMessage(`🎨 Available themes:\n${names}`, threadID, messageID);
+                const themes = await client.theme("list", threadID, senderID);
+                const names = themes.slice(0, 20).map(t => `• ${t.name}`).join("\n");
+                return reply(`🎨 Available themes (first 20):\n${names}`);
             }
 
-            const result = await api.theme(input, threadID, senderID);
-            return api.sendMessage(`✅ Theme changed to "${result.themeName}"`, threadID, messageID);
+            const result = await client.theme(input, threadID, senderID);
+            return reply(`✅ Theme changed to "${result.themeName}"`);
         } catch (err) {
-            return api.sendMessage(`❌ Couldn't change theme: ${err.message}`, threadID, messageID);
+            return reply(`❌ Couldn't change theme: ${err.message}`);
         }
     }
 });
