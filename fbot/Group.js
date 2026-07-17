@@ -4,6 +4,44 @@ const config = require("../set");
 
 
 
+keith({
+    name: "groupinfo",
+    aliases: ["gcinfo", "threadinfo"],
+    category: "Group",
+    usePrefix: false,
+    admin: false,
+    usage: "groupinfo",
+    version: "1.0",
+    cooldown: 10,
+
+    execute: async ({ client, event, reply, keithApi }) => {
+        const { threadID, messageID } = event;
+
+        try {
+            const info = await client.getThreadInfo(threadID);
+
+            if (!info || info.isGroup === false) {
+                return reply("⚠️ This command only works in group chats.");
+            }
+
+            const memberCount = info.participantIDs ? info.participantIDs.length : "unknown";
+            const adminCount = info.adminIDs ? info.adminIDs.length : 0;
+
+            const msg =
+                `╭━━⟮ GROUP INFO ⟯━━┈⊷\n` +
+                `┃✵│ Name    : ${info.name || "Unnamed"}\n` +
+                `┃✵│ ID      : ${info.threadID}\n` +
+                `┃✵│ Members : ${memberCount}\n` +
+                `┃✵│ Admins  : ${adminCount}\n` +
+                `╰━━━━━━━━━━━━━━━━━┈⊷`;
+
+            return reply(msg);
+        } catch (err) {
+            return reply(`❌ Couldn't fetch group info: ${err.message}`);
+        }
+    }
+});
+
 
 keith({
     name: "demote",
