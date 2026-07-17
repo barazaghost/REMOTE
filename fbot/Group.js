@@ -3,6 +3,45 @@ const config = require("../set");
 
 
 
+
+
+keith({
+    name: "kick",
+    aliases: ["remove"],
+    category: "Group",
+    usePrefix: false,
+    admin: true,
+    usage: "kick <@mention> (or reply to their message)",
+    version: "1.0",
+    cooldown: 5,
+
+    execute: async ({ client, event, reply, keithApi }) => {
+        const { threadID, messageID, mentions, messageReply } = event;
+
+        let targetID;
+        if (mentions && Object.keys(mentions).length > 0) {
+            targetID = Object.keys(mentions)[0];
+        } else if (messageReply) {
+            targetID = messageReply.senderID;
+        }
+
+        if (!targetID) {
+            return reply("⚠️ Mention the user to kick, or reply to one of their messages.");
+        }
+
+        try {
+            const result = await client.gcmember("remove", [targetID], threadID);
+            if (result && result.type === "error_gc") {
+                return reply(`❌ ${result.error}`);
+            }
+            return reply("✅ Member removed.");
+        } catch (err) {
+            return reply(`❌ Couldn't remove member: ${err.message}`);
+        }
+    }
+});
+
+
 keith({
     name: "groupname",
     aliases: ["setgcname"],
