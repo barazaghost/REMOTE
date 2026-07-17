@@ -1,6 +1,55 @@
 const { keith } = require("../commandHandler");
 const config = require("../set");
 
+
+
+
+keith({
+    name: "add",
+    aliases: ["invite"],
+    category: "Group",
+    usePrefix: false,
+    admin: true,
+    usage: "add [list | number]",
+    version: "1.1",
+    description: "Add the owner to a group.",
+    cooldown: 5,
+
+    async execute({ client, event, args, reply, keithApi }) {
+        const threadID = event.threadID;
+        const senderID = event.senderID;
+
+        if (senderID !== config.ownerID) {
+            return client.sendMessage("❌ You are not authorized to use this command.", threadID);
+        }
+
+        const threads = await client.getThreadList(100, null, ["INBOX"]);
+        const groups = threads.filter(t => t.isGroup);
+
+        if (args[0] === "list") {
+            if (groups.length === 0) return client.sendMessage("❌ No groups found.", threadID);
+
+            const msg = groups.map((g, i) => `${i + 1}. ${g.name || "Unnamed"} (${g.threadID})`).join("\n");
+            return client.sendMessage("📋 List of Groups:\n\n" + msg, threadID);
+        }
+
+        const index = parseInt(args[0]) - 1;
+        const group = groups[index];
+        if (!group) return client.sendMessage("❌ Invalid group number.", threadID);
+
+        try {
+            const result = await client.gcmember("add", [config.ownerID], group.threadID);
+            if (result && result.type === "error_gc") {
+                return client.sendMessage(`❌ ${result.error}`, threadID);
+            }
+            return client.sendMessage(`✅ Owner added to group: ${group.name || "Unnamed Group"}`, threadID);
+        } catch (err) {
+            console.error("❌ Failed to add owner:", err);
+            return client.sendMessage("❌ Couldn't add owner. They might already be in the group or can't be added.", threadID);
+        }
+    }
+});
+
 keith({
     name: "leave",
     aliases: ["left", "exit"],
