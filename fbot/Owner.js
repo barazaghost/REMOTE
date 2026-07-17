@@ -69,3 +69,39 @@ keith({
         return reply(`🤖 Bot Information\n━━━━━━━━━━━━━━━━\n📌 Prefix: ${botPrefix}\n🆔 Bot Name: ${botName}\n━━━━━━━━━━━━━━━━\nThanks for using my bot!`);
     }
 });       
+
+
+//const { keith } = require("../commandHandler");
+
+keith({
+    name: "del",
+    aliases: ["delete", "recall"],
+    category: "Utility",
+    usePrefix: false,
+    usage: "unsend (reply to bot message)",
+    version: "1.1",
+    cooldown: 5,
+    admin: false,
+
+    execute: async ({ client, event, reply, keithApi }) => {
+        if (!event.messageReply) {
+            return reply("⚠️ Please reply to a bot message to unsend it.");
+        }
+
+        const { messageReply } = event;
+
+        // Check if the replied message was sent by the bot
+        if (messageReply.senderID !== client.getCurrentUserID()) {
+            return reply("⚠️ You can only unsend bot messages!");
+        }
+
+        try {
+            await client.unsendMessage(messageReply.messageID);
+            console.log(`✅ Message unsent: ${messageReply.messageID}`);
+        } catch (error) {
+            console.error("❌ Error unsending message:", error);
+            reply("❌ Failed to unsend the message.");
+        }
+    },
+});
+                   
