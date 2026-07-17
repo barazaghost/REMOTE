@@ -3,6 +3,34 @@ const config = require("../set");
 
 
 
+keith({
+    name: "groupname",
+    aliases: ["setgcname"],
+    category: "Group",
+    usePrefix: false,
+    admin: true,
+    usage: "groupname <new name>",
+    version: "1.0",
+    cooldown: 10,
+
+    execute: async ({ client, event, args, reply, keithApi }) => {
+        const { threadID, messageID, senderID } = event;
+        const newName = args.join(" ");
+
+        if (!newName) {
+            return reply("⚠️ Usage: groupname <new name>");
+        }
+
+        try {
+            // 3-arg call: gcname(newName, threadID, initiatorID) — see theme.js for why.
+            await client.gcname(newName, threadID, senderID);
+            return reply(`✅ Group name changed to "${newName}"`);
+        } catch (err) {
+            return reply(`❌ Couldn't rename group: ${err.message}`);
+        }
+    }
+});
+
 
 keith({
     name: "groupinfo",
