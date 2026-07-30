@@ -930,49 +930,35 @@ async function forwardMediaToInbox(client, message) {
 //========================================================================================================================
 async function detectAndDownloadSocialMedia(client, message) {
     try {
-        // Check if autosocialdownload is enabled
         const settings = await getSettings();
         if (settings.autosocialdownload !== 'true') return;
-      //  if (autosocialdownload !== 'true') return;
-        
-       // if (!message?.message || message.key.fromMe) return;
-        
+
         const from = message.key.remoteJid;
-           // ===== ADD THIS BLOCKED GROUP CHECK =====
-      //  const from = message.key.remoteJid;
         const blockedGroup = "120363409121825594@g.us";
         if (from === blockedGroup) {
             console.log(`⛔ Social media download blocked in group: ${from}`);
             return;
         }
-        
-        // Don't process status broadcasts
+
         if (from === 'status@broadcast') return;
-        
-        // Get text from message
+
         const text = message.message?.conversation || 
-                    message.message?.extendedTextMessage?.text || 
-                    message.message?.imageMessage?.caption || '';
-        
+                     message.message?.extendedTextMessage?.text || 
+                     message.message?.imageMessage?.caption || '';
         if (!text) return;
-        
-        // Define the base API URL
+
         const apiurl = "https://apiskeith2-production-ec66.up.railway.app";
-        
-        // Social media regex patterns
+
         const patterns = {
-           // tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/@[\w.-]+\/video\/\d+|vt\.tiktok\.com\/[\w]+|vm\.tiktok\.com\/[\w]+|tiktok\.com\/t\/[\w]+)/i,
-          //  tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/(?:@[\w.-]+\/video\/\d+|t\/[\w-]+|v\/\d+)|(?:vm|vt)\.tiktok\.com\/[\w-]+)/i,
             tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/(?:@[\w.-]+\/video\/\d+|t\/[\w-]+|v\/\d+)|(?:vm|vt)\.tiktok\.com\/[\w-]+)/i,
             instagram: /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com\/(?:reel|p|tv)\/[\w-]+)/i,
             facebook: /(?:https?:\/\/)?(?:www\.)?(?:facebook\.com\/(?:watch\?v=\d+|share\/[\w]+\/[\w]+|reel\/\d+)|fb\.watch\/[\w]+)/i,
-          //  youtube: /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=[\w-]+|youtu\.be\/[\w-]+|youtube\.com\/shorts\/[\w-]+)/i,
             twitter: /(?:https?:\/\/)?(?:www\.)?(?:twitter\.com\/[\w]+\/status\/\d+|x\.com\/[\w]+\/status\/\d+)/i
         };
-        
+
         let platform = null;
         let url = null;
-        
+
         for (const [key, pattern] of Object.entries(patterns)) {
             const match = text.match(pattern);
             if (match) {
@@ -981,38 +967,45 @@ async function detectAndDownloadSocialMedia(client, message) {
                 break;
             }
         }
-        
+
         if (!platform || !url) return;
-        
+
         const apiEndpoints = {
             tiktok: `${apiurl}/download/tiktokdl3?url=${encodeURIComponent(url)}`,
             instagram: `${apiurl}/download/instadl?url=${encodeURIComponent(url)}`,
             facebook: `${apiurl}/download/fbdl?url=${encodeURIComponent(url)}`,
-         //   youtube: `${apiurl}/download/mp4?url=${encodeURIComponent(url)}`,
             twitter: `${apiurl}/download/twitter?url=${encodeURIComponent(url)}`
         };
-        
+
         const apiUrl = apiEndpoints[platform];
         if (!apiUrl) return;
-        
+
         try {
             const response = await axios.get(apiUrl);
-            
-            if (response.data && response.data.status === true && response.data.result) {
-                const videoUrl = response.data.result;
-                
-                // Send video directly using URL - no download needed
-                await client.sendMessage(from, {
-                    video: { url: videoUrl }
-                }, { quoted: message });
-                
-                console.log(`✅ Sent ${platform} video from: ${url}`);
+
+            if (response.data) {
+                if (platform === "instagram") {
+                    const videoUrl = response.data.download?.video_mp4;
+                    if (videoUrl) {
+                        await client.sendMessage(from, {
+                            video: { url: videoUrl }
+                        }, { quoted: message });
+                        console.log(`✅ Sent Instagram video from: ${url}`);
+                    } else {
+                        console.error("Instagram video URL not found in response");
+                    }
+                } else if (response.data.status === true && response.data.result) {
+                    const videoUrl = response.data.result;
+                    await client.sendMessage(from, {
+                        video: { url: videoUrl }
+                    }, { quoted: message });
+                    console.log(`✅ Sent ${platform} video from: ${url}`);
+                }
             }
-            
         } catch (error) {
             console.error(`${platform} download error:`, error.message);
         }
-        
+
     } catch (error) {
         console.error('Auto social download error:', error.message);
     }
