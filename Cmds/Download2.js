@@ -425,7 +425,8 @@ async (from, client, conText) => {
     const apiUrl = `${api}/download/instadl?url=${encodeURIComponent(q)}`;
     const response = await axios.get(apiUrl, { timeout: 100000 });
 
-    const result = response.data?.result;
+    const result = response.data?.download?.video_mp4;
+    const thumb = response.data?.thumbnail;
 
     if (!result) {
       return reply("❌ No video found for this Instagram link.");
@@ -436,6 +437,7 @@ async (from, client, conText) => {
       {
         video: { url: result },
         mimetype: "video/mp4"
+        //jpegThumbnail: thumb ? await getBuffer(thumb) : null
       },
       { quoted: mek }
     );
