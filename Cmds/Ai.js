@@ -881,11 +881,6 @@ keith({
 });
 //========================================================================================================================
 
-
-
-//========================================================================================================================
-
-
 keith({
   pattern: "vocalremover",
   aliases: ["removevocal", "aivocal", "extractvocal"],
@@ -917,17 +912,7 @@ keith({
       audio: { url: vocalUrl },
       mimetype: "audio/mpeg",
       fileName: "vocal.mp3",
-      ptt: false,
-      caption: `🎤 *${botname} Vocal Remover*\nExtracted vocals from your clip`,
-      contextInfo: {
-        externalAdReply: {
-          title: `${botname} Vocal Remover`,
-          body: "AI powered vocal extraction",
-          mediaType: 2,
-          thumbnailUrl: botPic,
-          sourceUrl: "https://keithsite.vercel.app"
-        }
-      }
+      ptt: false
     }, { quoted: mek });
 
   } catch (err) {
@@ -939,6 +924,10 @@ keith({
     }
   }
 });
+
+//========================================================================================================================
+
+
 //========================================================================================================================
 
 keith({
