@@ -15,6 +15,54 @@ const axios = require('axios');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+keith({
+  pattern: "twistalk",
+  aliases: ["stalktwitter", "twstalk", "twitterstalk"],
+  description: "Stalk Twitter profile using username",
+  category: "Stalker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, api } = conText;
+
+  if (!q) return reply("❌ Provide a Twitter username.\n\nExample: twistalk keithkeizzah");
+
+  try {
+    const res = await axios.get(`${api}/stalker/twitter?user=${encodeURIComponent(q)}`);
+    const data = res.data;
+
+    if (!data.status || !data.result) {
+      return reply("❌ Failed to fetch Twitter profile. Make sure the username is correct.");
+    }
+
+    const p = data.result;
+
+    const caption = `🐦 *Twitter Profile: @${p.username}*\n\n` +
+      `👤 *Name:* ${p.name || 'N/A'}\n` +
+      `📄 *Bio:* ${p.bio || 'No bio'}\n` +
+      `📍 *Location:* ${p.location || 'N/A'}\n` +
+      `✅ *Verified:* ${p.verified ? 'Yes' : 'No'}\n` +
+      `📅 *Joined:* ${p.created_at || 'N/A'}\n\n` +
+      `📊 *Stats*\n` +
+      `📝 *Posts:* ${p.posts || 0}\n` +
+      `👥 *Followers:* ${p.followers || 0}\n` +
+      `👣 *Following:* ${p.following || 0}\n` +
+      `❤️ *Likes:* ${p.likes || 0}`;
+
+    if (p.profilePic) {
+      await client.sendMessage(from, {
+        image: { url: p.profilePic },
+        caption
+      }, { quoted: mek });
+    } else {
+      await client.sendMessage(from, { text: caption }, { quoted: mek });
+    }
+
+  } catch (err) {
+    console.error("twistalk error:", err);
+    reply(`❌ Error: ${err.message}`);
+  }
+});
 //========================================================================================================================
 
 keith({
@@ -245,49 +293,7 @@ keith({
 //========================================================================================================================
 
 
-keith({
-  pattern: "twistalk",
-  aliases: ["stalktwitter", "twstalk"],
-  description: "Stalk Twitter profile using username",
-  category: "stalker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, reply, mek, api } = conText;
 
-  if (!q) return reply("❌ Provide a Twitter username.\n\nExample: twistalk keithkeizzah");
-
-  try {
-    const res = await axios.get(`${api}/stalker/twitter?user=${encodeURIComponent(q)}`);
-    const data = res.data;
-
-    if (!data.status || !data.result?.profile) {
-      return reply("❌ Failed to fetch Twitter profile. Make sure the username is correct.");
-    }
-
-    const { profile, stats } = data.result;
-    const caption = `🐦 *Twitter Profile: @${profile.username}*\n\n` +
-      `👤 Name: ${profile.displayName}\n` +
-      `🆔 ID: ${profile.id}\n` +
-      `📄 Bio: ${profile.description || "—"}\n` +
-      `📍 Location: ${profile.location || "—"}\n` +
-      `✅ Verified: ${profile.verified ? "Yes" : "No"}\n` +
-      `📅 Created: ${new Date(profile.createdAt).toDateString()}\n\n` +
-      `📊 *Stats*\n` +
-      `📝 Tweets: ${stats.tweets}\n` +
-      `👣 Following: ${stats.following}\n` +
-      `👥 Followers: ${stats.followers}\n` +
-      `❤️ Likes: ${stats.likes}\n` +
-      `🖼️ Media Posts: ${stats.media}`;
-
-    await client.sendMessage(from, {
-      image: { url: profile.images.avatar },
-      caption
-    }, { quoted: mek });
-  } catch (err) {
-    console.error("twistalk error:", err);
-    reply("❌ Error fetching Twitter profile: " + err.message);
-  }
-});
 //========================================================================================================================
 
 keith({
