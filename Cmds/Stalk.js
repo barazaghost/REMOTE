@@ -14,6 +14,60 @@ const axios = require('axios');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+keith({
+  pattern: "tiktokstalk",
+  aliases: ["ttstalk", "stalktiktok", "tiktokprofile"],
+  description: "Stalk TikTok profile using username",
+  category: "Stalker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, api } = conText;
+
+  if (!q) return reply("❌ Provide a TikTok username.\n\nExample: tiktokstalk keizzah4189");
+
+  try {
+    const res = await axios.get(`${api}/stalker/tiktok?user=${encodeURIComponent(q)}`);
+    const data = res.data;
+
+    if (!data.status || !data.result) {
+      return reply("❌ Failed to fetch TikTok profile. Make sure the username is correct.");
+    }
+
+    const p = data.result;
+    const stats = p.stats || {};
+
+    const caption = `👤 *TikTok Profile: @${p.username}*\n\n` +
+      `📛 *Name:* ${p.nickname || 'N/A'}\n` +
+      `🆔 *ID:* ${p.userId || 'N/A'}\n` +
+      `📝 *Bio:* ${p.signature || 'No bio'}\n` +
+      `🌐 *Language:* ${p.language || 'N/A'}\n` +
+      `🔒 *Private:* ${p.privateAccount ? 'Yes' : 'No'}\n` +
+      `✅ *Verified:* ${p.verified ? 'Yes' : 'No'}\n` +
+      `📅 *Joined:* ${p.createdAt ? new Date(p.createdAt).toDateString() : 'N/A'}\n\n` +
+      `📊 *Stats*\n` +
+      `👥 *Followers:* ${stats.followers || 0}\n` +
+      `👣 *Following:* ${stats.following || 0}\n` +
+      `❤️ *Hearts:* ${stats.hearts || 0}\n` +
+      `🎬 *Videos:* ${stats.videos || 0}\n` +
+      `🧑‍🤝‍🧑 *Friends:* ${stats.friends || 0}`;
+
+    const avatarUrl = p.avatar?.larger || p.avatar?.medium || p.avatar?.thumb;
+
+    if (avatarUrl) {
+      await client.sendMessage(from, {
+        image: { url: avatarUrl },
+        caption
+      }, { quoted: mek });
+    } else {
+      await client.sendMessage(from, { text: caption }, { quoted: mek });
+    }
+
+  } catch (err) {
+    console.error("tiktokstalk error:", err);
+    reply(`❌ Error: ${err.message}`);
+  }
+});
 //========================================================================================================================
 
 keith({
@@ -396,47 +450,3 @@ keith({
 });
 //========================================================================================================================
 //
-keith({
-  pattern: "tiktokstalk",
-  aliases: ["ttstalk", "stalktiktok"],
-  description: "Stalk TikTok profile using username",
-  category: "stalker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, reply, mek, api } = conText;
-
-  if (!q) return reply("❌ Provide a TikTok username.\n\nExample: tiktokstalk keizzah4189");
-
-  try {
-    const res = await axios.get(`${api}/stalker/tiktok?user=${encodeURIComponent(q)}`);
-    const data = res.data;
-
-    if (!data.status || !data.result?.profile) {
-      return reply("❌ Failed to fetch TikTok profile. Make sure the username is correct.");
-    }
-
-    const { profile, stats } = data.result;
-    const caption = `👤 *TikTok Profile: @${profile.username}*\n\n` +
-      `📛 Name: ${profile.nickname}\n` +
-      `🆔 ID: ${profile.id}\n` +
-      `🔗 Bio: ${profile.bio || "—"}\n` +
-      `🌐 Language: ${profile.language}\n` +
-      `🔒 Private: ${profile.private ? "Yes" : "No"}\n` +
-      `✅ Verified: ${profile.verified ? "Yes" : "No"}\n` +
-      `📅 Created: ${new Date(profile.createdAt).toDateString()}\n\n` +
-      `📊 *Stats*\n` +
-      `👥 Followers: ${stats.followers}\n` +
-      `👣 Following: ${stats.following}\n` +
-      `❤️ Likes: ${stats.likes}\n` +
-      `🎬 Videos: ${stats.videos}\n` +
-      `🧑‍🤝‍🧑 Friends: ${stats.friends}`;
-
-    await client.sendMessage(from, {
-      image: { url: profile.avatars.large },
-      caption
-    }, { quoted: mek });
-  } catch (err) {
-    console.error("tiktokstalk error:", err);
-    reply("❌ Error fetching TikTok profile: " + err.message);
-  }
-});
