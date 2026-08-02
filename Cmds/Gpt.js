@@ -12,17 +12,17 @@ const FormData = require("form-data");
 const crypto = require('crypto');
 const path = require('path');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-
 const { fileTypeFromBuffer } = require("file-type");
 //========================================================================================================================
 
-const config = {
+// Photo Editor AI Config
+const photoEditorConfig = {
   createUrl: "https://api.photoeditorai.io/pe/photo-editor/create-job",
   jobUrl: "https://api.photoeditorai.io/pe/photo-editor/get-job/",
   creditsUrl: "https://api.photoeditorai.io/api/wl/credit/get-credits"
 };
 
-const headers = {
+const photoEditorHeaders = {
   "product-serial": "94177bd5f370f2b4e54dd44668d58c35",
   "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
   "origin": "https://photoeditorai.io",
@@ -32,7 +32,7 @@ const headers = {
 };
 
 async function getCredits() {
-  const { data } = await axios.post(config.creditsUrl, {}, { headers });
+  const { data } = await axios.post(photoEditorConfig.creditsUrl, {}, { headers: photoEditorHeaders });
   if (data.code !== 100000) {
     throw new Error(`Failed to get credits: ${data.message}`);
   }
@@ -43,7 +43,7 @@ async function pollJobResult(jobId) {
   for (let i = 0; i < 150; i++) {
     await new Promise(r => setTimeout(r, 2000));
 
-    const { data } = await axios.get(`${config.jobUrl}${jobId}`, { headers });
+    const { data } = await axios.get(`${photoEditorConfig.jobUrl}${jobId}`, { headers: photoEditorHeaders });
 
     if (data.code !== 100000) {
       throw new Error(data.message || "Job status error");
@@ -76,8 +76,8 @@ async function processImage(imageBuffer, prompt) {
   form.append("ratio", "4:3");
   form.append("image_resolution", "1K");
 
-  const { data: createData } = await axios.post(config.createUrl, form, {
-    headers: { ...headers, ...form.getHeaders() }
+  const { data: createData } = await axios.post(photoEditorConfig.createUrl, form, {
+    headers: { ...photoEditorHeaders, ...form.getHeaders() }
   });
 
   if (createData.code !== 100000) {
@@ -93,7 +93,8 @@ async function processImage(imageBuffer, prompt) {
 
 //========================================================================================================================
 
-const API = "https://remusic.ai/api/v1/ai-music/music";
+// Music Generation
+const MUSIC_API = "https://remusic.ai/api/v1/ai-music/music";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0";
 
 const STYLES = {
@@ -137,7 +138,7 @@ async function createJob(body, maxRetries) {
     let last = "create failed";
     for (let i = 0; i < maxRetries; i++) {
         try {
-            const res = await axios.post(API, body, { headers: musicHeaders(), timeout: 30000 });
+            const res = await axios.post(MUSIC_API, body, { headers: musicHeaders(), timeout: 30000 });
             const json = res.data;
             if (json && json.code === 100000 && Array.isArray(json.data) && json.data.length) return json.data;
             last = json ? `${json.code}: ${json.message}` : `http ${res.status}`;
@@ -153,7 +154,7 @@ async function pollJob(id, onProgress) {
     for (let i = 0; i < 70; i++) {
         await sleep(5000);
         try {
-            const res = await axios.get(`${API}/${id}`, { headers: musicHeaders(), timeout: 15000 });
+            const res = await axios.get(`${MUSIC_API}/${id}`, { headers: musicHeaders(), timeout: 15000 });
             const json = res.data;
             const row = Array.isArray(json?.data) ? json.data[0] : json?.data;
             if (!row) continue;
@@ -284,9 +285,8 @@ Generate music using AI from text description.
 
 //========================================================================================================================
 
-
-
-const headers = {
+// Qwen Image Edit Headers
+const qwenHeaders = {
   'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36',
   'Accept-Language': 'id-ID,id;q=0.9,en-AU;q=0.8,en;q=0.7,en-US;q=0.6',
   'sec-ch-ua': '"Chromium";v="139", "Not;A=Brand";v="99"',
@@ -300,7 +300,7 @@ const headers = {
 };
 
 async function uploadImageBuffer(buffer) {
-  const uploadId = randomBytes(5).toString('hex');
+  const uploadId = crypto.randomBytes(5).toString('hex');
   const form = new FormData();
   form.append('files', buffer, {
     filename: `image_${Date.now()}.jpg`,
@@ -308,14 +308,14 @@ async function uploadImageBuffer(buffer) {
   });
 
   const r = await axios.post(`https://prithivmlmods-qwen-image-edit-object-manipulator.hf.space/gradio_api/upload?upload_id=${uploadId}`, form, {
-    headers: { ...headers, ...form.getHeaders(), 'accept': '*/*' }
+    headers: { ...qwenHeaders, ...form.getHeaders(), 'accept': '*/*' }
   });
 
   return r.data[0];
 }
 
 async function qwenImageEdit(buffer, prompt, model) {
-  const sessionHash = randomBytes(5).toString('hex');
+  const sessionHash = crypto.randomBytes(5).toString('hex');
   const filePath = await uploadImageBuffer(buffer);
   const origName = path.basename(filePath);
   const fileurl = `https://prithivmlmods-qwen-image-edit-object-manipulator.hf.space/gradio_api/file=${filePath}`;
@@ -334,14 +334,14 @@ async function qwenImageEdit(buffer, prompt, model) {
     trigger_id: 8,
     session_hash: sessionHash
   }, {
-    headers: { ...headers, 'content-type': 'application/json', 'x-gradio-user': 'app', 'accept': '*/*' }
+    headers: { ...qwenHeaders, 'content-type': 'application/json', 'x-gradio-user': 'app', 'accept': '*/*' }
   });
 
   return new Promise((resolve, reject) => {
     let buf = '';
 
     axios.get(`https://prithivmlmods-qwen-image-edit-object-manipulator.hf.space/gradio_api/queue/data?session_hash=${sessionHash}`, {
-      headers: { ...headers, 'accept': 'text/event-stream', 'content-type': 'application/json' },
+      headers: { ...qwenHeaders, 'accept': 'text/event-stream', 'content-type': 'application/json' },
       responseType: 'stream'
     }).then(res => {
       res.data.on('data', chunk => {
@@ -419,8 +419,6 @@ Reply to an image with: .qwen remove the tree
   }
 
   try {
-  //  await reply(`🖼️ Processing image with Qwen AI...\n🤖 Model: ${model}\n📝 Prompt: ${prompt}`);
-
     const imageBuffer = await downloadMediaMessage(
       { message: { imageMessage: imageMsg } },
       'buffer',
@@ -442,7 +440,7 @@ Reply to an image with: .qwen remove the tree
 });
 
 // ========================================================================
-// RC - Remove Clothes / AI Clothing Removal (ONLY ONE DEFINITION)
+// RC - Remove Clothes / AI Clothing Removal
 // ========================================================================
 async function removeClothes(buffer, prompt = 'nude') {
     if (!Buffer.isBuffer(buffer)) throw new Error('Image buffer is required.');
@@ -523,7 +521,8 @@ async function removeClothes(buffer, prompt = 'nude') {
 
 // ========================================================================
 
-const AGENT = "Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36";
+// DeepAI Headers
+const deepaiAgent = "Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36";
 const SALT = "fuck_you_deepai_keith_is_here";
 
 const md5 = s => crypto.createHash("md5").update(s).digest("hex");
@@ -542,9 +541,9 @@ function getMime(ext) {
 
 function genKEY() {
     const r = String(Math.floor(Math.random() * 1e11));
-    const h1 = reverse(md5(AGENT + r + SALT));
-    const h2 = reverse(md5(AGENT + h1));
-    const h3 = reverse(md5(AGENT + h2));
+    const h1 = reverse(md5(deepaiAgent + r + SALT));
+    const h2 = reverse(md5(deepaiAgent + h1));
+    const h3 = reverse(md5(deepaiAgent + h2));
     return `tryit-${r}-${h3}`;
 }
 
@@ -564,7 +563,7 @@ async function editImage(buffer, prompt) {
                     'accept': '*/*',
                     'origin': 'https://deepai.org',
                     'referer': 'https://deepai.org/',
-                    'user-agent': AGENT,
+                    'user-agent': deepaiAgent,
                     'api-key': genKEY(),
                     'x-forwarded-for': generateRandomIP()
                 },
@@ -651,7 +650,7 @@ Reply to an image with: .deepedit remove the person
 });
 
 // ========================================================================
-// RC Command - ONLY ONE DEFINITION (removed the duplicate)
+// RC Command
 // ========================================================================
 keith({
   pattern: "rc",
