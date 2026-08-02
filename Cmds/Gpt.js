@@ -10,6 +10,8 @@ const {
 const fs = require("fs");
 const FormData = require("form-data");
 const crypto = require('crypto');
+const path = require('path');
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 
 const { fileTypeFromBuffer } = require("file-type");
 //========================================================================================================================
@@ -282,43 +284,160 @@ Generate music using AI from text description.
 
 //========================================================================================================================
 
+
+
+const headers = {
+  'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36',
+  'Accept-Language': 'id-ID,id;q=0.9,en-AU;q=0.8,en;q=0.7,en-US;q=0.6',
+  'sec-ch-ua': '"Chromium";v="139", "Not;A=Brand";v="99"',
+  'sec-ch-ua-mobile': '?1',
+  'sec-ch-ua-platform': '"Android"',
+  'origin': 'https://prithivmlmods-qwen-image-edit-object-manipulator.hf.space',
+  'referer': 'https://prithivmlmods-qwen-image-edit-object-manipulator.hf.space/',
+  'sec-fetch-site': 'same-origin',
+  'sec-fetch-mode': 'cors',
+  'sec-fetch-dest': 'empty'
+};
+
+async function uploadImageBuffer(buffer) {
+  const uploadId = randomBytes(5).toString('hex');
+  const form = new FormData();
+  form.append('files', buffer, {
+    filename: `image_${Date.now()}.jpg`,
+    contentType: 'image/jpeg'
+  });
+
+  const r = await axios.post(`https://prithivmlmods-qwen-image-edit-object-manipulator.hf.space/gradio_api/upload?upload_id=${uploadId}`, form, {
+    headers: { ...headers, ...form.getHeaders(), 'accept': '*/*' }
+  });
+
+  return r.data[0];
+}
+
+async function qwenImageEdit(buffer, prompt, model) {
+  const sessionHash = randomBytes(5).toString('hex');
+  const filePath = await uploadImageBuffer(buffer);
+  const origName = path.basename(filePath);
+  const fileurl = `https://prithivmlmods-qwen-image-edit-object-manipulator.hf.space/gradio_api/file=${filePath}`;
+
+  const { data: { event_id } } = await axios.post('https://prithivmlmods-qwen-image-edit-object-manipulator.hf.space/gradio_api/queue/join', {
+    data: [
+      [{ image: { path: filePath, url: fileurl, size: null, orig_name: origName, mime_type: 'image/jpeg', is_stream: false, meta: { _type: 'gradio.FileData' } }, caption: null }],
+      prompt,
+      model,
+      0,
+      true,
+      1,
+      4
+    ],
+    fn_index: 1,
+    trigger_id: 8,
+    session_hash: sessionHash
+  }, {
+    headers: { ...headers, 'content-type': 'application/json', 'x-gradio-user': 'app', 'accept': '*/*' }
+  });
+
+  return new Promise((resolve, reject) => {
+    let buf = '';
+
+    axios.get(`https://prithivmlmods-qwen-image-edit-object-manipulator.hf.space/gradio_api/queue/data?session_hash=${sessionHash}`, {
+      headers: { ...headers, 'accept': 'text/event-stream', 'content-type': 'application/json' },
+      responseType: 'stream'
+    }).then(res => {
+      res.data.on('data', chunk => {
+        buf += chunk.toString();
+        const lines = buf.split('\n');
+        buf = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const j = JSON.parse(line.slice(6));
+            if (j.msg === 'process_completed' && j.event_id === event_id) {
+              const out = j.output?.data?.[0];
+              resolve({ url: out?.url, orig_name: out?.orig_name });
+            }
+          } catch {}
+        }
+      });
+
+      res.data.on('end', () => reject(new Error('stream ended without result')));
+      res.data.on('error', reject);
+    }).catch(reject);
+  });
+}
+
 keith({
-  pattern: "imageedit2",
-  aliases: ["nanobananapro", "nabpro", "editimg"],
+  pattern: "imageedit",
+  aliases: ["qwenedit", "qwenimage", "qwenai"],
+  description: "Edit image using Qwen AI (add/remove objects)",
   category: "Ai",
-  description: "Edit a quoted image with a prompt (PhotoEditor AI)",
   filename: __filename
 }, async (from, client, conText) => {
-  const { q, mek, quoted, quotedMsg, reply, isSuperUser } = conText;
-    if (!isSuperUser) return reply("❌ Owner Only Command!");
+  const { mek, quotedMsg, reply, q, isSuperUser } = conText;
 
-  if (!quotedMsg?.imageMessage) {
-    return reply("📌 Reply to an image with:\n`imageedit2 <prompt>`");
+  if (!isSuperUser) return reply("❌ Owner only!");
+
+  if (!quotedMsg) {
+    return reply(`📌 *Qwen Image Editor*
+    
+Edit images using AI - add or remove objects.
+
+*Usage:*
+Reply to an image with: .qwen remove the tree
+.qwen add a hat
+
+*Models:*
+1. Qwen-Image-Edit-2511-Object-Adder
+2. Qwen-Image-Edit-2511-Object-Remover
+3. QIE-2511-Object-Remover-v2
+4. Zoom-Master
+5. Extract-Outfit
+6. Outfit-Design-Layout
+
+*Examples:*
+.qwen remove the person
+.qwen add sunglasses | Qwen-Image-Edit-2511-Object-Adder`);
   }
+
   if (!q) {
-    return reply("❌ Provide a prompt!\nExample: imageedit2 make it black and white");
+    return reply("❌ Provide a prompt!\nExample: .qwen remove the background");
   }
 
-  await reply("🖼️ Processing your image...");
+  const imageMsg = quotedMsg.imageMessage;
+  if (!imageMsg) {
+    return reply("❌ Please reply to an image.");
+  }
 
-  let filePath = null;
+  let prompt = q;
+  let model = "Qwen-Image-Edit-2511-Object-Adder";
+
+  if (q.includes('|')) {
+    const parts = q.split('|').map(s => s.trim());
+    prompt = parts[0];
+    if (parts[1]) model = parts[1];
+  }
+
   try {
-    filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
-    const imageBuffer = fs.readFileSync(filePath);
+  //  await reply(`🖼️ Processing image with Qwen AI...\n🤖 Model: ${model}\n📝 Prompt: ${prompt}`);
 
-    const resultBuffer = await processImage(imageBuffer, q);
+    const imageBuffer = await downloadMediaMessage(
+      { message: { imageMessage: imageMsg } },
+      'buffer',
+      {},
+      { reuploadRequest: client.updateMediaMessage, logger: console }
+    );
+
+    const result = await qwenImageEdit(imageBuffer, prompt, model);
 
     await client.sendMessage(from, {
-      image: resultBuffer
+      image: { url: result.url },
+      caption: `✅ *Image Edited with Qwen AI*\n📝 *Prompt:* ${prompt}\n🤖 *Model:* ${model}`
     }, { quoted: mek });
 
   } catch (err) {
-    console.error("imageedit2 error:", err);
+    console.error("qwen error:", err);
     await reply(`❌ Error: ${err.message}`);
-  } finally {
-    if (filePath && fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
   }
 });
 
@@ -473,7 +592,7 @@ async function editImage(buffer, prompt) {
 // ========================================================================
 
 keith({
-    pattern: "imageedit",
+    pattern: "imageedit2",
     aliases: ["deepai", "dimage", "editai"],
     category: "Ai",
     description: "Edit image using DeepAI (remove objects, add elements)"
