@@ -487,11 +487,12 @@ keith({
 });
 //========================================================================================================================
 
+
 keith({
   pattern: "ytstalk",
-  aliases: ["youtubestalk", "ytchannelstalk"],
+  aliases: ["youtubestalk", "ytchannelstalk", "ytchannel"],
   description: "Stalk a YouTube channel using username",
-  category: "stalker",
+  category: "Stalker",
   filename: __filename
 }, async (from, client, conText) => {
   const { q, reply, mek, api } = conText;
@@ -502,35 +503,34 @@ keith({
     const res = await axios.get(`${api}/stalker/ytchannel?user=${encodeURIComponent(q)}`);
     const data = res.data;
 
-    if (!data.status || !data.result?.channel) {
+    if (!data.status || !data.result) {
       return reply("❌ Failed to fetch YouTube channel. Make sure the username is correct.");
     }
 
-    const { channel, videos } = data.result;
-    const caption = `📺 *YouTube Channel: ${channel.username}*\n\n` +
-      `👤 Name: ${channel.username.replace("@", "")}\n` +
-      `🔗 URL: ${channel.url}\n` +
-      `📄 Description: ${channel.description || "—"}\n` +
-      `📊 Subscribers: ${channel.stats.subscribers}\n` +
-      `🎬 Videos: ${channel.stats.videos}\n\n` +
-      `🆕 *Recent Uploads:*` +
-      videos.map((v, i) => `\n\n${i + 1}. *${v.title}*\n📅 ${v.published}\n👁️ ${v.views} views\n⏱️ ${v.duration}\n🔗 ${v.url}`).join("");
+    const { channel, stats } = data.result;
 
-    await client.sendMessage(from, {
-      image: { url: channel.avatar },
-      caption
-    }, { quoted: mek });
+    const caption = `📺 *YouTube Channel*\n\n` +
+      `📛 *Name:* ${channel.name || channel.username || 'N/A'}\n` +
+      `🆔 *ID:* ${channel.id || 'N/A'}\n` +
+      `📝 *Description:* ${channel.description || 'No description'}\n` +
+      `📍 *Country:* ${channel.country || 'N/A'}\n` +
+      `📅 *Created:* ${channel.createdAt ? new Date(channel.createdAt).toDateString() : 'N/A'}\n\n` +
+      `📊 *Stats*\n` +
+      `👥 *Subscribers:* ${stats?.subscribers || 0}\n` +
+      `🎬 *Videos:* ${stats?.videos || 0}\n` +
+      `👁️ *Views:* ${stats?.views || 0}`;
+
+    if (channel.avatar) {
+      await client.sendMessage(from, {
+        image: { url: channel.avatar },
+        caption
+      }, { quoted: mek });
+    } else {
+      await client.sendMessage(from, { text: caption }, { quoted: mek });
+    }
+
   } catch (err) {
     console.error("ytstalk error:", err);
-    reply("❌ Error fetching YouTube channel: " + err.message);
+    reply(`❌ Error: ${err.message}`);
   }
 });
-//========================================================================================================================
-
-
-
-//========================================================================================================================
-
-
-//========================================================================================================================
-
