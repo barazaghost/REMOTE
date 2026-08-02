@@ -13,6 +13,54 @@ const axios = require('axios');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+
+keith({
+  pattern: "igstalk",
+  aliases: ["stalkig", "instagramstalk", "igprofile"],
+  description: "Stalk Instagram profile using username",
+  category: "Stalker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, api } = conText;
+
+  if (!q) return reply("❌ Provide an Instagram username.\n\nExample: igstalk keithkeizzah");
+
+  try {
+    const res = await axios.get(`${api}/stalker/ig?user=${encodeURIComponent(q)}`);
+    const data = res.data;
+
+    if (!data.status || !data.result) {
+      return reply("❌ Failed to fetch Instagram profile. Make sure the username is correct.");
+    }
+
+    const p = data.result;
+
+    const caption = `📸 *Instagram Profile: @${p.username}*\n\n` +
+      `👤 *Name:* ${p.name || 'N/A'}\n` +
+      `📝 *Bio:* ${p.bio || 'No bio'}\n` +
+      `🔒 *Private:* ${p.isPrivate ? 'Yes' : 'No'}\n` +
+      `✅ *Verified:* ${p.isVerified ? 'Yes' : 'No'}\n\n` +
+      `📊 *Stats*\n` +
+      `📸 *Posts:* ${p.posts || 0}\n` +
+      `👥 *Followers:* ${p.followers || 0}\n` +
+      `👣 *Following:* ${p.following || 0}\n\n` +
+      `🔗 *Profile:* ${p.profileUrl || `https://instagram.com/${p.username}`}`;
+
+    if (p.profilePic) {
+      await client.sendMessage(from, {
+        image: { url: p.profilePic },
+        caption
+      }, { quoted: mek });
+    } else {
+      await client.sendMessage(from, { text: caption }, { quoted: mek });
+    }
+
+  } catch (err) {
+    console.error("igstalk error:", err);
+    reply(`❌ Error: ${err.message}`);
+  }
+});
 //========================================================================================================================
 
 keith({
@@ -350,103 +398,6 @@ keith({
 
 //========================================================================================================================
 
-keith({
-  pattern: "repostalk",
-  aliases: ["ghstalk", "githubrepostalk"],
-  description: "Stalk a GitHub repository using its URL",
-  category: "stalker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, reply, mek, api } = conText;
 
-  if (!q || !q.includes("github.com")) {
-    return reply("❌ Provide a valid GitHub repository URL.\n\nExample: repostalk https://github.com/Keithkeizzah/KEITH-MD");
-  }
-
-  try {
-    const res = await axios.get(`${api}/stalker/repostalk?url=${encodeURIComponent(q)}`);
-    const data = res.data;
-
-    if (!data.status || !data.result?.repo) {
-      return reply("❌ Failed to fetch repository data. Make sure the URL is correct.");
-    }
-
-    const { repo, owner } = data.result;
-    const caption = `📦 *GitHub Repo: ${repo.fullName}*\n\n` +
-      `📝 Description: ${repo.description || "—"}\n` +
-      `🔗 URL: ${repo.url}\n` +
-      `🔒 Private: ${repo.isPrivate ? "Yes" : "No"}\n` +
-      `🌐 Visibility: ${repo.visibility}\n` +
-      `🧑‍💻 Language: ${repo.language}\n` +
-      `📄 License: ${repo.license?.name || "—"}\n` +
-      `🌱 Default Branch: ${repo.defaultBranch}\n\n` +
-      `📊 *Stats*\n` +
-      `⭐ Stars: ${repo.stars}\n` +
-      `👁️ Watchers: ${repo.watchers}\n` +
-      `🍴 Forks: ${repo.forks}\n` +
-      `🐞 Issues: ${repo.openIssues}\n` +
-      `📦 Size: ${repo.size} KB\n\n` +
-      `👤 *Owner: ${owner.username}*\n` +
-      `🔗 Profile: ${owner.profileUrl}\n` +
-      `🆔 ID: ${owner.id}\n` +
-      `👤 Type: ${owner.type}`;
-
-    await client.sendMessage(from, {
-      image: { url: owner.avatar },
-      caption
-    }, { quoted: mek });
-  } catch (err) {
-    console.error("repostalk error:", err);
-    reply("❌ Error fetching GitHub repo data: " + err.message);
-  }
-});
 //========================================================================================================================
 
-keith({
-  pattern: "igstalk",
-  aliases: ["stalkig", "instastalk"],
-  description: "Stalk Instagram profile using username",
-  category: "stalker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, reply, mek, api } = conText;
-
-  if (!q) return reply("❌ Provide an Instagram username.\n\nExample: igstalk keithkeizzah");
-
-  try {
-    const res = await axios.get(`${api}/stalker/ig?user=${encodeURIComponent(q)}`);
-    const data = res.data;
-
-    if (!data.status || !data.result?.profile) {
-      return reply("❌ Failed to fetch Instagram profile. Make sure the username is correct.");
-    }
-
-    const { profile, stats, status } = data.result;
-    const caption = `📸 *Instagram Profile: ${profile.username}*\n\n` +
-      `👤 Name: ${profile.fullName}\n` +
-      `🔗 Profile: ${profile.profileUrl}\n` +
-      `📄 Bio: ${profile.biography || "—"}\n` +
-      `🌐 External Link: ${profile.externalUrl || "—"}\n` +
-      `🏷️ Category: ${profile.category || "—"}\n` +
-      `🧾 Account Type: ${profile.accountType || "—"}\n\n` +
-      `📊 *Stats*\n` +
-      `👥 Followers: ${stats.followers}\n` +
-      `👣 Following: ${stats.following}\n` +
-      `🖼️ Posts: ${stats.mediaCount}\n` +
-      `📈 Engagement: ${stats.engagementRate}\n` +
-      `🎞️ Clips: ${stats.clipsCount}\n\n` +
-      `🔒 Private: ${status.isPrivate ? "Yes" : "No"}\n` +
-      `✅ Verified: ${status.isVerified ? "Yes" : "No"}\n` +
-      `🏢 Business: ${status.isBusiness ? "Yes" : "No"}`;
-
-    await client.sendMessage(from, {
-      image: { url: profile.avatars.hd },
-      caption
-    }, { quoted: mek });
-  } catch (err) {
-    console.error("igstalk error:", err);
-    reply("❌ Error fetching Instagram profile: " + err.message);
-  }
-});
-//========================================================================================================================
-//
