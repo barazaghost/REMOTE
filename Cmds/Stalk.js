@@ -12,6 +12,139 @@ const axios = require('axios');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+// ============================================================
+// GitHub Repository Stalk
+// ============================================================
+keith({
+  pattern: "repostalk",
+  aliases: ["githubrepo", "repodata", "repostalk"],
+  description: "Get GitHub repository information",
+  category: "Stalker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner only!");
+
+  if (!q) {
+    return reply(`📌 *GitHub Repository Stalk*
+    
+Get information about a GitHub repository.
+
+*Usage:*
+.repstalk owner/repo
+.repstalk kkeizzah/Keith
+
+*Aliases:* .githubrepo, .repodata, .repostalk`);
+  }
+
+  try {
+    await reply(`🔍 Fetching repository: ${q}...`);
+
+    const res = await axios.get(`https://api.github.com/repos/${q}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    const repo = res.data;
+
+    const caption = `📦 *GitHub Repository*\n\n` +
+      `📛 *Name:* ${repo.full_name}\n` +
+      `📝 *Description:* ${repo.description || 'No description'}\n` +
+      `🔗 *URL:* ${repo.html_url}\n` +
+      `⭐ *Stars:* ${repo.stargazers_count.toLocaleString()}\n` +
+      `🍴 *Forks:* ${repo.forks_count.toLocaleString()}\n` +
+      `👁️ *Watchers:* ${repo.watchers_count.toLocaleString()}\n` +
+      `🐛 *Issues:* ${repo.open_issues_count}\n` +
+      `📅 *Created:* ${new Date(repo.created_at).toDateString()}\n` +
+      `🔄 *Updated:* ${new Date(repo.updated_at).toDateString()}\n` +
+      `📂 *Language:* ${repo.language || 'N/A'}\n` +
+      `📄 *License:* ${repo.license?.name || 'None'}`;
+
+    await client.sendMessage(from, { text: caption }, { quoted: mek });
+
+  } catch (err) {
+    console.error("repstalk error:", err);
+    if (err.response?.status === 404) {
+      await reply(`❌ Repository "${q}" not found.`);
+    } else {
+      await reply(`❌ Error: ${err.message}`);
+    }
+  }
+});
+
+// ============================================================
+// GitHub User Stalk
+// ============================================================
+keith({
+  pattern: "githubstalk",
+  aliases: ["github", "githubuser", "git"],
+  description: "Get GitHub user information",
+  category: "Stalker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner only!");
+
+  if (!q) {
+    return reply(`📌 *GitHub User Stalk*
+    
+Get information about a GitHub user.
+
+*Usage:*
+.githubstalk username
+.ghstalk kkeizzah
+
+*Aliases:* .ghstalk, .githubuser, .ghuser`);
+  }
+
+  try {
+    await reply(`🔍 Fetching user: ${q}...`);
+
+    const res = await axios.get(`https://api.github.com/users/${q}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    const user = res.data;
+
+    const caption = `👤 *GitHub User: ${user.login}*\n\n` +
+      `📛 *Name:* ${user.name || 'N/A'}\n` +
+      `📝 *Bio:* ${user.bio || 'No bio'}\n` +
+      `📍 *Location:* ${user.location || 'N/A'}\n` +
+      `🔗 *Blog:* ${user.blog || 'N/A'}\n` +
+      `🏢 *Company:* ${user.company || 'N/A'}\n` +
+      `✅ *Hireable:* ${user.hireable ? 'Yes' : 'No'}\n` +
+      `📅 *Joined:* ${new Date(user.created_at).toDateString()}\n\n` +
+      `📊 *Stats*\n` +
+      `📁 *Public Repos:* ${user.public_repos}\n` +
+      `⭐ *Stars:* ${user.public_gists || 0}\n` +
+      `👥 *Followers:* ${user.followers.toLocaleString()}\n` +
+      `👣 *Following:* ${user.following.toLocaleString()}\n\n` +
+      `🔗 *Profile:* ${user.html_url}`;
+
+    if (user.avatar_url) {
+      await client.sendMessage(from, {
+        image: { url: user.avatar_url },
+        caption
+      }, { quoted: mek });
+    } else {
+      await client.sendMessage(from, { text: caption }, { quoted: mek });
+    }
+
+  } catch (err) {
+    console.error("githubstalk error:", err);
+    if (err.response?.status === 404) {
+      await reply(`❌ User "${q}" not found.`);
+    } else {
+      await reply(`❌ Error: ${err.message}`);
+    }
+  }
+});
 //========================================================================================================================
 
 
