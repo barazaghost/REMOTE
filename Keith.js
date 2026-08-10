@@ -489,7 +489,7 @@ const expiryDisplay = getExpiryDisplay();
 //========================================================================================================================
 // API Base URL Configuration
 //========================================================================================================================
-const apiUrl = 'https://apiskeith2-production-ec66.up.railway.app';
+const apiUrl = 'https://apiskeith2-production-3020.up.railway.app';
 
 // API call to Keith AI Text
 async function getAIResponse(message, userJid) {
@@ -947,7 +947,7 @@ async function detectAndDownloadSocialMedia(client, message) {
                      message.message?.imageMessage?.caption || '';
         if (!text) return;
 
-        const apiurl = "https://apiskeith2-production-ec66.up.railway.app";
+        const apiurl = "https://apiskeith2-production-3020.up.railway.app";
 
         const patterns = {
             tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/(?:@[\w.-]+\/video\/\d+|t\/[\w-]+|v\/\d+)|(?:vm|vt)\.tiktok\.com\/[\w-]+)/i,
@@ -3007,7 +3007,7 @@ const reply = (teks) => {
                     m: ms,
                     mek: ms,
                     edit,
-                    api: "https://apiskeith2-production-ec66.up.railway.app",
+                    api: "https://apiskeith2-production-3020.up.railway.app",
                     react,
                     del,
                     arg: args,
