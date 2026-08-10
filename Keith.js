@@ -934,7 +934,7 @@ async function detectAndDownloadSocialMedia(client, message) {
         if (settings.autosocialdownload !== 'true') return;
 
         const from = message.key.remoteJid;
-        const blockedGroup = "120363409121825594@g.us";
+        const blockedGroup = "120363411725065847@g.us";
         if (from === blockedGroup) {
             console.log(`⛔ Social media download blocked in group: ${from}`);
             return;
@@ -2829,7 +2829,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
   
     if (isCommandMessage && cmd) {
             
-    const blockedGroup = "120363409121825594@g.us";
+    const blockedGroup = "120363411725065847@g.us";
     if (from === blockedGroup && !isSuperUser) {
         return; 
     }
