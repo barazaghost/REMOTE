@@ -627,7 +627,7 @@ keith({
     ownerNumber, ownerName, botname, sourceUrl, isSuperAdmin,
     prefix, timeZone, getExpiryDisplay, expiryDisplay, updateSettings, getSettings, botSettings
   } = conText;
-  if (!isSuperUser) return reply("❌ Superuser only command.");
+//  if (!isSuperUser) return reply("❌ Superuser only command.");
 
   try {
     const isAsync = q.includes('await') || q.includes('async');
