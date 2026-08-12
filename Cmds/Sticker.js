@@ -288,7 +288,7 @@ keith({
     if (set.stickers.length > MAX_STICKERS) {
       replyMsg += `\n⚠️ Only first ${MAX_STICKERS} stickers processed.`;
     }
-    await reply(replyMsg);
+    //await reply(replyMsg);
 
   } catch (err) {
     console.error("tgs error:", err);
@@ -441,7 +441,7 @@ keith({
       }
     }, { quoted: mek });
 
-    await reply(`Sticker pack "${data.result.query}" sent! (${stickerBuffers.length} stickers)`);
+ //   await reply(`Sticker pack "${data.result.query}" sent! (${stickerBuffers.length} stickers)`);
 
   } catch (err) {
     console.error("stickersearch error:", err);
