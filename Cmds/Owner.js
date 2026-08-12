@@ -1,6 +1,5 @@
 
 
-
 const { keith } = require('../commandHandler');
 const { S_WHATSAPP_NET, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const Jimp = require('jimp');
@@ -14,6 +13,36 @@ const axios = require('axios');
 const util = require('util');
 
 const { sendInteractiveMessage } = require('gifted-btns');
+//========================================================================================================================
+
+// Debug helper - shows exactly what identity info Baileys gave us for the sender / quoted
+// user, so username-based sudo checks can be verified against real data instead of guesswork.
+keith({
+  pattern: "whoami",
+  aliases: ["myid", "debugid"],
+  category: "Owner",
+  description: "Debug: show sender/quoted jid + username info",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { reply, isSuperUser, sender, senderUsername, quotedUser, quotedUsername, mek } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  const lines = [
+    "*🔎 Identity Debug*",
+    "",
+    `sender jid: ${sender || '(none)'}`,
+    `senderUsername: ${senderUsername || '(none resolved)'}`,
+    "",
+    `quotedUser jid: ${quotedUser || '(no quoted message)'}`,
+    `quotedUsername: ${quotedUsername || '(none resolved)'}`,
+    "",
+    `key.participantUsername: ${mek?.key?.participantUsername || '(undefined)'}`,
+    `key.remoteJidUsername: ${mek?.key?.remoteJidUsername || '(undefined)'}`
+  ];
+
+  await reply(lines.join("\n"));
+});
 //========================================================================================================================
 
 keith({
@@ -1382,45 +1411,62 @@ keith({
   description: "Sets User as Sudo",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, reply, isSuperUser, quotedUser, quotedMsg, q, setSudo } = conText;
+  const { mek, reply, isSuperUser, quotedUser, quotedUsername, quotedMsg, q, setSudo } = conText;
 
   if (!isSuperUser) {
     return reply("❌ Owner Only Command!");
   }
 
   let targetNumber;
+  let targetUsername;
 
-  // Case 1: quoted user
-  if (quotedMsg && quotedUser) {
-    let result = quotedUser;
-    if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
-      result = quotedUser.replace('@', '') + '@lid';
+  // Case 1: quoted user - check username first, fall back to jid exactly like before
+  if (quotedMsg && (quotedUsername || quotedUser)) {
+    if (quotedUsername) {
+      targetUsername = quotedUsername;
     }
-    let finalResult = result;
-    if (result.includes('@lid')) {
-      finalResult = await client.getJidFromLid(result);
+
+    if (quotedUser) {
+      let result = quotedUser;
+      if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
+        result = quotedUser.replace('@', '') + '@lid';
+      }
+      let finalResult = result;
+      if (result.includes('@lid')) {
+        finalResult = await client.getJidFromLid(result);
+      }
+      targetNumber = finalResult.split("@")[0];
     }
-    targetNumber = finalResult.split("@")[0];
   }
 
-  // Case 2: direct number in args
-  if (!targetNumber && q) {
-    const possibleNumber = q.trim().split(/\s+/).find(part => /^\d+$/.test(part));
-    if (!possibleNumber || possibleNumber.length < 5) {
-      return reply("❌ Please provide a valid phone number (at least 5 digits).");
+  // Case 2: direct number or @username in args
+  if (!targetNumber && !targetUsername && q) {
+    const parts = q.trim().split(/\s+/);
+    const possibleUsername = parts.find(part => part.startsWith('@') && !/^\d+$/.test(part.slice(1)));
+    const possibleNumber = parts.find(part => /^\d+$/.test(part));
+
+    if (possibleUsername) targetUsername = possibleUsername.replace('@', '').toLowerCase();
+    if (possibleNumber && possibleNumber.length >= 5) targetNumber = possibleNumber;
+
+    if (!targetNumber && !targetUsername) {
+      return reply("❌ Please provide a valid phone number (at least 5 digits) or @username.");
     }
-    targetNumber = possibleNumber;
   }
 
-  if (!targetNumber) {
-    return reply("❌ Please reply to a user or provide a phone number.\nExample: .setsudo 254748387615");
+  if (!targetNumber && !targetUsername) {
+    return reply("❌ Please reply to a user or provide a phone number/username.\nExample: .setsudo 254748387615\nExample: .setsudo @veske_rs");
   }
+
+  // A username alone with no known jid still needs a jid to satisfy the DB - if we truly
+  // only have a username, store it as both jid and username so lookups by username work.
+  const jidToStore = targetNumber || targetUsername;
 
   try {
-    const added = await setSudo(targetNumber);
+    const added = await setSudo(jidToStore, targetUsername);
+    const label = targetUsername ? `@${targetUsername}` : `@${targetNumber}`;
     const msg = added
-      ? `✅ Added @${targetNumber} to sudo list.`
-      : `⚠️ @${targetNumber} is already in sudo list.`;
+      ? `✅ Added ${label} to sudo list.`
+      : `⚠️ ${label} is already in sudo list.`;
 
     await client.sendMessage(from, {
       text: msg,
@@ -1443,44 +1489,57 @@ keith({
   category: "Owner",
   description: "Deletes User as Sudo",
   filename: __filename
-}, async (from, client, { mek, reply, isSuperUser, quotedUser, quotedMsg, q, delSudo }) => {
+}, async (from, client, { mek, reply, isSuperUser, quotedUser, quotedUsername, quotedMsg, q, delSudo }) => {
   if (!isSuperUser) {
     return reply("❌ Owner Only Command!");
   }
 
-  let targetNumber;
+  let targetIdentifier;
+  let targetLabel;
 
-  // Case 1: quoted user
-  if (quotedMsg && quotedUser) {
-    let result = quotedUser;
-    if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
-      result = quotedUser.replace('@', '') + '@lid';
+  // Case 1: quoted user - check username first, fall back to jid exactly like before
+  if (quotedMsg && (quotedUsername || quotedUser)) {
+    if (quotedUsername) {
+      targetIdentifier = quotedUsername;
+      targetLabel = quotedUsername;
+    } else {
+      let result = quotedUser;
+      if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
+        result = quotedUser.replace('@', '') + '@lid';
+      }
+      let finalResult = result;
+      if (result.includes('@lid')) {
+        finalResult = await client.getJidFromLid(result);
+      }
+      targetIdentifier = finalResult.split("@")[0];
+      targetLabel = targetIdentifier;
     }
-    let finalResult = result;
-    if (result.includes('@lid')) {
-      finalResult = await client.getJidFromLid(result);
-    }
-    targetNumber = finalResult.split("@")[0];
   }
 
-  // Case 2: direct number in args
-  if (!targetNumber && q) {
-    const possibleNumber = q.trim().split(/\s+/).find(part => /^\d+$/.test(part));
-    if (!possibleNumber || possibleNumber.length < 5) {
-      return reply("❌ Please provide a valid phone number (at least 5 digits).");
+  // Case 2: direct number or @username in args
+  if (!targetIdentifier && q) {
+    const parts = q.trim().split(/\s+/);
+    const possibleUsername = parts.find(part => part.startsWith('@') && !/^\d+$/.test(part.slice(1)));
+    const possibleNumber = parts.find(part => /^\d+$/.test(part));
+
+    if (possibleUsername) {
+      targetIdentifier = possibleUsername.replace('@', '').toLowerCase();
+      targetLabel = targetIdentifier;
+    } else if (possibleNumber && possibleNumber.length >= 5) {
+      targetIdentifier = possibleNumber;
+      targetLabel = possibleNumber;
     }
-    targetNumber = possibleNumber;
   }
 
-  if (!targetNumber) {
-    return reply("❌ Please reply to a user or provide a phone number.\nExample: .delsudo 254748387615");
+  if (!targetIdentifier) {
+    return reply("❌ Please reply to a user or provide a phone number/username.\nExample: .delsudo 254748387615\nExample: .delsudo @veske_rs");
   }
 
   try {
-    const removed = await delSudo(targetNumber);
+    const removed = await delSudo(targetIdentifier);
     const msg = removed
-      ? `❌ Removed @${targetNumber} from sudo list.`
-      : `⚠️ @${targetNumber} is not in the sudo list.`;
+      ? `❌ Removed @${targetLabel} from sudo list.`
+      : `⚠️ @${targetLabel} is not in the sudo list.`;
 
     await client.sendMessage(from, {
       text: msg,
@@ -1501,44 +1560,57 @@ keith({
   category: "Owner",
   description: "Check if user is sudo",
   filename: __filename
-}, async (from, client, { mek, reply, isSuperUser, quotedUser, quotedMsg, q, isSudo }) => {
+}, async (from, client, { mek, reply, isSuperUser, quotedUser, quotedUsername, quotedMsg, q, isSudo }) => {
   if (!isSuperUser) {
     return reply("❌ Owner Only Command!");
   }
 
-  let targetNumber;
+  let targetIdentifier;
+  let targetLabel;
 
-  // Case 1: quoted user
-  if (quotedMsg && quotedUser) {
-    let result = quotedUser;
-    if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
-      result = quotedUser.replace('@', '') + '@lid';
+  // Case 1: quoted user - check username first, fall back to jid exactly like before
+  if (quotedMsg && (quotedUsername || quotedUser)) {
+    if (quotedUsername) {
+      targetIdentifier = quotedUsername;
+      targetLabel = quotedUsername;
+    } else {
+      let result = quotedUser;
+      if (quotedUser.startsWith('@') && quotedUser.includes('@lid')) {
+        result = quotedUser.replace('@', '') + '@lid';
+      }
+      let finalResult = result;
+      if (result.includes('@lid')) {
+        finalResult = await client.getJidFromLid(result);
+      }
+      targetIdentifier = finalResult.split("@")[0];
+      targetLabel = targetIdentifier;
     }
-    let finalResult = result;
-    if (result.includes('@lid')) {
-      finalResult = await client.getJidFromLid(result);
-    }
-    targetNumber = finalResult.split("@")[0];
   }
 
-  // Case 2: direct number in args
-  if (!targetNumber && q) {
-    const possibleNumber = q.trim().split(/\s+/).find(part => /^\d+$/.test(part));
-    if (!possibleNumber || possibleNumber.length < 5) {
-      return reply("❌ Please provide a valid phone number (at least 5 digits).");
+  // Case 2: direct number or @username in args
+  if (!targetIdentifier && q) {
+    const parts = q.trim().split(/\s+/);
+    const possibleUsername = parts.find(part => part.startsWith('@') && !/^\d+$/.test(part.slice(1)));
+    const possibleNumber = parts.find(part => /^\d+$/.test(part));
+
+    if (possibleUsername) {
+      targetIdentifier = possibleUsername.replace('@', '').toLowerCase();
+      targetLabel = targetIdentifier;
+    } else if (possibleNumber && possibleNumber.length >= 5) {
+      targetIdentifier = possibleNumber;
+      targetLabel = possibleNumber;
     }
-    targetNumber = possibleNumber;
   }
 
-  if (!targetNumber) {
-    return reply("❌ Please reply to a user or provide a phone number.\nExample: .issudo 254748387615");
+  if (!targetIdentifier) {
+    return reply("❌ Please reply to a user or provide a phone number/username.\nExample: .issudo 254748387615\nExample: .issudo @veske_rs");
   }
 
   try {
-    const isUserSudo = await isSudo(targetNumber);
+    const isUserSudo = await isSudo(targetIdentifier);
     const msg = isUserSudo
-      ? `✅ @${targetNumber} is a sudo user.`
-      : `❌ @${targetNumber} is not a sudo user.`;
+      ? `✅ @${targetLabel} is a sudo user.`
+      : `❌ @${targetLabel} is not a sudo user.`;
 
     await client.sendMessage(from, {
       text: msg,
@@ -1558,7 +1630,7 @@ keith({
   category: "Owner",
   description: "Get All Sudo Users",
 }, async (from, client, conText) => {
-  const { mek, reply, react, isSuperUser, getSudoNumbers, dev, devNumbers } = conText;
+  const { mek, reply, react, isSuperUser, getSudoNumbers, getSudoUsernames, dev, devNumbers, devUsernames } = conText;
 
   try {
     if (!isSuperUser) {
@@ -1566,16 +1638,20 @@ keith({
       return reply("❌ Owner Only Command!");
     }
 
-    // Get sudo numbers from database
+    // Get sudo numbers/usernames from database
     const sudoFromDB = await getSudoNumbers() || [];
-    
+    const sudoUsernamesFromDB = (typeof getSudoUsernames === 'function')
+      ? (await getSudoUsernames() || [])
+      : [];
+
     // Current dev from settings
     const currentDev = dev ? [dev.replace(/\D/g, '')] : [];
 
     // Combine all sudo users
     const allSudos = [...new Set([...sudoFromDB, ...devNumbers, ...currentDev])];
+    const allSudoUsernames = [...new Set([...sudoUsernamesFromDB, ...(devUsernames || [])])];
 
-    if (!allSudos.length) {
+    if (!allSudos.length && !allSudoUsernames.length) {
       return reply("⚠️ No sudo users found.");
     }
 
@@ -1586,6 +1662,15 @@ keith({
       msg += `*Database Sudo Users (${sudoFromDB.length}):*\n`;
       sudoFromDB.forEach((num, i) => {
         msg += `${i + 1}. wa.me/${num}\n`;
+      });
+      msg += '\n';
+    }
+
+    // Sudo usernames (db + hardcoded devUsernames)
+    if (allSudoUsernames.length > 0) {
+      msg += `*Sudo Usernames (${allSudoUsernames.length}):*\n`;
+      allSudoUsernames.forEach((uname, i) => {
+        msg += `${i + 1}. @${uname}\n`;
       });
       msg += '\n';
     }
@@ -1608,7 +1693,7 @@ keith({
       msg += '\n';
     }
 
-    msg += `*Total Sudo Users: ${allSudos.length}*`;
+    msg += `*Total Sudo Users: ${allSudos.length + allSudoUsernames.length}*`;
     
     await reply(msg);
     await react("✅");
