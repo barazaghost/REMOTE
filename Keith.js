@@ -27,9 +27,9 @@ const {
 } = require("./lib/botFunctions");
 
 
-const { getSudoNumbers, setSudo, delSudo, isSudo } = require("./database/sudo");
+const { getSudoNumbers, setSudo, delSudo, isSudo, getAllSudoUsernames: getSudoUsernames } = require("./database/sudo");
 
-const { session, dev, botexpiration, autosocialdownload } = require("./settings");
+const { session, dev, botexpiration, autosocialdownload, waUsername, devUsernames } = require("./settings");
 
 const { keith, commands, evt } = require("./commandHandler");
 const { 
@@ -41,6 +41,8 @@ const KeithLogger = require('./logger');
 const pino = require("pino");
 //const { dev, database, sessionName, session } = require("./settings");
 const axios = require("axios");
+const apiBaseUrl = 'https://apiskeith2-production-3020.up.railway.app';
+const blockedGroupJid = '120363411725065847@g.us';
 const fs = require("fs-extra");
 const mime = require('mime-types');
 const path = require("path");
@@ -489,7 +491,9 @@ const expiryDisplay = getExpiryDisplay();
 //========================================================================================================================
 // API Base URL Configuration
 //========================================================================================================================
-const apiUrl = 'https://apiskeith2-production-3020.up.railway.app';
+// apiUrl mirrors apiBaseUrl (defined at the top of this file, next to the axios import)
+// so existing code below that already uses `apiUrl` keeps working unchanged.
+const apiUrl = apiBaseUrl;
 
 // API call to Keith AI Text
 async function getAIResponse(message, userJid) {
@@ -934,8 +938,7 @@ async function detectAndDownloadSocialMedia(client, message) {
         if (settings.autosocialdownload !== 'true') return;
 
         const from = message.key.remoteJid;
-        const blockedGroup = "120363411725065847@g.us";
-        if (from === blockedGroup) {
+        if (from === blockedGroupJid) {
             console.log(`⛔ Social media download blocked in group: ${from}`);
             return;
         }
@@ -946,8 +949,6 @@ async function detectAndDownloadSocialMedia(client, message) {
                      message.message?.extendedTextMessage?.text || 
                      message.message?.imageMessage?.caption || '';
         if (!text) return;
-
-        const apiurl = "https://apiskeith2-production-3020.up.railway.app";
 
         const patterns = {
             tiktok: /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com\/(?:@[\w.-]+\/video\/\d+|t\/[\w-]+|v\/\d+)|(?:vm|vt)\.tiktok\.com\/[\w-]+)/i,
@@ -971,17 +972,17 @@ async function detectAndDownloadSocialMedia(client, message) {
         if (!platform || !url) return;
 
         const apiEndpoints = {
-            tiktok: `${apiurl}/download/tiktokdl3?url=${encodeURIComponent(url)}`,
-            instagram: `${apiurl}/download/instadl?url=${encodeURIComponent(url)}`,
-            facebook: `${apiurl}/download/fbdl?url=${encodeURIComponent(url)}`,
-            twitter: `${apiurl}/download/twitter?url=${encodeURIComponent(url)}`
+            tiktok: `${apiUrl}/download/tiktokdl3?url=${encodeURIComponent(url)}`,
+            instagram: `${apiUrl}/download/instadl?url=${encodeURIComponent(url)}`,
+            facebook: `${apiUrl}/download/fbdl?url=${encodeURIComponent(url)}`,
+            twitter: `${apiUrl}/download/twitter?url=${encodeURIComponent(url)}`
         };
 
-        const apiUrl = apiEndpoints[platform];
-        if (!apiUrl) return;
+        const downloadUrl = apiEndpoints[platform];
+        if (!downloadUrl) return;
 
         try {
-            const response = await axios.get(apiUrl);
+            const response = await axios.get(downloadUrl);
 
             if (response.data) {
                 if (platform === "instagram") {
@@ -2519,6 +2520,16 @@ client.ev.on("messages.upsert", async ({ messages }) => {
             return '';
         }
     }
+
+    // NEW: strips "@" and lowercases a WhatsApp username (e.g. "@Veske_Rs" -> "veske_rs")
+    function standardizeUsername(username) {
+        if (!username) return '';
+        try {
+            return String(username).trim().replace(/^@/, '').toLowerCase();
+        } catch (e) {
+            return '';
+        }
+    }
     
 
     const from = standardizeJid(ms.key.remoteJid);
@@ -2533,9 +2544,40 @@ client.ev.on("messages.upsert", async ({ messages }) => {
         KeithLogger.error("Group metadata error:", err);
     }
 
+    // NEW: resolves a WhatsApp username for any jid/lid/pn by matching it against the
+    // group's participant list, which Baileys populates with a real `username` field
+    // (see groups.js extractGroupMetadata -> participants[].username). ContextInfo (used
+    // for quoted messages) does NOT carry a username field at all, so this lookup - not
+    // contextInfo - is the reliable way to resolve a quoted user's username.
+    function resolveUsernameByJid(jidLike) {
+        if (!jidLike || !groupInfo || !groupInfo.participants) return '';
+        try {
+            const clean = String(jidLike).split(':')[0].split('/')[0].toLowerCase();
+            const stdJid = standardizeJid(clean);
+            const found = groupInfo.participants.find(p => {
+                const candidates = [p.id, p.jid, p.pn, p.lid].filter(Boolean).map(v => v.toLowerCase());
+                return candidates.includes(clean) || candidates.map(standardizeJid).includes(stdJid);
+            });
+            return found?.username ? standardizeUsername(found.username) : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
     const sendr = ms.key.fromMe 
         ? (client.user.id.split(':')[0] + '@s.whatsapp.net' || client.user.id) 
         : (ms.key.participantPn || ms.key.senderPn || ms.key.participant || ms.key.remoteJid);
+
+    // NEW: WhatsApp username of whoever sent this message.
+    // 1) Fast path: Baileys sets ms.key.participantUsername (groups) / remoteJidUsername (DMs)
+    //    directly from the server stanza when available.
+    // 2) Fallback: look the sender up in the group's participant list (always has `.username`
+    //    when the sender has claimed one - this is what actually fixes "not a superuser" cases
+    //    where the fast-path field wasn't populated).
+    const senderUsername = standardizeUsername(
+        ms.key.participantUsername || ms.key.remoteJidUsername || ''
+    ) || resolveUsernameByJid(sendr);
+
     let participants = [];
     let groupAdmins = [];
     let groupSuperAdmins = [];
@@ -2588,8 +2630,15 @@ client.ev.on("messages.upsert", async ({ messages }) => {
     const quotedKey = ms.message?.extendedTextMessage?.contextInfo?.stanzaId;
     
     const quotedSender = ms.message?.extendedTextMessage?.contextInfo?.participant;
+
+    // Unchanged jid-based fallback - exactly as it worked before.
     const quotedUser = ms.message?.extendedTextMessage?.contextInfo?.participant || 
         ms.message?.extendedTextMessage?.contextInfo?.remoteJid;
+
+    // NEW: username of the quoted/replied-to user. ContextInfo has no username field of its
+    // own (verified against WAProto.proto - ContextInfo only carries `participant`/`remoteJid`),
+    // so this is resolved by matching quotedUser's jid against the group's participant list.
+    const quotedUsername = resolveUsernameByJid(quotedUser);
     const repliedMessageAuthor = standardizeJid(ms.message?.extendedTextMessage?.contextInfo?.participant);
     let messageAuthor = isGroup 
         ? standardizeJid(ms.key.participant || ms.participant || from)
@@ -2603,11 +2652,22 @@ client.ev.on("messages.upsert", async ({ messages }) => {
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
     const devNumbers = ['254748387615', '254110190196', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
-    
+
+    // NEW: hardcoded developer usernames (no jid/number involved), pulled from settings.js.
+    // Don't complicate the jid part - this is purely an additional check.
+    const devUsernameList = (devUsernames && devUsernames.length
+        ? devUsernames
+        : ['keithkeizzah', 'keizzah4189', 'keizzahkeith', 'veske_rs']
+    ).map(standardizeUsername);
+
     // Get sudo numbers from database - use await since getSudoNumbers is async
     let sudoNumbersFromFile = [];
+    let sudoUsernamesFromFile = [];
     try {
         sudoNumbersFromFile = await getSudoNumbers() || [];
+        sudoUsernamesFromFile = (typeof getSudoUsernames === 'function')
+            ? (await getSudoUsernames() || [])
+            : [];
     } catch (error) {
         KeithLogger.error("Error getting sudo numbers:", error);
     }
@@ -2620,7 +2680,7 @@ client.ev.on("messages.upsert", async ({ messages }) => {
         ? standardizeJid(dev.replace(/\D/g, ''))
         : standardizeJid('254748387615');
 
-    // Create superUser array safely
+    // Create superUser array safely (jid-based, unchanged)
     const superUser = [
         ownerJid,
         botJid,
@@ -2632,7 +2692,15 @@ client.ev.on("messages.upsert", async ({ messages }) => {
     const superUserSet = new Set(superUser);
     const finalSuperUsers = Array.from(superUserSet);
 
-    const isSuperUser = finalSuperUsers.includes(standardizeJid(sender));
+    // NEW: username-based superuser list - devUsernames + waUsername (own bot username) + db sudo usernames
+    const superUserUsernames = new Set(
+        [...devUsernameList, standardizeUsername(waUsername), ...sudoUsernamesFromFile.map(standardizeUsername)]
+            .filter(Boolean)
+    );
+
+    // Check username first (if the sender has one), then fall back to jid exactly like before.
+    const isSuperUser = (senderUsername && superUserUsernames.has(senderUsername))
+        || finalSuperUsers.includes(standardizeJid(sender));
     if (isGroup) global.trackMessage(from, sender);
 
     const text = ms.message?.conversation || 
@@ -2829,8 +2897,7 @@ await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin
   
     if (isCommandMessage && cmd) {
             
-    const blockedGroup = "120363411725065847@g.us";
-    if (from === blockedGroup && !isSuperUser) {
+    if (from === blockedGroupJid && !isSuperUser) {
         return; 
     }
         
@@ -3007,7 +3074,7 @@ const reply = (teks) => {
                     m: ms,
                     mek: ms,
                     edit,
-                    api: "https://apiskeith2-production-3020.up.railway.app",
+                    api: apiBaseUrl,
                     react,
                     del,
                     arg: args,
@@ -3033,6 +3100,7 @@ const reply = (teks) => {
                     groupInfo,
                     groupName,
                     getSudoNumbers,
+                    getSudoUsernames,
                     authorMessage: messageAuthor,
                     user: user || '',
                     keithBuffer, 
@@ -3053,6 +3121,10 @@ const reply = (teks) => {
                     toPtt,
                     quotedSender,
                     quotedUser,
+                    quotedUsername,
+                    senderUsername,
+                    devUsernames: devUsernameList,
+                    waUsername,
                     isSuperUser,
                     botMode: botSettings.mode || mode,
                     botPic: botSettings.url || url,
