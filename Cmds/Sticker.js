@@ -1,4 +1,3 @@
-
 const { keith } = require('../commandHandler');
 const axios = require('axios');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
@@ -15,12 +14,12 @@ try {
 } catch {
   ffmpegPath = 'ffmpeg';
 }
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
 
 const TG_API = "https://api.telegram.org/bot8313451751:AAHN_5RniuG3iGKIiDJ9_DsOaiVxmejzTcE";
 
+// ============================================================
+// Helper Functions
+// ============================================================
 const makeVideoSticker = async (inputBuffer, pushName, author) => {
   const id = Date.now();
   const tmpDir = os.tmpdir();
@@ -67,31 +66,49 @@ const makeImageSticker = async (inputBuffer, pushName, author) => {
   return await sticker.toBuffer();
 };
 
+const makeAnimatedSticker = async (inputBuffer, pushName, author) => {
+  try {
+    return await makeVideoSticker(inputBuffer, pushName, author);
+  } catch (err) {
+    console.error("Animated sticker conversion failed:", err.message);
+    throw err;
+  }
+};
+
+function isAnimatedWebp(buffer) {
+  if (!buffer || buffer.length < 50) return false;
+  const header = buffer.toString('hex', 0, 200);
+  return header.includes('414e494d') || header.includes('616e696d');
+}
+
+// ============================================================
+// TGS2 - Telegram Sticker Set (Individual)
+// ============================================================
 keith({
-  pattern: "tgs",
-  aliases: ["telesticker", "tg"],
-  description: "Import Telegram sticker set (supports video stickers too)",
+  pattern: "tgs2",
+  aliases: ["telesticker2"],
+  description: "Import Telegram sticker set (individual stickers)",
   category: "Sticker",
   filename: __filename
 }, async (from, client, conText) => {
   const { q, reply, pushName, author, isSuperUser, mek } = conText;
 
-  if (!isSuperUser) return reply("❌ Owner only!");
-  if (!q) return reply("📌 .tgs https://t.me/addstickers/Name");
+  if (!isSuperUser) return reply("Owner only!");
+  if (!q) return reply("Usage: .tgs2 https://t.me/addstickers/Name");
 
   if (!q.includes('/addstickers/')) {
-    return reply("❌ Invalid link");
+    return reply("Invalid link. Use: https://t.me/addstickers/Name");
   }
 
   const name = q.split('/addstickers/')[1];
   
   try {
-    await reply(`📦 Fetching ${name}...`);
+    await reply(`Fetching ${name}...`);
 
     const res = await axios.get(`${TG_API}/getStickerSet?name=${encodeURIComponent(name)}`);
     const set = res.data.result;
 
-    if (!set?.stickers?.length) return reply("❌ No stickers found.");
+    if (!set?.stickers?.length) return reply("No stickers found.");
 
     let sent = 0;
     let skipped = 0;
@@ -110,7 +127,6 @@ keith({
 
         let stickerBuffer;
         
-        // Handle video stickers
         if (extension === '.mp4' || extension === '.webm' || item.is_video) {
           try {
             stickerBuffer = await makeVideoSticker(bufferRes.data, pushName, author);
@@ -119,15 +135,10 @@ keith({
             skipped++;
             continue;
           }
-        } 
-        // Handle animated stickers (TGS - Lottie)
-        else if (extension === '.tgs' || item.is_animated) {
-          // Skip TGS for now (requires additional conversion)
+        } else if (extension === '.tgs' || item.is_animated) {
           skipped++;
           continue;
-        }
-        // Handle static/webp stickers
-        else {
+        } else {
           stickerBuffer = await makeImageSticker(bufferRes.data, pushName, author);
         }
 
@@ -141,122 +152,306 @@ keith({
       }
     }
 
-    let replyMsg = `✅ Sent ${sent} stickers from ${set.title || name}!`;
+    let replyMsg = `Sent ${sent} stickers from ${set.title || name}!`;
     if (skipped > 0) {
-      replyMsg += `\n⚠️ Skipped ${skipped} animated/TGS stickers (not supported)`;
+      replyMsg += `\nSkipped ${skipped} animated/TGS stickers (not supported)`;
+    }
+    await reply(replyMsg);
+
+  } catch (err) {
+    console.error("tgs2 error:", err);
+    reply(`Error: ${err.message}`);
+  }
+});
+
+// ============================================================
+// TGS - Telegram Sticker Set (Pack)
+// ============================================================
+keith({
+  pattern: "tgs",
+  aliases: ["telesticker", "spack", "stickerpack"],
+  description: "Import Telegram sticker set as a sticker pack",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, pushName, author, isSuperUser, mek } = conText;
+
+  if (!isSuperUser) return reply("Owner only!");
+  if (!q) return reply("Usage: .tgs https://t.me/addstickers/Name");
+
+  if (!q.includes('/addstickers/')) {
+    return reply("Invalid link. Use: https://t.me/addstickers/Name");
+  }
+
+  const name = q.split('/addstickers/')[1];
+  
+  try {
+    await reply(`Fetching ${name}...`);
+
+    const res = await axios.get(`${TG_API}/getStickerSet?name=${encodeURIComponent(name)}`);
+    const set = res.data.result;
+
+    if (!set?.stickers?.length) return reply("No stickers found.");
+
+    const stickerBuffers = [];
+    let failed = 0;
+    let coverBuffer = null;
+    const MAX_STICKERS = 60;
+
+    const stickersToProcess = set.stickers.slice(0, MAX_STICKERS);
+
+    for (let i = 0; i < stickersToProcess.length; i++) {
+      const item = stickersToProcess[i];
+      try {
+        const fileRes = await axios.get(`${TG_API}/getFile?file_id=${item.file_id}`);
+        const filePath = fileRes.data.result.file_path;
+        const extension = path.extname(filePath).toLowerCase();
+
+        const bufferRes = await axios({
+          method: 'GET',
+          url: `https://api.telegram.org/file/bot${TG_API.split('/bot')[1]}/${filePath}`,
+          responseType: 'arraybuffer'
+        });
+
+        let stickerBuffer;
+        
+        if (extension === '.mp4' || extension === '.webm' || item.is_video) {
+          try {
+            stickerBuffer = await makeVideoSticker(bufferRes.data, pushName, author);
+          } catch (err) {
+            console.error("Video sticker conversion failed:", err.message);
+            failed++;
+            continue;
+          }
+        } else if (extension === '.tgs' || item.is_animated) {
+          try {
+            stickerBuffer = await makeAnimatedSticker(bufferRes.data, pushName, author);
+          } catch (err) {
+            console.error("Animated sticker conversion failed:", err.message);
+            failed++;
+            continue;
+          }
+        } else {
+          stickerBuffer = await makeImageSticker(bufferRes.data, pushName, author);
+        }
+
+        if (stickerBuffer && stickerBuffer.length > 0) {
+          stickerBuffers.push(stickerBuffer);
+          if (i === 0 && !coverBuffer) {
+            coverBuffer = stickerBuffer;
+          }
+        }
+        
+      } catch (err) {
+        console.error("Error on sticker:", err.message);
+        failed++;
+      }
+    }
+
+    if (stickerBuffers.length === 0) {
+      return reply("Failed to convert any stickers.");
+    }
+
+    if (!coverBuffer) {
+      coverBuffer = await sharp({
+        create: {
+          width: 512,
+          height: 512,
+          channels: 4,
+          background: { r: 100, g: 150, b: 255, alpha: 1 }
+        }
+      })
+      .png()
+      .toBuffer();
+    }
+
+    const packName = set.title || name;
+    const stickers = stickerBuffers.map((buffer) => ({
+      sticker: buffer,
+      emojis: [""]
+    }));
+
+    await client.sendMessage(from, {
+      stickerPack: {
+        name: packName,
+        publisher: pushName || "Telegram Pack",
+        description: `${stickerBuffers.length} stickers`,
+        cover: coverBuffer,
+        stickers: stickers
+      }
+    }, { quoted: mek });
+
+    let replyMsg = `Sticker pack "${packName}" sent! (${stickerBuffers.length} stickers)`;
+    if (failed > 0) {
+      replyMsg += `\nSkipped ${failed} stickers that couldn't be converted.`;
+    }
+    if (set.stickers.length > MAX_STICKERS) {
+      replyMsg += `\n⚠️ Only first ${MAX_STICKERS} stickers processed.`;
     }
     await reply(replyMsg);
 
   } catch (err) {
     console.error("tgs error:", err);
-    reply(`❌ Error: ${err.message}`);
+    reply(`Error: ${err.message}`);
   }
 });
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
 
-
-function isAnimatedWebp(buffer) {
-  if (!buffer || buffer.length < 50) return false;
-  const header = buffer.toString('hex', 0, 200);
-  return header.includes('414e494d') || header.includes('616e696d');
-}
-
+// ============================================================
+// StickerSearch2 - Individual Stickers
+// ============================================================
 keith({
-  pattern: "tovideo",
-  aliases: ["tomp4", "tovid", "mp4", "stickertomp4"],
-  description: "Convert animated sticker to video",
+  pattern: "stickersearch2",
+  aliases: ["ssearch2"],
+  description: "Search Tenor stickers (individual)",
   category: "Sticker",
   filename: __filename
 }, async (from, client, conText) => {
-  const { reply, quotedMsg, mek, isSuperUser } = conText;
+  const { q, reply, pushName, author, mek, api } = conText;
 
-  
-  if (!quotedMsg) {
-    return reply(`📌 *Convert Sticker to Video*
-    
-Reply to an animated sticker with .tovideo
-
-*Aliases:* .tomp4, .tovid, .stickertomp4`);
-  }
-
-  const stickerMsg = quotedMsg.stickerMessage;
-  if (!stickerMsg) {
-    return reply("❌ Reply to a sticker!");
-  }
+  if (!q) return reply("Where is the request?\n\nExample: stickersearch2 happy dance");
 
   try {
-    //await reply("🎬 Processing sticker...");
+    const response = await axios.get(`${api}/search/sticker?q=${encodeURIComponent(q)}`);
+    const data = response.data;
 
-    const buffer = await downloadMediaMessage(
-      { message: { stickerMessage: stickerMsg } },
-      'buffer',
-      {},
-      { reuploadRequest: client.updateMediaMessage, logger: console }
-    );
-
-    const isAnimated = isAnimatedWebp(buffer);
-
-    if (!isAnimated) {
-      const pngBuffer = await sharp(buffer).png().toBuffer();
-      await client.sendMessage(from, {
-        image: pngBuffer,
-        caption: "✅ Static sticker converted to image!"
-      }, { quoted: mek });
-      return;
+    if (!data.status || !data.result?.results?.length) {
+      return reply("No stickers found for that query.");
     }
 
-  //  await reply("⏳ Converting animated sticker to video...");
+    const results = data.result.results.slice(0, 10);
+    let sent = 0;
 
-    // Extract frames from animated WebP
-    const metadata = await sharp(buffer, { animated: true }).metadata();
-    const pages = metadata.pages || 1;
+    for (const item of results) {
+      const gifUrl = item.media?.gif || item.media?.webp || item.url;
+      if (!gifUrl) continue;
 
-    const id = Date.now();
-    const tmpDir = os.tmpdir();
-    const framesDir = path.join(tmpDir, `frames_${id}`);
-    const outputPath = path.join(tmpDir, `video_${id}.mp4`);
-    
-    fs.mkdirSync(framesDir, { recursive: true });
+      try {
+        const sticker = new Sticker(gifUrl, {
+          pack: pushName || "Sticker Search",
+          author: author || "WhatsApp Bot",
+          type: StickerTypes.FULL,
+          categories: ["🤩", "🎉"],
+          id: `search-${Date.now()}-${sent}`,
+          quality: 60,
+          background: "transparent"
+        });
 
-    // Extract each frame
-    for (let i = 0; i < pages; i++) {
-      const frameBuf = await sharp(buffer, { animated: false, page: i })
-        .png()
-        .toBuffer();
-      const framePath = path.join(framesDir, `frame_${String(i).padStart(4, '0')}.png`);
-      fs.writeFileSync(framePath, frameBuf);
+        const buffer = await sticker.toBuffer();
+        await client.sendMessage(from, { sticker: buffer }, { quoted: mek });
+        sent++;
+        await new Promise(r => setTimeout(r, 300));
+      } catch (err) {
+        console.error("Sticker conversion error:", err.message);
+      }
     }
 
-    // Convert frames to video
-    execSync(
-      `"${ffmpegPath}" -y -framerate 15 -i "${framesDir}/frame_%04d.png" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -pix_fmt yuv420p -movflags faststart "${outputPath}"`,
-      { timeout: 60000, stdio: 'pipe' }
-    );
-
-    if (!fs.existsSync(outputPath)) {
-      return reply('❌ Output file not created');
+    if (sent === 0) {
+      return reply("Failed to convert any stickers. Try a different query.");
     }
-
-    const videoBuffer = fs.readFileSync(outputPath);
-    await client.sendMessage(from, { video: videoBuffer }, { quoted: mek });
-
-    // Cleanup
-    try { fs.rmSync(framesDir, { recursive: true, force: true }); } catch {}
-    try { fs.unlinkSync(outputPath); } catch {}
-
- //   await reply("✅ Sticker converted to video successfully!");
 
   } catch (err) {
-    console.error("tovideo error:", err);
-    reply(`❌ Error: ${err.message}`);
+    console.error("stickersearch2 error:", err);
+    reply("Error while searching for stickers.");
   }
 });
-//========================================================================================================================
-//========================================================================================================================
 
+// ============================================================
+// StickerSearch - Sticker Pack
+// ============================================================
+keith({
+  pattern: "stickersearch",
+  aliases: ["ssearch", "stickerpacksearch"],
+  description: "Search Tenor stickers and send as sticker pack",
+  category: "Sticker",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, pushName, author, mek, api } = conText;
+
+  if (!q) return reply("Where is the request?\n\nExample: stickersearch happy dance");
+
+  try {
+    const response = await axios.get(`${api}/search/sticker?q=${encodeURIComponent(q)}`);
+    const data = response.data;
+
+    if (!data.status || !data.result?.results?.length) {
+      return reply("No stickers found for that query.");
+    }
+
+    const results = data.result.results.slice(0, 10);
+    const stickerBuffers = [];
+    let coverBuffer = null;
+
+    for (let i = 0; i < results.length; i++) {
+      const item = results[i];
+      const gifUrl = item.media?.gif || item.media?.webp || item.url;
+      if (!gifUrl) continue;
+
+      try {
+        const sticker = new Sticker(gifUrl, {
+          pack: pushName || "Sticker Search",
+          author: author || "WhatsApp Bot",
+          type: StickerTypes.FULL,
+          categories: ["🤩", "🎉"],
+          id: `search-${Date.now()}-${i}`,
+          quality: 60,
+          background: "transparent"
+        });
+
+        const buffer = await sticker.toBuffer();
+        if (buffer && buffer.length > 0) {
+          stickerBuffers.push(buffer);
+          if (i === 0 && !coverBuffer) {
+            coverBuffer = buffer;
+          }
+        }
+      } catch (err) {
+        console.error("Sticker conversion error:", err.message);
+      }
+    }
+
+    if (stickerBuffers.length === 0) {
+      return reply("Failed to convert any stickers. Try a different query.");
+    }
+
+    if (!coverBuffer) {
+      coverBuffer = await sharp({
+        create: {
+          width: 512,
+          height: 512,
+          channels: 4,
+          background: { r: 100, g: 150, b: 255, alpha: 1 }
+        }
+      })
+      .png()
+      .toBuffer();
+    }
+
+    const stickers = stickerBuffers.map((buffer) => ({
+      sticker: buffer,
+      emojis: [""]
+    }));
+
+    await client.sendMessage(from, {
+      stickerPack: {
+        name: data.result.query || "Sticker Pack",
+        publisher: pushName || "Sticker Search",
+        description: `${stickerBuffers.length} stickers found`,
+        cover: coverBuffer,
+        stickers: stickers
+      }
+    }, { quoted: mek });
+
+    await reply(`Sticker pack "${data.result.query}" sent! (${stickerBuffers.length} stickers)`);
+
+  } catch (err) {
+    console.error("stickersearch error:", err);
+    reply("Error while searching for stickers.");
+  }
+});
+
+// ============================================================
+// Sticker - Create Sticker from Image/Video
+// ============================================================
 keith({
   pattern: "sticker",
   aliases: ["stik", "s", "stikpack"],
@@ -264,11 +459,9 @@ keith({
   category: "Sticker",
   filename: __filename
 }, async (from, client, conText) => {
-  const { quotedMsg, pushName, author, mek, reply, isSuperUser } = conText;
+  const { quotedMsg, pushName, author, mek, reply } = conText;
 
-  //if (!isSuperUser) return reply("❌ Owner only!");
-
-  if (!quotedMsg) return reply("❌ Quote an image or a short video.");
+  if (!quotedMsg) return reply("Quote an image or a short video.");
 
   let media;
   let isVideo = false;
@@ -279,14 +472,14 @@ keith({
     media = quotedMsg.videoMessage;
     isVideo = true;
   } else {
-    return reply("❌ That is neither an image nor a short video.");
+    return reply("That is neither an image nor a short video.");
   }
 
   if (isVideo) {
     const sizeMB = (media.fileLength || 0) / (1024 * 1024);
     const seconds = media.seconds || 0;
-    if (sizeMB > 8) return reply(`❌ Video too large (${sizeMB.toFixed(1)} MB). Max is 8 MB.`);
-    if (seconds > 10) return reply(`❌ Video too long (${seconds}s). Max is 10 seconds.`);
+    if (sizeMB > 8) return reply(`Video too large (${sizeMB.toFixed(1)} MB). Max is 8 MB.`);
+    if (seconds > 10) return reply(`Video too long (${seconds}s). Max is 10 seconds.`);
   }
 
   try {
@@ -344,13 +537,12 @@ keith({
         }
 
         if (stickerBuffer.length > 1024 * 1024) {
-          return reply(`❌ Sticker too large. Try a shorter clip.`);
+          return reply(`Sticker too large. Try a shorter clip.`);
         }
       } catch (videoErr) {
-        return reply(`❌ Video sticker failed.\n${videoErr.message}`);
+        return reply(`Video sticker failed.\n${videoErr.message}`);
       }
     } else {
-      // Process image with pushName and author
       const metadata = await sharp(buffer).metadata();
       const { width, height } = metadata;
       
@@ -382,158 +574,52 @@ keith({
     
   } catch (err) {
     console.error("sticker error:", err);
-    await reply(`❌ Failed: ${err.message}`);
+    await reply(`Failed: ${err.message}`);
   }
 });
-/*
-keith({
-  pattern: "stickervid",
-  aliases: ["stikvid", "sv", "stickervideo"],
-  description: "Create sticker from quoted image or video",
-  category: "Sticker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { quotedMsg, pushName, author, mek, reply } = conText;
 
-  if (!quotedMsg) return reply("❌ Quote an image or a short video.");
-
-  let media;
-  let isVideo = false;
-
-  if (quotedMsg.imageMessage) {
-    media = quotedMsg.imageMessage;
-  } else if (quotedMsg.videoMessage) {
-    media = quotedMsg.videoMessage;
-    isVideo = true;
-  } else {
-    return reply("❌ That is neither an image nor a short video.");
-  }
-
-  if (isVideo) {
-    const sizeMB = (media.fileLength || 0) / (1024 * 1024);
-    const seconds = media.seconds || 0;
-    if (sizeMB > 8) return reply(`❌ Video too large (${sizeMB.toFixed(1)} MB). Max is 8 MB.`);
-    if (seconds > 10) return reply(`❌ Video too long (${seconds}s). Max is 10 seconds.`);
-  }
-
-  const result = await client.downloadAndSaveMediaMessage(media);
-  let stickerBuf;
-
-  try {
-    if (isVideo) {
-      const makeSticker = async (inputPath, fps, quality) => {
-        const id = Date.now();
-        const tmpDir = os.tmpdir();
-        const processedPath = path.join(tmpDir, `stk_${id}_${fps}fps.mp4`);
-        
-        try {
-          execSync(
-            `"${ffmpegPath}" -y -i "${inputPath}" -t 6 ` +
-            `-vf "scale=512:512:force_original_aspect_ratio=increase,fps=${fps},` +
-            `crop=min(iw\\,ih):min(iw\\,ih),scale=512:512" ` +
-            `-an -c:v libx264 -crf 28 -preset ultrafast "${processedPath}"`,
-            { timeout: 30000, stdio: 'pipe' }
-          );
-        } catch (e) {
-          fs.copyFileSync(inputPath, processedPath);
-        }
-        
-        const sticker = new Sticker(fs.readFileSync(processedPath), {
-          pack: pushName || "Sticker",
-          author: author || "Bot",
-          type: StickerTypes.FULL,
-          quality: quality,
-        });
-        
-        const buf = await sticker.toBuffer();
-        try { fs.unlinkSync(processedPath); } catch {}
-        return buf;
-      };
-
-      try {
-        stickerBuf = await makeSticker(result, 10, 40);
-        if (!stickerBuf || stickerBuf.length < 500) throw new Error('Output buffer empty');
-
-        if (stickerBuf.length > 950 * 1024) {
-          const retryBuf = await makeSticker(result, 5, 25);
-          if (retryBuf && retryBuf.length >= 500) stickerBuf = retryBuf;
-        }
-
-        if (stickerBuf.length > 1024 * 1024) {
-          return reply(`❌ Sticker too large (${(stickerBuf.length / 1024 / 1024).toFixed(2)} MB). Try a shorter clip.`);
-        }
-      } catch (videoErr) {
-        return reply(`❌ Video sticker failed.\n${videoErr.message}`);
-      }
-    } else {
-      // Get image metadata
-      const metadata = await sharp(result).metadata();
-      const { width, height } = metadata;
-      
-      // Determine best fit for 512x512
-      let resizeOptions;
-      if (width === height) {
-        // Perfect square
-        resizeOptions = { width: 512, height: 512, fit: 'cover' };
-      } else if (width > height) {
-        // Landscape - fit to width
-        resizeOptions = { width: 512, height: 512, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } };
-      } else {
-        // Portrait - fit to height
-        resizeOptions = { width: 512, height: 512, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } };
-      }
-      
-      stickerBuf = await sharp(result)
-        .resize(512, 512, resizeOptions)
-        .webp({ quality: 85 })
-        .toBuffer();
-    }
-
-    await client.sendMessage(from, { sticker: stickerBuf }, { quoted: mek });
-    
-  } catch (err) {
-    console.error("sticker error:", err);
-    await reply(`❌ Failed: ${err.message}`);
-  } finally {
-    try { fs.unlinkSync(result); } catch {}
-  }
-});*/
-//========================================================================================================================
-//========================================================================================================================
-
-
+// ============================================================
+// ToVideo - Convert Animated Sticker to Video
+// ============================================================
 keith({
   pattern: "tovideo",
-  aliases: ["mp4", "tovid", "sticker2video"],
+  aliases: ["tomp4", "tovid", "mp4", "stickertomp4"],
   description: "Convert animated sticker to video",
   category: "Sticker",
   filename: __filename
 }, async (from, client, conText) => {
   const { reply, quotedMsg, mek, isSuperUser } = conText;
 
-  if (!isSuperUser) return reply("❌ Owner only!");
-
   if (!quotedMsg) {
-    return reply("📎 Reply to an *animated sticker* with .tovideo");
+    return reply("Reply to an animated sticker with .tovideo\nAliases: .tomp4, .tovid, .stickertomp4");
   }
 
-  const mime = quotedMsg.stickerMessage?.mimetype || '';
-  if (!/webp/.test(mime)) {
-    return reply("⚠️ That's not a sticker.");
+  const stickerMsg = quotedMsg.stickerMessage;
+  if (!stickerMsg) {
+    return reply("Reply to a sticker!");
   }
 
   try {
-    
+    const buffer = await downloadMediaMessage(
+      { message: { stickerMessage: stickerMsg } },
+      'buffer',
+      {},
+      { reuploadRequest: client.updateMediaMessage, logger: console }
+    );
 
-    const buffer = await client.downloadAndSaveMediaMessage(quotedMsg);
-    
-    const image = sharp(buffer, { animated: true });
-    const metadata = await image.metadata();
-    const pages = metadata.pages || 1;
-    
-    if (pages <= 1) {
-      return reply("⚠️ This is a *static* sticker, not animated!");
+    const isAnimated = isAnimatedWebp(buffer);
+
+    if (!isAnimated) {
+      const pngBuffer = await sharp(buffer).png().toBuffer();
+      await client.sendMessage(from, {
+        image: pngBuffer,
+        caption: "Static sticker converted to image!"
+      }, { quoted: mek });
+      return;
     }
+
+    const metadata = await sharp(buffer, { animated: true }).metadata();
+    const pages = metadata.pages || 1;
 
     const id = Date.now();
     const tmpDir = os.tmpdir();
@@ -550,17 +636,13 @@ keith({
       fs.writeFileSync(framePath, frameBuf);
     }
 
-    try {
-      execSync(
-        `"${ffmpegPath}" -y -framerate 15 -i "${framesDir}/frame_%04d.png" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -pix_fmt yuv420p -movflags faststart "${outputPath}"`,
-        { timeout: 60000, stdio: 'pipe' }
-      );
-    } catch (e) {
-      return reply('❌ ffmpeg error');
-    }
+    execSync(
+      `"${ffmpegPath}" -y -framerate 15 -i "${framesDir}/frame_%04d.png" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -pix_fmt yuv420p -movflags faststart "${outputPath}"`,
+      { timeout: 60000, stdio: 'pipe' }
+    );
 
     if (!fs.existsSync(outputPath)) {
-      return reply('❌ Failed');
+      return reply('Output file not created');
     }
 
     const videoBuffer = fs.readFileSync(outputPath);
@@ -571,18 +653,13 @@ keith({
 
   } catch (err) {
     console.error("tovideo error:", err);
-    reply(`❌ Error: ${err.message}`);
+    reply(`Error: ${err.message}`);
   }
 });
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
 
-
-
-//========================================================================================================================
-//========================================================================================================================
-
+// ============================================================
+// ATTp2 - Animated Text Sticker (Tenor)
+// ============================================================
 keith({
   pattern: "attp2",
   aliases: ["textgif", "tenorsticker"],
@@ -590,37 +667,24 @@ keith({
   category: "Sticker",
   filename: __filename
 }, async (from, client, conText) => {
-  const { q, mek, reply, pushName, author, args } = conText;
+  const { q, mek, reply, pushName, author } = conText;
 
   if (!q) {
-    return reply(`📌 *ATTp2 - Tenor Animated Text Sticker*
+    return reply(`ATTp2 - Tenor Animated Text Sticker
     
-Create animated text stickers using Tenor API!
-
-*Usage:*
-.attp keith
-.attp Hello World
-
-*Style options:*
-.attp text | style
-.attp keith | neon
-.attp hello | rainbow
-
-*Available styles:* neon, rainbow, fire, ice, shadow
-
-*Aliases:* .textgif, .tenorsticker`);
+Usage: .attp2 text | style
+Styles: neon, rainbow, fire, ice, shadow
+Example: .attp2 keith | neon`);
   }
 
-  // Parse text and optional style
   let text = q;
-  let style = "258698638"; // default style ID
+  let style = "258698638";
   
   if (q.includes('|')) {
     const parts = q.split('|');
     text = parts[0].trim();
     const styleName = parts[1].trim().toLowerCase();
     
-    // Map style names to Tenor IDs
     const styleMap = {
       neon: "258698638",
       rainbow: "258698639",
@@ -636,8 +700,6 @@ Create animated text stickers using Tenor API!
   const apiUrl = `https://tenor.googleapis.com/v2/render_dynamic_text?client_key=waffles&key=AIzaSyCbDgY_wZO9guZMktW6MnOGo-nKVFXqaUE&%24alt=proto&text=${encodedText}&id=${style}`;
 
   try {
-   // await reply(`🎨 Creating ${style !== "258698638" ? styleName + " " : ""}animated sticker for *${text.substring(0, 30)}*...`);
-
     const response = await axios.get(apiUrl, {
       responseType: 'arraybuffer',
       timeout: 30000,
@@ -647,7 +709,7 @@ Create animated text stickers using Tenor API!
     });
 
     if (!response.data || response.data.byteLength < 500) {
-      return reply("❌ Failed to generate animated sticker! Try different text.");
+      return reply("Failed to generate animated sticker! Try different text.");
     }
 
     const sticker = new Sticker(response.data, {
@@ -669,21 +731,23 @@ Create animated text stickers using Tenor API!
   } catch (err) {
     console.error("attp2 error:", err);
     
-    let errorMsg = "❌ Failed to generate animated sticker!";
+    let errorMsg = "Failed to generate animated sticker!";
     
     if (err.code === 'ECONNABORTED') {
-      errorMsg = "❌ Request timeout! Please try again with shorter text.";
+      errorMsg = "Request timeout! Please try again with shorter text.";
     } else if (err.response?.status === 403) {
-      errorMsg = "❌ API key expired or invalid! Please use another method.";
+      errorMsg = "API key expired or invalid! Please use another method.";
     } else if (err.response?.status === 404) {
-      errorMsg = "❌ Style not found! Using default style.";
+      errorMsg = "Style not found! Using default style.";
     }
     
     await reply(errorMsg);
   }
 });
-//========================================================================================================================
 
+// ============================================================
+// BratVideo - Text to Brat Style Video Sticker
+// ============================================================
 keith({
   pattern: "bratvideo",
   aliases: ["bratvid", "brat"],
@@ -691,26 +755,15 @@ keith({
   category: "Sticker",
   filename: __filename
 }, async (from, client, conText) => {
-  const { q, mek, reply, pushName, author, args } = conText;
+  const { q, mek, reply, pushName, author } = conText;
 
   if (!q) {
-    return reply(`📌 *Brat Video Sticker*
+    return reply(`Brat Video Sticker
     
-Convert text to Brat style animated sticker!
-
-*Usage:*
-.bratvideo amel hai
-.bratvid Hello World
-.brat keith
-
-*Options:*
-.bratvideo text | color
-Example: .bratvideo keith | red
-
-*Aliases:* .bratvid, .brat`);
+Usage: .bratvideo text | color
+Example: .bratvideo keith | red`);
   }
 
-  // Parse text and optional color
   let text = q;
   let color = "";
   
@@ -720,18 +773,14 @@ Example: .bratvideo keith | red
     color = parts[1].trim();
   }
 
-  // Format text for URL (replace spaces with +)
   const formattedText = text.replace(/ /g, '+');
   let apiUrl = `https://api.deline.web.id/maker/bratvid?text=${encodeURIComponent(formattedText)}`;
   
-  // Add color if specified
   if (color) {
     apiUrl += `&color=${encodeURIComponent(color)}`;
   }
 
   try {
-   // await reply(`🎬 Creating Brat sticker for *${text.substring(0, 30)}*...`);
-
     const response = await axios.get(apiUrl, {
       responseType: 'arraybuffer',
       timeout: 30000,
@@ -741,7 +790,7 @@ Example: .bratvideo keith | red
     });
 
     if (!response.data || response.data.byteLength < 500) {
-      return reply("❌ Failed to generate Brat sticker! Try different text.");
+      return reply("Failed to generate Brat sticker! Try different text.");
     }
 
     const sticker = new Sticker(response.data, {
@@ -762,11 +811,13 @@ Example: .bratvideo keith | red
 
   } catch (err) {
     console.error("bratvideo error:", err);
-    await reply("❌ Failed to generate Brat sticker! Please try again.");
+    await reply("Failed to generate Brat sticker! Please try again.");
   }
 });
-//========================================================================================================================
 
+// ============================================================
+// ATTp - Any Text To Sticker
+// ============================================================
 keith({
   pattern: "attp",
   aliases: ["texttosticker", "txtsticker"],
@@ -777,31 +828,23 @@ keith({
   const { q, mek, reply, pushName, author } = conText;
 
   if (!q) {
-    return reply(`📌 *ATTp - Any Text To Sticker*
+    return reply(`ATTp - Any Text To Sticker
     
-Convert any text to an animated WhatsApp sticker!
-
-*Usage:*
-.attp keith
-.attp Hello World
-.attp I love you
-
-*Aliases:* .texttosticker, .txtsticker`);
+Usage: .attp text
+Example: .attp Hello World`);
   }
 
   const encodedText = encodeURIComponent(q);
   const apiUrl = `https://api.deline.web.id/maker/attp?text=${encodedText}`;
 
   try {
-  //  await reply(`🎨 Converting *${q.substring(0, 30)}* to animated sticker...`);
-
     const response = await axios.get(apiUrl, {
       responseType: 'arraybuffer',
       timeout: 30000
     });
 
     if (!response.data || response.data.byteLength < 100) {
-      return reply("❌ Failed to generate sticker! Try different text.");
+      return reply("Failed to generate sticker! Try different text.");
     }
 
     const sticker = new Sticker(response.data, {
@@ -822,10 +865,13 @@ Convert any text to an animated WhatsApp sticker!
 
   } catch (err) {
     console.error("attp error:", err);
-    await reply("❌ Failed to generate sticker! Please try again.");
+    await reply("Failed to generate sticker! Please try again.");
   }
 });
-//========================================================================================================================
+
+// ============================================================
+// Egif - Emoji to Animated Sticker
+// ============================================================
 keith({
   pattern: "egif",
   aliases: ["emojisticker", "emojigif", "emosticker"],
@@ -836,13 +882,12 @@ keith({
   const { q, mek, reply, pushName, author } = conText;
 
   if (!q) {
-    return reply("📌 Provide an emoji!\nExample: .emojisticker 😂\nExample: .emojisticker 🎉");
+    return reply("Provide an emoji!\nExample: .egif 😂");
   }
 
-  // Get first emoji from input
   const emojiMatch = q.match(/([\p{Emoji_Presentation}|\p{Extended_Pictographic}])/u);
   if (!emojiMatch) {
-    return reply("❌ Please provide a valid emoji!");
+    return reply("Please provide a valid emoji!");
   }
 
   const emoji = emojiMatch[0];
@@ -850,18 +895,14 @@ keith({
   const gifUrl = `https://fonts.gstatic.com/s/e/notoemoji/latest/${emojiCode}/512.gif`;
 
   try {
- //   await reply(`🎨 Converting ${emoji} to animated sticker...`);
-
-    // Download the GIF
     const response = await axios.get(gifUrl, {
       responseType: 'arraybuffer'
     });
 
     if (!response.data) {
-      return reply("❌ Failed to fetch emoji GIF!");
+      return reply("Failed to fetch emoji GIF!");
     }
 
-    // Create animated sticker from GIF
     const sticker = new Sticker(response.data, {
       pack: pushName || "Emoji Sticker",
       author: author || "WhatsApp Bot",
@@ -879,13 +920,14 @@ keith({
     }, { quoted: mek });
 
   } catch (err) {
-    console.error("emojisticker error:", err);
-    await reply(`❌ Error: ${err.message}`);
+    console.error("egif error:", err);
+    await reply(`Error: ${err.message}`);
   }
 });
-//========================================================================================================================
 
-
+// ============================================================
+// QC - Quote Sticker
+// ============================================================
 keith({
   pattern: "qc",
   aliases: ["quotemaker", "quotesticker"],
@@ -893,18 +935,16 @@ keith({
   description: "Generate a quote sticker (reply to a message or provide text)",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, q, sender, reply, author, pushName, quoted, quotedUser, quotedMsg, isGroup } = conText;
+  const { mek, q, sender, reply, author, pushName, quoted, quotedUser, quotedMsg } = conText;
 
   let quoteText = q;
   let targetUser = sender;
   let displayName = pushName || sender.split('@')[0];
 
-  // Case 1: If replying to a message, get the quoted user's info and quoted message text
   if (quotedMsg && quotedUser) {
     targetUser = quotedUser;
-    displayName = pushName; // Use pushName from the quoted user context
+    displayName = pushName;
     
-    // Get the quoted user's name if possible
     try {
       const contact = await client.getContact(targetUser);
       displayName = contact.pushname || contact.verifiedName || contact.name || targetUser.split('@')[0];
@@ -912,42 +952,36 @@ keith({
       displayName = targetUser.split('@')[0];
     }
     
-    // If no text provided in command, use the quoted message text
     if (!quoteText && quotedMsg.text) {
       quoteText = quotedMsg.text;
     } else if (!quoteText && quotedMsg.caption) {
       quoteText = quotedMsg.caption;
     }
     
-    // If still no text, use the quoted message content
     if (!quoteText) {
-      quoteText = "✨ Quote Sticker ✨";
+      quoteText = "Quote Sticker";
     }
   }
 
-  // Case 2: If text is provided in command (not replying)
   if (!quoteText && q) {
     quoteText = q;
   }
 
-  // Validate if we have text to generate quote
   if (!quoteText) {
-    return reply("📌 *Usage:*\n• `.qc <text>` - Create quote with your profile\n• *Reply* to a message with `.qc` - Create quote with that user's profile and message\n• *Reply* with `.qc <text>` - Create quote with that user's profile and custom text");
+    return reply("Usage:\n• .qc <text>\n• Reply to a message with .qc");
   }
 
-  // Get profile picture URL (without fallback)
   let ppUrl;
   try {
     ppUrl = await client.profilePictureUrl(targetUser, 'image');
   } catch (err) {
-    return reply(`❌ Could not fetch profile picture. Make sure they have a profile picture set.`);
+    return reply("Could not fetch profile picture. Make sure they have a profile picture set.");
   }
 
-  // WhatsApp style configuration
   const obj = {
     type: 'quote',
     format: 'png',
-    backgroundColor: '#0B141A', // WhatsApp dark mode background
+    backgroundColor: '#0B141A',
     width: 512,
     height: 768,
     scale: 2,
@@ -962,7 +996,6 @@ keith({
       text: quoteText,
       replyMessage: {}
     }],
-    
     style: {
       backgroundColor: '#0B141A',
       textColor: '#E9EDEF', 
@@ -979,14 +1012,12 @@ keith({
   };
 
   try {
-    // Generate quote
     const response = await axios.post('https://bot.lyo.su/quote/generate', obj, {
       headers: { 'Content-Type': 'application/json' }
     });
 
     const buffer = Buffer.from(response.data.result.image, 'base64');
 
-    // Create sticker with pushName for pack name
     const sticker = new Sticker(buffer, {
       pack: pushName || "Quote Maker",
       type: StickerTypes.FULL,
@@ -1000,11 +1031,13 @@ keith({
 
   } catch (err) {
     console.error("QC Sticker error:", err);
-    await reply("❌ Failed to generate quote sticker. Please try again later.");
+    await reply("Failed to generate quote sticker. Please try again later.");
   }
 });
-//========================================================================================================================
 
+// ============================================================
+// EmoMix - Mix Two Emojis
+// ============================================================
 keith({
   pattern: "emomix",
   aliases: ["emojimix", "emix"],
@@ -1015,19 +1048,17 @@ keith({
   const { q, mek, reply, pushName, author } = conText;
 
   if (!q) {
-    return reply("📌 Provide two emojis separated by +\nExample: .emomix 😹+😹");
+    return reply("Provide two emojis separated by +\nExample: .emomix 😹+😹");
   }
 
   try {
-    // Call API
     const res = await axios.get(`https://levanter.onrender.com/emix?q=${encodeURIComponent(q)}`);
     const data = res.data;
 
     if (!data.status || !data.result) {
-      return reply("❌ Failed to generate emoji mix.");
+      return reply("Failed to generate emoji mix.");
     }
 
-    // Build sticker with pack/author metadata
     const sticker = new Sticker(data.result, {
       pack: pushName || "EmojiMix",
       type: StickerTypes.FULL,
@@ -1042,11 +1073,13 @@ keith({
 
   } catch (err) {
     console.error("emomix error:", err);
-    await reply("❌ Error generating emoji mix: " + err.message);
+    await reply("Error generating emoji mix: " + err.message);
   }
 });
-//========================================================================================================================
 
+// ============================================================
+// Brat - Brat Style Sticker
+// ============================================================
 const namedColors = {
   black: "000000", white: "ffffff", red: "ff0000", blue: "0000ff", green: "00ff00",
   yellow: "ffff00", pink: "ffc0cb", purple: "800080", orange: "ffa500", gray: "808080",
@@ -1062,8 +1095,8 @@ const makeURL = (txt, bg, color) =>
 async function createSticker(url, pushName, author, quality) {
   return (new Sticker(url, {
     type: 'full',
-    pack: pushName,   // sticker pack name = sender’s pushName
-    author: author,   // author from conText
+    pack: pushName,
+    author: author,
     quality
   })).toBuffer();
 }
@@ -1076,13 +1109,12 @@ keith({
   filename: __filename
 }, async (from, client, conText) => {
   const { q, reply, mek, pushName, author } = conText;
-  if (!q) return reply("📌 Usage: .brat Hello |background,textColor\nExample: .brat Hey |black,white");
+  if (!q) return reply("Usage: .brat Hello |background,textColor\nExample: .brat Hey |black,white");
 
-  // Split text and optional colors
   let [textPart, colorPart] = q.split("|");
   const realText = textPart.trim() || " ";
-  let bg = "000000";   // default black background
-  let color = "ffffff"; // default white text
+  let bg = "000000";
+  let color = "ffffff";
 
   if (colorPart) {
     const colors = colorPart.split(",").map(c => c.trim().toLowerCase());
@@ -1097,115 +1129,13 @@ keith({
     const sticker = await createSticker(data.image_url, pushName, author, 50);
     await client.sendMessage(from, { sticker }, { quoted: mek });
   } catch (err) {
-    reply(`❌ Failed: ${err.message}`);
-  }
-});
-//========================================================================================================================
-/*
-keith({
-  pattern: "sticker",
-  aliases: ["stik", "s", "stikpack"],
-  description: "Create sticker from quoted image or video",
-  category: "Sticker",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { quotedMsg, pushName, author, mek, reply } = conText;
-
-  if (!quotedMsg) return reply("❌ Quote an image or a short video.");
-
-  let media;
-  if (quotedMsg.imageMessage) {
-    media = quotedMsg.imageMessage;
-  } else if (quotedMsg.videoMessage) {
-    media = quotedMsg.videoMessage;
-  } else {
-    return reply("❌ That is neither an image nor a short video.");
-  }
-
-  try {
-    const result = await client.downloadAndSaveMediaMessage(media);
-
-    const sticker = new Sticker(result, {
-      pack: pushName,
-      author: author,
-      type: StickerTypes.FULL,
-      categories: ["🤩", "🎉"],
-      id: "12345",
-      quality: 70,
-      background: "transparent"
-    });
-
-    const buffer = await sticker.toBuffer();
-    await client.sendMessage(from, { sticker: buffer }, { quoted: mek });
-  } catch (err) {
-    console.error("sticker error:", err);
-    await reply("❌ Failed to generate sticker.");
-  }
-});*/
-//=======================
-
-
-//=================================================================================================
-
-
-keith({
-  pattern: "stickersearch",
-  aliases: ["ssearch"],
-  description: "Search Tenor stickers and send as animated stickers",
-  category: "Sticker",
-  filename: __filename
-  
-}, async (from, client, conText) => {
-  const { q, reply, pushName, author, mek, api } = conText;
-
-  if (!q) return reply("❌ Where is the request?\n\nExample: stickersearch happy dance");
-
-  try {
-    const response = await axios.get(`${api}/search/sticker?q=${encodeURIComponent(q)}`);
-    const data = response.data;
-
-    if (!data.status || !data.result?.results?.length) {
-      return reply("❌ No stickers found for that query.");
-    }
-
-    const results = data.result.results.slice(0, 10);
-    let sent = 0;
-
-    for (const item of results) {
-      const gifUrl = item.media?.gif || item.media?.webp || item.url;
-      if (!gifUrl) continue;
-
-      try {
-        const sticker = new Sticker(gifUrl, {
-          pack: pushName || "Sticker Search",
-          author: author || "WhatsApp Bot",
-          type: StickerTypes.FULL,
-          categories: ["🤩", "🎉"],
-          id: `search-${Date.now()}-${sent}`,
-          quality: 60,
-          background: "transparent"
-        });
-
-        const buffer = await sticker.toBuffer();
-        await client.sendMessage(from, { sticker: buffer }, { quoted: mek });
-        sent++;
-        await new Promise(r => setTimeout(r, 300));
-      } catch (err) {
-        console.error("Sticker conversion error:", err.message);
-      }
-    }
-
-    if (sent === 0) {
-      return reply("❌ Failed to convert any stickers. Try a different query.");
-    }
-
-  } catch (err) {
-    console.error("stickersearch error:", err);
-    reply("❌ Error while searching for stickers.");
+    reply(`Failed: ${err.message}`);
   }
 });
 
-//========================================================================================================================
+// ============================================================
+// Take - Restick Sticker
+// ============================================================
 keith({
   pattern: "take",
   aliases: ["restick", "grabsticker"],
@@ -1216,7 +1146,7 @@ keith({
   const { quotedMsg, pushName, author, mek, reply } = conText;
 
   if (!quotedMsg?.stickerMessage) {
-    return reply("❌ Quote a sticker to restick.");
+    return reply("Quote a sticker to restick.");
   }
 
   try {
@@ -1236,10 +1166,6 @@ keith({
     await client.sendMessage(from, { sticker: buffer }, { quoted: mek });
   } catch (err) {
     console.error("take error:", err);
-    await reply("❌ Failed to restick the quoted sticker.");
+    await reply("Failed to restick the quoted sticker.");
   }
 });
-
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
