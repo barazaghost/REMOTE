@@ -72,23 +72,14 @@ async (from, client, conText) => {
     const durationReadable = `${durationMin}:${durationSec.toString().padStart(2, '0')}`;
 
     // Context info for external ad reply
-    const contextInfo = {
-      externalAdReply: {
-        title: videoTitle || "NXX Video",
-        body: `Duration: ${durationReadable} | ${videoInfo || "HD Quality"}`,
-        mediaType: 1,
-        sourceUrl: videoUrl,
-        thumbnailUrl: videoThumbnail,
-        renderLargerThumbnail: false
-      }
-    };
+    
 
     // Send video directly from URL
     await client.sendMessage(from, {
       video: { url: videoUrl },
       mimetype: "video/mp4",
-      fileName: `${videoTitle || "nxx_video"}.mp4`,
-      contextInfo
+      fileName: `${videoTitle || "nxx_video"}.mp4`
+      
     }, { quoted: mek });
 
   } catch (error) {
@@ -151,23 +142,14 @@ async (from, client, conText) => {
     }
 
     // Context info for external ad reply
-    const contextInfo = {
-      externalAdReply: {
-        title: videoTitle || "Video",
-        body: `Duration: ${duration || "N/A"}`,
-        mediaType: 1,
-        sourceUrl: videoUrl,
-        thumbnailUrl: videoThumbnail,
-        renderLargerThumbnail: false
-      }
-    };
+    
 
     // Send video with contextInfo
     await client.sendMessage(from, {
       video: { url: videoUrl },
       mimetype: "video/mp4",
-      fileName: `${videoTitle || "video"}.mp4`,
-      contextInfo
+      fileName: `${videoTitle || "video"}.mp4`
+      
     }, { quoted: mek });
 
   } catch (error) {
@@ -216,8 +198,8 @@ async (from, client, conText) => {
       video: { url: videoUrl },
       mimetype: "video/mp4",
       fileName,
-      caption,
-      contextInfo
+      caption
+      
     }, { quoted: mek });
 
   } catch (error) {
