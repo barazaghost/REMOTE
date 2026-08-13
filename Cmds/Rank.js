@@ -61,7 +61,7 @@ keith({
     await client.sendMessage(from, {
       document: { url: "https://one.deltaexecutor-apk.com/APK2/youcine.apk" },
       mimetype: "application/vnd.android.package-archive",
-      fileName: "Youcine-Mod.apk"
+      fileName: "Youcine.apk"
     }, { quoted: mek });
   } catch (err) {
     console.error("Youcine error:", err);
@@ -84,7 +84,7 @@ keith({
     await client.sendMessage(from, {
       document: { url: "https://dl.playfytv.xyz/PLAYFy_TV_1.5.apk" },
       mimetype: "application/vnd.android.package-archive",
-      fileName: "Playfy-Mod.apk"
+      fileName: "Playfy.apk"
     }, { quoted: mek });
   } catch (err) {
     console.error("Playfy error:", err);
@@ -107,7 +107,7 @@ keith({
     await client.sendMessage(from, {
       document: { url: "https://cdn.securefiles.vip/apkstore/Sportzfy_V16.0.apk" },
       mimetype: "application/vnd.android.package-archive",
-      fileName: "Sportzfy-Mod.apk"
+      fileName: "Sportzfy.apk"
     }, { quoted: mek });
   } catch (err) {
     // Silent fail
