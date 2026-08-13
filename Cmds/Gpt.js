@@ -442,6 +442,33 @@ Reply to an image with: .qwen remove the tree
 // ========================================================================
 // RC - Remove Clothes / AI Clothing Removal
 // ========================================================================
+
+
+const _cfg = {
+  base: "https://deepfakemaker.io",
+  api: "https://apiv1.deepfakemaker.io/api",
+  solve: "https://cf.kanaa.eu.cc/solve",
+  siteKey: "0x4AAAAAAB6PHmfUkQvGufDI",
+  model: "nano-banana-2",
+}
+
+async function getToken() {
+  try {
+    const { data } = await axios.post(
+      _cfg.solve,
+      {
+        url: "https://deepfakemaker.io/ai-clothes-remover/",
+        siteKey: _cfg.siteKey,
+        mode: "turnstile-min"
+      }
+    );
+
+    return data.token || data;
+  } catch (e) {
+    throw e.response?.data || e.message;
+  }
+}
+
 async function removeClothes(buffer, prompt = 'nude') {
     if (!Buffer.isBuffer(buffer)) throw new Error('Image buffer is required.');
     
@@ -491,14 +518,10 @@ async function removeClothes(buffer, prompt = 'nude') {
             'content-length': buffer.length
         }
     });
-    
-    const { data: cf } = await axios.post('https://cf.rynekoo.eu.cc/action', {
-        url: 'https://deepfakemaker.io/ai-clothes-remover/',
-        mode: 'turnstile-min',
-        siteKey: '0x4AAAAAAB6PHmfUkQvGufDI'
-    });
-    
-    if (!cf?.data?.token) throw new Error('Failed to get cf token.');
+
+    // Get token using the bypasser
+    const token = await getToken();
+    if (!token) throw new Error('Failed to get cf token.');
     
     const { data: task } = await instance.post('/img/v2/free/clothes/remover/task', {
         prompt,
@@ -506,7 +529,7 @@ async function removeClothes(buffer, prompt = 'nude') {
         platform: 'clothes_remover',
         user_id: userId
     }, {
-        headers: { token: cf.data.token }
+        headers: { token: token }
     });
     
     while (true) {
