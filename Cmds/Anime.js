@@ -1,6 +1,365 @@
 
 const { keith } = require('../commandHandler');
 
+
+
+
+// ============================================================
+// Business Address
+// ============================================================
+keith({
+  pattern: "bizaddress",
+  aliases: ["setaddress", "bizaddr"],
+  category: "wa-business",
+  description: "Set business address",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("Owner only!");
+
+  if (!q) {
+    return reply(`📌 *Set Business Address*
+    
+Set your business address.
+
+*Usage:*
+.bizaddress 123 Main St, City, Country
+
+*Example:*
+.bizaddress 123 Main Street, Nairobi, Kenya`);
+  }
+
+  try {
+    await reply("Updating business address...");
+    await client.updateBussinesProfile({ address: q.trim() });
+    await reply(`✅ Business address updated to: ${q.trim()}`);
+  } catch (err) {
+    console.error("bizaddress error:", err);
+    reply(`Error: ${err.message}`);
+  }
+});
+
+// ============================================================
+// Business Email
+// ============================================================
+keith({
+  pattern: "bizemail",
+  aliases: ["setemail", "bizmail"],
+  category: "wa-business",
+  description: "Set business email",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("Owner only!");
+
+  if (!q) {
+    return reply(`📌 *Set Business Email*
+    
+Set your business email address.
+
+*Usage:*
+.bizemail business@example.com
+
+*Example:*
+.bizemail info@mycompany.com`);
+  }
+
+  // Basic email validation
+  if (!q.includes('@') || !q.includes('.')) {
+    return reply("Invalid email format. Please provide a valid email address.");
+  }
+
+  try {
+    await reply("Updating business email...");
+    await client.updateBussinesProfile({ email: q.trim() });
+    await reply(`✅ Business email updated to: ${q.trim()}`);
+  } catch (err) {
+    console.error("bizemail error:", err);
+    reply(`Error: ${err.message}`);
+  }
+});
+
+// ============================================================
+// Business Description
+// ============================================================
+keith({
+  pattern: "bizdesc",
+  aliases: ["setdescription", "bizdescription", "bizbio"],
+  category: "wa-business",
+  description: "Set business description",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("Owner only!");
+
+  if (!q) {
+    return reply(`📌 *Set Business Description*
+    
+Set your business description.
+
+*Usage:*
+.bizdesc We sell amazing products...
+
+*Example:*
+.bizdesc Premium quality products delivered worldwide`);
+  }
+
+  if (q.length > 500) {
+    return reply("Description too long. Maximum 500 characters.");
+  }
+
+  try {
+    await reply("Updating business description...");
+    await client.updateBussinesProfile({ description: q.trim() });
+    await reply(`✅ Business description updated!`);
+  } catch (err) {
+    console.error("bizdesc error:", err);
+    reply(`Error: ${err.message}`);
+  }
+});
+
+// ============================================================
+// Business Website
+// ============================================================
+keith({
+  pattern: "bizwebsite",
+  aliases: ["setwebsite", "bizurl", "bizsite"],
+  category: "wa-business",
+  description: "Set business website",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("Owner only!");
+
+  if (!q) {
+    return reply(`📌 *Set Business Website*
+    
+Set your business website URL.
+
+*Usage:*
+.bizwebsite https://example.com
+
+*Example:*
+.bizwebsite https://mycompany.com`);
+  }
+
+  if (!q.startsWith('http://') && !q.startsWith('https://')) {
+    return reply("Invalid URL. Please include http:// or https://");
+  }
+
+  try {
+    await reply("Updating business website...");
+    await client.updateBussinesProfile({ websites: [q.trim()] });
+    await reply(`✅ Business website updated to: ${q.trim()}`);
+  } catch (err) {
+    console.error("bizwebsite error:", err);
+    reply(`Error: ${err.message}`);
+  }
+});
+
+// ============================================================
+// Business Hours
+// ============================================================
+keith({
+  pattern: "bizhours",
+  aliases: ["biztime", "businesshours", "sethours"],
+  category: "wa-business",
+  description: "Set business hours",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("Owner only!");
+
+  if (!q) {
+    return reply(`📌 *Set Business Hours*
+    
+Set your business opening hours.
+
+*Usage:*
+.bizhours monday | 09:00 | 17:00
+.bizhours sunday | closed
+
+*Examples:*
+.bizhours monday | 09:00 | 17:00
+.bizhours tuesday | 09:00 | 17:00
+.bizhours wednesday | 09:00 | 17:00
+.bizhours sunday | closed
+
+*Set all at once using JSON:*
+.bizhours json | {"timezone":"America/New_York","days":[{"day":"monday","mode":"specific_hours","openTimeInMinutes":540,"closeTimeInMinutes":1020}]}`);
+  }
+
+  try {
+    let hoursData;
+
+    if (q.toLowerCase().startsWith('json')) {
+      const jsonStr = q.replace(/^json\s*\|?\s*/, '');
+      hoursData = JSON.parse(jsonStr);
+    } else {
+      const parts = q.split('|').map(s => s.trim());
+      
+      if (parts.length < 2) {
+        return reply("Invalid format. Use: .bizhours day | open | close");
+      }
+
+      const dayMap = {
+        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+        'friday': 4, 'saturday': 5, 'sunday': 6
+      };
+      
+      const day = parts[0].toLowerCase();
+      
+      if (dayMap[day] === undefined) {
+        return reply(`Invalid day: ${day}\nAvailable: monday, tuesday, wednesday, thursday, friday, saturday, sunday`);
+      }
+
+      const open = parts[1];
+      const close = parts[2];
+
+      if (open.toLowerCase() === 'closed') {
+        hoursData = {
+          timezone: 'America/New_York',
+          days: [{ day: day, mode: 'appointment_only' }]
+        };
+      } else if (!close) {
+        return reply("Please provide both open and close time.\nExample: .bizhours monday | 09:00 | 17:00");
+      } else {
+        const [openHour, openMin] = open.split(':').map(Number);
+        const [closeHour, closeMin] = close.split(':').map(Number);
+        
+        if (isNaN(openHour) || isNaN(openMin) || isNaN(closeHour) || isNaN(closeMin)) {
+          return reply("Invalid time format. Use HH:MM (e.g., 09:00)");
+        }
+        
+        const openMinutes = openHour * 60 + openMin;
+        const closeMinutes = closeHour * 60 + closeMin;
+
+        hoursData = {
+          timezone: 'America/New_York',
+          days: [{ 
+            day: day, 
+            mode: 'specific_hours', 
+            openTimeInMinutes: openMinutes, 
+            closeTimeInMinutes: closeMinutes 
+          }]
+        };
+      }
+    }
+
+    await client.updateBussinesProfile({ hours: hoursData });
+    await reply("✅ Business hours updated successfully!");
+
+  } catch (err) {
+    console.error("bizhours error:", err);
+    reply(`Error: ${err.message}`);
+  }
+});
+
+// ============================================================
+// Business Profile - View All
+// ============================================================
+keith({
+  pattern: "bizview",
+  aliases: ["viewbiz", "bizinfo", "bizprofile"],
+  category: "wa-business",
+  description: "View business profile information",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("Owner only!");
+
+  try {
+    await reply("Fetching business profile...");
+    
+    // Note: You may need to fetch the profile differently depending on your Baileys version
+    // This is a placeholder - adjust based on available methods
+    const profile = await client.getBusinessProfile(client.user.id);
+    
+    if (!profile) {
+      return reply("No business profile found.");
+    }
+
+    let text = `📊 *Business Profile*\n\n`;
+    text += `📍 *Address:* ${profile.address || 'Not set'}\n`;
+    text += `📧 *Email:* ${profile.email || 'Not set'}\n`;
+    text += `📝 *Description:* ${profile.description || 'Not set'}\n`;
+    text += `🌐 *Website:* ${profile.websites?.[0] || 'Not set'}\n`;
+    text += `⏰ *Hours:* ${profile.hours ? 'Configured' : 'Not set'}\n`;
+    text += `🖼️ *Cover Photo:* ${profile.coverPhoto ? '✅ Set' : 'Not set'}`;
+
+    await client.sendMessage(from, { text }, { quoted: mek });
+
+  } catch (err) {
+    console.error("bizview error:", err);
+    reply(`Error: ${err.message}`);
+  }
+});
+
+// ============================================================
+// Cover Photo Commands
+// ============================================================
+keith({
+  pattern: "bizcover",
+  aliases: ["coverphoto", "updatecover", "bizcoverphoto"],
+  category: "wa-business",
+  description: "Update business cover photo",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, isSuperUser, quotedMsg } = conText;
+
+  if (!isSuperUser) return reply("Owner only!");
+
+  if (!quotedMsg?.imageMessage) {
+    return reply("Reply to an image with .bizcover to set as business cover photo");
+  }
+
+  try {
+    await reply("Updating cover photo...");
+
+    const filePath = await client.downloadAndSaveMediaMessage(quotedMsg.imageMessage);
+    const coverId = await client.updateCoverPhoto({ url: filePath });
+    
+    fs.unlinkSync(filePath);
+    
+    await reply(`✅ Cover photo updated successfully!\n🆔 Cover ID: ${coverId}`);
+
+  } catch (err) {
+    console.error("bizcover error:", err);
+    reply(`Error: ${err.message}`);
+  }
+});
+
+keith({
+  pattern: "removecover",
+  aliases: ["deletecover", "removebizcover"],
+  category: "wa-business",
+  description: "Remove business cover photo",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("Owner only!");
+
+  if (!q) {
+    return reply("Provide the cover ID to remove.\n\nUsage: .removecover <cover_id>");
+  }
+
+  try {
+    await reply("Removing cover photo...");
+    await client.removeCoverPhoto(q.trim());
+    await reply("✅ Cover photo removed successfully!");
+
+  } catch (err) {
+    console.error("removecover error:", err);
+    reply(`Error: ${err.message}`);
+  }
+});
 //========================================================================================================================
 // All commands below map directly to the community methods exposed by your baileys build
 // (lib/Socket/communities.js): communityCreate, communityMetadata, communityFetchAllParticipating,
