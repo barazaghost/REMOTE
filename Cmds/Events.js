@@ -14,6 +14,95 @@ const { generateWAMessageContent, generateWAMessageFromContent } = require('@whi
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
+
+keith({
+  pattern: "bet",
+  aliases: ["prediction", "sureodds", "betslip", "footballbet", "soccerbet", "surebet"],
+  category: "Sports",
+  description: "Get football match predictions",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, api } = conText;
+
+  let leagueFilter = q ? q.trim().toLowerCase() : null;
+  
+  try {
+   // await reply("Fetching match predictions...");
+
+    const response = await axios.get(`${api}/bet`);
+    const data = response.data;
+
+    if (!data.status || !data.result || data.result.length === 0) {
+      return reply("No matches found.");
+    }
+
+    let allMatches = [];
+    let totalMatches = 0;
+
+    // Filter leagues if specific league is requested
+    let leagues = data.result;
+    if (leagueFilter) {
+      leagues = data.result.filter(l => 
+        l.league.toLowerCase().includes(leagueFilter)
+      );
+      if (leagues.length === 0) {
+        return reply(`No matches found for league: "${q}"`);
+      }
+    }
+
+    // Build response
+    let text = `⚽ *Football Predictions*\n`;
+    if (leagueFilter) {
+      text += `📌 *League:* ${leagueFilter.toUpperCase()}\n`;
+    }
+    text += `📅 *Date:* ${new Date().toLocaleDateString()}\n\n`;
+
+    for (const league of leagues) {
+      const matches = league.matches.filter(m => m.homeScore === '-' || m.awayScore === '-');
+      
+      if (matches.length === 0) continue;
+      
+      totalMatches += matches.length;
+      text += `━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `📋 *${league.league}*\n`;
+      
+      for (const match of matches) {
+        const kickoff = new Date(match.kickoff);
+        const timeStr = kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const odd = match.prediction?.odd ? ` (${match.prediction.odd})` : '';
+        const tip = match.prediction?.tip || 'N/A';
+        
+        text += `\n🕐 ${timeStr}\n`;
+        text += `🏠 *${match.homeTeam}* vs *${match.awayTeam}*\n`;
+        text += `📊 Prediction: *${tip}*${odd}\n`;
+        
+        allMatches.push(match);
+      }
+      text += `\n`;
+    }
+
+    if (totalMatches === 0) {
+      return reply(`No upcoming matches found${leagueFilter ? ` for "${q}"` : ''}.`);
+    }
+
+    text += `━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `📊 *Total Matches:* ${totalMatches}`;
+
+    // Split if too long
+    if (text.length > 4000) {
+      const parts = text.match(/.{1,4000}/g) || [];
+      for (let i = 0; i < parts.length; i++) {
+        await client.sendMessage(from, { text: parts[i] }, { quoted: mek });
+      }
+    } else {
+      await client.sendMessage(from, { text }, { quoted: mek });
+    }
+
+  } catch (err) {
+    console.error("bet error:", err);
+    reply(`Error: ${err.message}`);
+  }
+});
 //========================================================================================================================
 keith({
   pattern: "fifa",
@@ -928,59 +1017,6 @@ keith({
 
 //========================================================================================================================
 
-keith({
-  pattern: "surebet",
-  aliases: ["bettips", "odds", "predict", "bet", "sureodds"],
-  description: "Get betting tips and odds",
-  category: "Sports",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { mek, reply, botname, api } = conText;
-
-  try {
-    const { data } = await axios.get(`${api}/bet`);
-    if (!data?.status || !data?.result?.length) {
-      return reply("❌ No betting tips available right now.");
-    }
-
-    let txt = `🎲 *${botname} Betting Tips & Odds*\n\n`;
-
-    data.result.forEach((match, i) => {
-      txt += `*${i + 1}. ${match.match}*\n`;
-      txt += `League: ${match.league}\n`;
-      txt += `Time: ${match.time}\n\n`;
-
-      if (match.predictions?.fulltime) {
-        txt += `Fulltime Odds:\n`;
-        txt += `  🏠 Home: ${match.predictions.fulltime.home}%\n`;
-        txt += `  🤝 Draw: ${match.predictions.fulltime.draw}%\n`;
-        txt += `  🚀 Away: ${match.predictions.fulltime.away}%\n`;
-      }
-
-      if (match.predictions?.over_2_5) {
-        txt += `Over 2.5 Goals:\n`;
-        txt += `  ✅ Yes: ${match.predictions.over_2_5.yes}%\n`;
-        txt += `  ❌ No: ${match.predictions.over_2_5.no}%\n`;
-      }
-
-      if (match.predictions?.bothTeamToScore) {
-        txt += `Both Teams To Score:\n`;
-        txt += `  ✅ Yes: ${match.predictions.bothTeamToScore.yes}%\n`;
-      }
-
-      if (typeof match.predictions?.value_bets !== "undefined") {
-        txt += `Value Bets: ${match.predictions.value_bets}\n`;
-      }
-
-      txt += `\n──────────────────────\n\n`;
-    });
-
-    await client.sendMessage(from, { text: txt }, { quoted: mek });
-  } catch (err) {
-    console.error("Bet command error:", err);
-    reply("❌ Failed to fetch betting tips. Try again later.");
-  }
-});
 //========================================================================================================================
 
 keith({
