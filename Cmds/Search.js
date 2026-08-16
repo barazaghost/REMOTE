@@ -857,7 +857,7 @@ async (from, client, conText) => {
 keith({
   pattern: "movie",
   aliases: ["moviesearch"],
-  category: "search",
+  category: "movie",
   description: "Search for movie information"
 },
 async (from, client, conText) => {
