@@ -942,7 +942,7 @@ keith({
   pattern: "news",
   aliases: ["headlines", "latestnews"],
   description: "Get the latest news headlines for any topic",
-  category: "search",
+  category: "news",
   filename: __filename
 }, async (from, client, conText) => {
   const { q, reply, mek, api } = conText;
