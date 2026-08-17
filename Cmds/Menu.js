@@ -39,6 +39,21 @@ function getCategoryCommands(categories, selectedNumber) {
   };
 }
 
+function locationQuoted(pushName) {
+  return {
+    key: {
+      participant: '0@s.whatsapp.net',
+      remoteJid: 'status@broadcast',
+    },
+    message: {
+      locationMessage: {
+        name: `Hi ${pushName || 'User'}`,
+        jpegThumbnail: '',
+      },
+    },
+  };
+}
+
 //========================================================================================================================
 // MENU (full list)
 keith({
@@ -46,7 +61,7 @@ keith({
   category: "general",
   description: "Show all commands grouped by category"
 }, async (from, client, conText) => {
-  const { mek, sender, botname, expiryDisplay, botPic } = conText;
+  const { mek, sender, botname, expiryDisplay, botPic, pushName } = conText;
   const username = sender.split('@')[0];
 
   initializeCommands();
@@ -66,21 +81,29 @@ keith({
     menuText += `\n╰──────────────┈⊷\n\n`;
   });
 
+  // Create location quoted
+  const quoted = locationQuoted(pushName);
+
   await client.sendMessage(from, {
     image: { url: botPic },
     caption: menuText.trim(),
-    mentions: [sender]
+    mentions: [sender],
+    contextInfo: {
+      quotedMessage: quoted.message,
+      participant: quoted.key.participant,
+      stanzaId: 'status@broadcast'
+    }
   });
 });
 
 //========================================================================================================================
-// MENU2 (interactive)
+// MENU (interactive)
 keith({
   pattern: "menu",
   category: "general",
   description: "Interactive category-based menu"
 }, async (from, client, conText) => {
-  const { mek, sender, botname, botPic, expiryDisplay } = conText;
+  const { mek, sender, botname, botPic, expiryDisplay, pushName } = conText;
   const userId = mek.sender;
   const username = sender.split('@')[0];
 
@@ -107,10 +130,18 @@ ${categories.map((cat, i) => `> │◦➛ ${i + 1}. ${cat}`).join("\n")}
 ╰─────────────────────┈⊷
 `.trim();
 
+  // Create location quoted
+  const quoted = locationQuoted(pushName);
+
   const sentMessage = await client.sendMessage(from, {
     image: { url: botPic },
     caption: menuText,
-    mentions: [sender]
+    mentions: [sender],
+    contextInfo: {
+      quotedMessage: quoted.message,
+      participant: quoted.key.participant,
+      stanzaId: 'status@broadcast'
+    }
   });
 
   const replyHandler = async (update) => {
@@ -126,10 +157,16 @@ ${categories.map((cat, i) => `> │◦➛ ${i + 1}. ${cat}`).join("\n")}
     const selectedNumber = parseInt(userInput);
 
     if (userInput === "0") {
+      const quotedMsg = locationQuoted(pushName);
       await client.sendMessage(from, {
         image: { url: botPic },
         caption: menuText,
-        mentions: [sender]
+        mentions: [sender],
+        contextInfo: {
+          quotedMessage: quotedMsg.message,
+          participant: quotedMsg.key.participant,
+          stanzaId: 'status@broadcast'
+        }
       });
       activeMenus.set(userId, {
         sentMessage,
@@ -150,10 +187,16 @@ ${categories.map((cat, i) => `> │◦➛ ${i + 1}. ${cat}`).join("\n")}
       return;
     }
 
+    const quotedMsg = locationQuoted(pushName);
     const categoryMessage = await client.sendMessage(from, {
       image: { url: botPic },
       caption: commandsText,
-      mentions: [sender]
+      mentions: [sender],
+      contextInfo: {
+        quotedMessage: quotedMsg.message,
+        participant: quotedMsg.key.participant,
+        stanzaId: 'status@broadcast'
+      }
     });
 
     activeMenus.set(userId, {
