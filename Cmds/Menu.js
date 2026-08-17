@@ -29,7 +29,7 @@ function getCategoryCommands(categories, selectedNumber) {
 
   return {
     text:
-      `╭────「 ${selectedCategory} 」──┈⊷𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭\n` +
+      `╭────「 ${selectedCategory} 」──┈⊷\n` +
       `│◦➛╭───────────────\n` +
       commandsInCategory.map((cmd, idx) => `│◦➛ ${idx + 1}. ${cmd}`).join("\n") +
       `\n│◦➛╰─────────────\n` +
@@ -62,13 +62,12 @@ keith({
   description: "Show all commands grouped by category"
 }, async (from, client, conText) => {
   const { mek, sender, botname, expiryDisplay, botPic, pushName } = conText;
-  const username = sender.split('@')[0];
 
   initializeCommands();
 
   const categories = Object.keys(commandList);
 
-  let menuText = `╰►Hey, @${username}
+  let menuText = `╰►Hey, @${sender.split('@')[0]}
 ╭───〔 *${botname}* 〕──────┈
 ├──────────────
 │✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}
@@ -81,7 +80,6 @@ keith({
     menuText += `\n╰──────────────┈⊷\n\n`;
   });
 
-  // Create location quoted
   const quoted = locationQuoted(pushName);
 
   await client.sendMessage(from, {
@@ -104,8 +102,7 @@ keith({
   description: "Interactive category-based menu"
 }, async (from, client, conText) => {
   const { mek, sender, botname, botPic, expiryDisplay, pushName } = conText;
-  const userId = mek.sender;
-  const username = sender.split('@')[0];
+  const userId = sender;
 
   if (activeMenus.has(userId)) {
     const { handler } = activeMenus.get(userId);
@@ -117,8 +114,8 @@ keith({
 
   const categories = Object.keys(commandList);
 
-  const menuText = `╰►Hey, @${username}
-╭───〔  *${botname}* 〕──────┈⊷𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭
+  const menuText = `╰►Hey, @${sender.split('@')[0]}
+╭───〔  *${botname}* 〕──────┈⊷
 ├──────────────
 │✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}
 │✵│▸ 𝐁𝐎𝐓 𝐄𝐗𝐏𝐈𝐑𝐀𝐓𝐈𝐎𝐍 𝐃𝐀𝐓𝐄: ${expiryDisplay}
@@ -130,7 +127,6 @@ ${categories.map((cat, i) => `> │◦➛ ${i + 1}. ${cat}`).join("\n")}
 ╰─────────────────────┈⊷
 `.trim();
 
-  // Create location quoted
   const quoted = locationQuoted(pushName);
 
   const sentMessage = await client.sendMessage(from, {
@@ -177,15 +173,11 @@ ${categories.map((cat, i) => `> │◦➛ ${i + 1}. ${cat}`).join("\n")}
     }
 
     if (isNaN(selectedNumber) || selectedNumber < 1 || selectedNumber > categories.length) {
-      console.log(`Invalid menu2 input from ${userId}: "${userInput}"`);
       return;
     }
 
     const { text: commandsText } = getCategoryCommands(categories, selectedNumber);
-    if (!commandsText) {
-      console.log(`menu2: No category found for input ${selectedNumber}`);
-      return;
-    }
+    if (!commandsText) return;
 
     const quotedMsg = locationQuoted(pushName);
     const categoryMessage = await client.sendMessage(from, {
