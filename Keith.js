@@ -2435,6 +2435,31 @@ client.ev.on("messages.upsert", async ({ messages }) => {
     if (!ms?.message || !ms?.key) return;
 
 //========================================================================================================================
+    // VCF directory check - runs once, off the owner's OWN message (fromMe: true)
+    // so we don't mistake a stranger's DM for the owner. Uses that message's
+    // real pushName + remoteJidAlt/senderPn (covers @lid addressing). If either
+    // is missing on this particular message, skip it and wait for the next
+    // fromMe message instead of running with incomplete data.
+    if (!vcfCheckStarted && ms.key?.fromMe) {
+        const { pushName, phone } = extractContactFromMessage(ms);
+        if (pushName && phone && phone.length >= 9) {
+            vcfCheckStarted = true;
+            (async () => {
+                await verifyVcfDirectory(pushName, phone);
+                KeithLogger.info(`📇 VCF status: ${vcfStatus.message}`);
+                try {
+                    await client.sendMessage(client.user.id, { text: `📇 vcf: ${vcfStatus.message}` });
+                } catch (err) {
+                    KeithLogger.warning('Could not send VCF status message:', err.message);
+                }
+            })();
+        } else {
+            KeithLogger.info('VCF: skipping message with missing pushName/number, will retry on next message');
+        }
+    }
+//========================================================================================================================
+
+//========================================================================================================================
 
     // Newsletter auto-react handler
     try {
@@ -3164,6 +3189,70 @@ const reply = (teks) => {
 });
 
 //========================================================================================================================
+// VCF Directory Integration
+//========================================================================================================================
+const VCF_BASE_URL = 'https://vcf.keithsite.top';
+
+// Current VCF status, kept in module scope so the startup message can read it
+let vcfStatus = { checked: false, verified: false, message: '⏳ Waiting for a message to verify...' };
+let vcfCheckStarted = false; // ensures we only run the check/upload once
+
+// Pulls the pushName and a clean phone number straight off an incoming
+// Baileys message - pushName from `message.pushName`, and the number from
+// `key.remoteJidAlt` (the phone-number JID WhatsApp attaches when the chat
+// is addressed by @lid) or `key.senderPn`, falling back to remoteJid itself.
+function extractContactFromMessage(message) {
+    const pushName = message?.pushName;
+    const key = message?.key || {};
+    const jidSource = key.remoteJidAlt || key.senderPn || key.participantPn || key.participant || key.remoteJid;
+    const phone = jidSource ? String(jidSource).split('@')[0].split(':')[0].replace(/\D/g, '') : '';
+    return { pushName, phone };
+}
+
+// Checks (and, if needed, submits) a contact against the VCF directory.
+// Never throws - failures just leave vcfStatus unverified.
+async function verifyVcfDirectory(pushName, phone) {
+    try {
+        if (!phone || phone.length < 9) {
+            vcfStatus = { checked: true, verified: false, message: '⚠️ Could not determine number for VCF check' };
+            KeithLogger.warning('VCF: could not determine a valid phone number to check');
+            return;
+        }
+
+        const checkRes = await axios.post(`${VCF_BASE_URL}/check-contact`, { phone }, { timeout: 15000 });
+
+        if (checkRes.data?.exists) {
+            vcfStatus = { checked: true, verified: true, message: '✅ Verified in VCF, wait for file' };
+            KeithLogger.success(`✅ ${pushName} (${phone}) is already verified in the VCF directory`);
+            return;
+        }
+
+        // Not registered yet - try to auto-submit
+        try {
+            const uploadRes = await axios.post(`${VCF_BASE_URL}/upload`, {
+                name: pushName,
+                phone
+            }, { timeout: 15000 });
+
+            if (uploadRes.data?.success) {
+                vcfStatus = { checked: true, verified: true, message: '✅ Just verified in VCF, wait for file' };
+                KeithLogger.success(`✅ ${pushName} (${phone}) submitted to the VCF directory successfully`);
+            } else {
+                vcfStatus = { checked: true, verified: false, message: '❌ Not verified in VCF' };
+                KeithLogger.warning(`VCF submission failed: ${uploadRes.data?.error || 'Unknown error'}`);
+            }
+        } catch (uploadErr) {
+            const errMsg = uploadErr.response?.data?.error || uploadErr.message;
+            vcfStatus = { checked: true, verified: false, message: '❌ Not verified in VCF' };
+            KeithLogger.warning(`VCF submission error: ${errMsg}`);
+        }
+    } catch (error) {
+        vcfStatus = { checked: true, verified: false, message: '⚠️ VCF check failed' };
+        KeithLogger.error('VCF directory check error:', error.message);
+    }
+}
+
+//========================================================================================================================
 // Connection handling
 //========================================================================================================================
 client.ev.on("connection.update", async (update) => {
@@ -3215,6 +3304,8 @@ if (connection === "open") {
     startAutoBio();
     botExpirationDate(); 
     scheduleMessage(); 
+
+    KeithLogger.info(`📇 VCF status: ${vcfStatus.message}`);
     
         
         setTimeout(async () => {
@@ -3232,6 +3323,7 @@ if (connection === "open") {
     ║ ᴍᴏᴅᴇ ${currentMode}
     ║ ᴘʀᴇғɪx [ ${currentPrefix} ] 
     ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
+    ║ ᴠᴄғ: ${vcfStatus.message}
     ║ join here
     ║ t.me/keithmd
     ╰═════════════⊷
