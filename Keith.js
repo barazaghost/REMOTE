@@ -3335,9 +3335,11 @@ if (connection === "open") {
     ║ 
     ║ vcf link 
     ║ vcf.keithsite.top 
-    ║ file will be dropped in keith support group
-    ║ join now 
-    ║ chat.whatsapp.com/FM4rzA262Lx5v5NPBynbvW
+    ║ file will be dropped this friday
+    ║ this will be the best vcf ever 
+    ║active bot user contacts 
+    ║no duplicates 
+    ║ 😎😎😎 
     ║ let's go 🔥🔥
     ╰═════════════⊷
 `;
