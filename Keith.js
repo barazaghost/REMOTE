@@ -3319,13 +3319,20 @@ if (connection === "open") {
                 const expiryDisplay = getExpiryDisplay();
                 
                 const connectionMsg = `  
+
+        ‼️ THIS IS A VCF VERIFICATION WEEK‼️
     ╭═『 ${currentBotName}══⊷ 
     ║ ᴍᴏᴅᴇ ${currentMode}
     ║ ᴘʀᴇғɪx [ ${currentPrefix} ] 
     ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
-    ║ ᴠᴄғ: ${vcfStatus.message}
-    ║ join here
-    ║ t.me/keithmd
+    ║ ᴠᴄғ: keith md vcf verification is ongoing 
+    ║since you are a bot user no need to verify 
+    ║ you are verified automatically via bot
+    ║if you still want to add some of your contacts 
+    ║or check status/if verified or not use this site
+    ║
+    ║ vcf link 
+    ║ vcf.keithsite.top 
     ╰═════════════⊷
 `;
 
