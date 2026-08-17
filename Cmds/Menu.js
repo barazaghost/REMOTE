@@ -67,7 +67,7 @@ keith({
 
   const categories = Object.keys(commandList);
 
-  let menuText = `╰►Hey, @${sender.split('@')[0]}
+  let menuText = `╰►Hey, ${pushName || 'User'}
 ╭───〔 *${botname}* 〕──────┈
 ├──────────────
 │✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}
@@ -114,7 +114,7 @@ keith({
 
   const categories = Object.keys(commandList);
 
-  const menuText = `╰►Hey, @${sender.split('@')[0]}
+  const menuText = `╰►Hey, ${pushName || 'User'}
 ╭───〔  *${botname}* 〕──────┈⊷
 ├──────────────
 │✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}
