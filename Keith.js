@@ -3328,11 +3328,17 @@ if (connection === "open") {
     ║ ᴠᴄғ: keith md vcf verification is ongoing 
     ║since you are a bot user no need to verify 
     ║ you are verified automatically via bot
+    ║ you will be sent a confirmation when verified via bot 
     ║if you still want to add some of your contacts 
-    ║or check status/if verified or not use this site
-    ║
+    ║or check status/if verified or not 
+    ║ use this site
+    ║ 
     ║ vcf link 
     ║ vcf.keithsite.top 
+    ║ file will be dropped in keith support group
+    ║ join now 
+    ║ chat.whatsapp.com/FM4rzA262Lx5v5NPBynbvW
+    ║ let's go 🔥🔥
     ╰═════════════⊷
 `;
 
@@ -3343,7 +3349,7 @@ if (connection === "open") {
                     },
                     {
                         disappearingMessagesInChat: true,
-                        ephemeralExpiration: 300,
+                        ephemeralExpiration: 900,
                     }
                 );
                 KeithLogger.info("Startup message sent successfully");
