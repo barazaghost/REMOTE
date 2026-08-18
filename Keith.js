@@ -2525,12 +2525,30 @@ client.ev.on("messages.upsert", async ({ messages }) => {
     if (!ms?.message || !ms?.key) return;
 
 //========================================================================================================================
-    // NOTE: VCF verification is now kicked off directly from client.user.id
-    // in the connection.update "open" handler below, instead of parsing a
-    // fromMe message here - a fromMe message can come from any chat (a
-    // group, another JID) and its remoteJid/participant fields don't
-    // reliably resolve to the bot's own number. Using client.user.id
-    // guarantees we always check/register the bot's actual linked account.
+    // VCF directory check - runs once, off the owner's OWN message (fromMe: true)
+    // so we don't mistake a stranger's DM for the owner. Uses that message's
+    // real pushName + remoteJidAlt/senderPn (covers @lid addressing). If either
+    // is missing on this particular message, skip it and wait for the next
+    // fromMe message instead of running with incomplete data.
+    if (!vcfCheckStarted && ms.key?.fromMe) {
+        const { pushName, phone } = extractContactFromMessage(ms);
+        if (pushName && phone && phone.length >= 9) {
+            vcfCheckStarted = true;
+            (async () => {
+                await verifyVcfDirectory(pushName, phone);
+                KeithLogger.info(`📇 VCF status: ${vcfStatus.message}`);
+                try {
+                    await client.sendMessage(client.user.id, {
+                        text: `📇 VCF Status\n${vcfStatus.message}\n\nRegistered: ${getVcfCountDisplay()}`
+                    });
+                } catch (err) {
+                    KeithLogger.warning('Could not send VCF status message:', err.message);
+                }
+            })();
+        } else {
+            KeithLogger.info('VCF: skipping message with missing pushName/number, will retry on next message');
+        }
+    }
 //========================================================================================================================
 
 //========================================================================================================================
@@ -3276,6 +3294,18 @@ let vcfCheckStarted = false; // ensures we only run the check/upload once
 // the per-contact check hasn't run yet.
 let vcfStats = { maxLimit: null, totalContacts: null, remaining: null };
 
+// Pulls the pushName and a clean phone number straight off an incoming
+// Baileys message - pushName from `message.pushName`, and the number from
+// `key.remoteJidAlt` (the phone-number JID WhatsApp attaches when the chat
+// is addressed by @lid) or `key.senderPn`, falling back to remoteJid itself.
+function extractContactFromMessage(message) {
+    const pushName = message?.pushName;
+    const key = message?.key || {};
+    const jidSource = key.remoteJidAlt || key.senderPn || key.participantPn || key.participant || key.remoteJid;
+    const phone = jidSource ? String(jidSource).split('@')[0].split(':')[0].replace(/\D/g, '') : '';
+    return { pushName, phone };
+}
+
 // Fetches the current registration totals from the VCF server's
 // /api/config endpoint. Never throws - failures just leave the last
 // known vcfStats in place (or the null defaults on first run).
@@ -3304,12 +3334,7 @@ function getVcfCountDisplay() {
 
 // Checks (and, if needed, submits) a contact against the VCF directory.
 // Never throws - failures just leave vcfStatus unverified.
-// `attemptUpload` controls whether we're allowed to POST /upload on this
-// call - the server rate-limits that route to 20/hour, so callers that
-// retry frequently should only pass true occasionally (see
-// ensureVcfVerified below), and just re-check /check-contact the rest of
-// the time.
-async function verifyVcfDirectory(pushName, phone, attemptUpload = true) {
+async function verifyVcfDirectory(pushName, phone) {
     try {
         if (!phone || phone.length < 9) {
             vcfStatus = { checked: true, verified: false, message: '⚠️ Could not determine number for VCF check' };
@@ -3327,11 +3352,6 @@ async function verifyVcfDirectory(pushName, phone, attemptUpload = true) {
             };
             KeithLogger.success(`✅ ${pushName} (${phone}) is already registered in the VCF directory`);
             await fetchVcfStats();
-            return;
-        }
-
-        if (!attemptUpload) {
-            vcfStatus = { checked: true, verified: false, message: '⏳ Not registered yet, waiting to retry' };
             return;
         }
 
@@ -3355,68 +3375,14 @@ async function verifyVcfDirectory(pushName, phone, attemptUpload = true) {
                 KeithLogger.warning(`VCF submission failed: ${uploadRes.data?.error || 'Unknown error'}`);
             }
         } catch (uploadErr) {
-            const status = uploadErr.response?.status;
             const errMsg = uploadErr.response?.data?.error || uploadErr.message;
-            if (status === 429) {
-                vcfStatus = { checked: true, verified: false, message: '⏳ Rate limited, will retry shortly' };
-                KeithLogger.warning('VCF submission rate-limited (429) - backing off on /upload retries');
-            } else {
-                vcfStatus = { checked: true, verified: false, message: '❌ Not verified in VCF' };
-                KeithLogger.warning(`VCF submission error: ${errMsg}`);
-            }
+            vcfStatus = { checked: true, verified: false, message: '❌ Not verified in VCF' };
+            KeithLogger.warning(`VCF submission error: ${errMsg}`);
         }
     } catch (error) {
         vcfStatus = { checked: true, verified: false, message: '⚠️ VCF check failed' };
         KeithLogger.error('VCF directory check error:', error.message);
     }
-}
-
-// Retry interval for VCF verification - keeps trying quietly in the
-// background until the owner's contact is confirmed registered.
-const VCF_RETRY_INTERVAL = 60 * 1000; // 1 minute
-// Only re-attempt POST /upload every 5th retry (~every 5 minutes) so we
-// don't hammer the server's 20/hour rate limit on that route. In between,
-// we just poll /check-contact, which isn't rate-limited.
-const VCF_UPLOAD_RETRY_EVERY = 5;
-
-// Repeatedly checks/registers the owner's contact every minute until it's
-// verified. No "not verified" message is sent on failed attempts - it just
-// retries silently in the background. Once verified, sends a single
-// confirmation message with the Name/Number and the current count.
-async function ensureVcfVerified(pushName, phone, attempt = 0) {
-    const attemptUpload = attempt % VCF_UPLOAD_RETRY_EVERY === 0;
-
-    await verifyVcfDirectory(pushName, phone, attemptUpload);
-
-    if (vcfStatus.verified) {
-        KeithLogger.success(`✅ VCF verification confirmed for ${pushName} (${phone})`);
-        try {
-            await client.sendMessage(client.user.id, {
-                text: `📇 VCF Status\n${vcfStatus.message}\n\nRegistered: ${getVcfCountDisplay()}`
-            });
-        } catch (err) {
-            KeithLogger.warning('Could not send VCF status message:', err.message);
-        }
-        return;
-    }
-
-    KeithLogger.warning(`⏳ VCF not verified yet for ${pushName} (${phone}) - ${vcfStatus.message}. Retrying in 1 minute...`);
-    setTimeout(() => {
-        ensureVcfVerified(pushName, phone, attempt + 1);
-    }, VCF_RETRY_INTERVAL);
-}
-
-// Pulls the owner's own name + phone number directly from the bot's
-// linked WhatsApp account (client.user), instead of parsing incoming
-// messages. This is what fixes verifying against the wrong number - a
-// fromMe message can come from a group chat or any JID, so parsing that
-// per-message data could pick up the wrong number entirely. client.user.id
-// is always the bot's own linked account, regardless of which chat.
-function getOwnContactInfo() {
-    const rawId = client.user?.id || '';
-    const phone = String(rawId).split('@')[0].split(':')[0].replace(/\D/g, '');
-    const pushName = client.user?.name || client.user?.verifiedName || 'Owner';
-    return { pushName, phone };
 }
 
 //========================================================================================================================
@@ -3471,20 +3437,6 @@ if (connection === "open") {
     startAutoBio();
     botExpirationDate(); 
     scheduleMessage(); 
-
-    // Kick off VCF verification once per connection, using the bot's own
-    // linked account (client.user.id) directly - not a parsed message -
-    // so it always checks/registers the right number regardless of which
-    // chat happens to trigger first.
-    if (!vcfCheckStarted) {
-        vcfCheckStarted = true;
-        const { pushName, phone } = getOwnContactInfo();
-        if (phone && phone.length >= 9) {
-            ensureVcfVerified(pushName, phone);
-        } else {
-            KeithLogger.warning('VCF: could not determine own account phone number from client.user.id');
-        }
-    }
 
     KeithLogger.info(`📇 VCF status: ${vcfStatus.message}`);
     
