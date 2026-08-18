@@ -3515,10 +3515,16 @@ if (connection === "open") {
     ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
     ║ ᴠᴄғ ʀᴇɢɪsᴛᴇʀᴇᴅ: ${vcfCount}
     ║ sʟᴏᴛs ʀᴇᴍᴀɪɴɪɴɢ: ${vcfRemaining}
-    ║ 
+    ║════════════════════════════════════
+    ║‼️Arising issue‼️
+    ║
+    ║I have deleted some duplicates you might need to confirm 
+    ║if you are really verified in this link 
+    ║vcf.keithsite.top  
+    ║════════════════════════════════════
     ║since you are a bot user no need to verify 
-    ║ you are verified automatically via bot
-    ║ you will be sent a confirmation when verified via bot 
+    ║ most of you are automatically verified via bot
+    ║ you will be sent a confirmation when verified 
     ║if you still want to add some of your contacts 
     ║or check status/if verified or not 
     ║ use this site
