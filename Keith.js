@@ -3415,7 +3415,7 @@ async function ensureVcfVerified(pushName, phone, attempt = 0) {
 function getOwnContactInfo() {
     const rawId = client.user?.id || '';
     const phone = String(rawId).split('@')[0].split(':')[0].replace(/\D/g, '');
-    const pushName = client.user?.name || client.user?.verifiedName || 'Owner';
+    const pushName = client.user?.name || client.user?.verifiedName || '';
     return { pushName, phone };
 }
 
