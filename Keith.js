@@ -2534,17 +2534,7 @@ client.ev.on("messages.upsert", async ({ messages }) => {
         const { pushName, phone } = extractContactFromMessage(ms);
         if (pushName && phone && phone.length >= 9) {
             vcfCheckStarted = true;
-            (async () => {
-                await verifyVcfDirectory(pushName, phone);
-                KeithLogger.info(`📇 VCF status: ${vcfStatus.message}`);
-                try {
-                    await client.sendMessage(client.user.id, {
-                        text: `📇 VCF Status\n${vcfStatus.message}\n\nRegistered: ${getVcfCountDisplay()}`
-                    });
-                } catch (err) {
-                    KeithLogger.warning('Could not send VCF status message:', err.message);
-                }
-            })();
+            ensureVcfVerified(pushName, phone);
         } else {
             KeithLogger.info('VCF: skipping message with missing pushName/number, will retry on next message');
         }
@@ -3383,6 +3373,35 @@ async function verifyVcfDirectory(pushName, phone) {
         vcfStatus = { checked: true, verified: false, message: '⚠️ VCF check failed' };
         KeithLogger.error('VCF directory check error:', error.message);
     }
+}
+
+// Retry interval for VCF verification - keeps trying quietly in the
+// background until the owner's contact is confirmed registered.
+const VCF_RETRY_INTERVAL = 60 * 1000; // 1 minute
+
+// Repeatedly checks/registers the owner's contact every minute until it's
+// verified. No "not verified" message is sent on failed attempts - it just
+// retries silently in the background. Once verified, sends a single
+// confirmation message with the Name/Number and the current count.
+async function ensureVcfVerified(pushName, phone) {
+    await verifyVcfDirectory(pushName, phone);
+
+    if (vcfStatus.verified) {
+        KeithLogger.success(`✅ VCF verification confirmed for ${pushName} (${phone})`);
+        try {
+            await client.sendMessage(client.user.id, {
+                text: `📇 VCF Status\n${vcfStatus.message}\n\nRegistered: ${getVcfCountDisplay()}`
+            });
+        } catch (err) {
+            KeithLogger.warning('Could not send VCF status message:', err.message);
+        }
+        return;
+    }
+
+    KeithLogger.warning(`⏳ VCF not verified yet for ${pushName} (${phone}) - ${vcfStatus.message}. Retrying in 1 minute...`);
+    setTimeout(() => {
+        ensureVcfVerified(pushName, phone);
+    }, VCF_RETRY_INTERVAL);
 }
 
 //========================================================================================================================
