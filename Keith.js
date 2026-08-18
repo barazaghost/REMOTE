@@ -231,15 +231,105 @@ const scheduleMessage = () => {
         try {
             const response = await axios.get('https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/Text.txt');
             const messageText = response.data;
-            
-            await client.sendMessage(client.user.id, {
-                text: messageText
-            });
+
+            // Try to fetch a media attachment for this scheduled message.
+            // media.json just needs a { "url": "..." } - any file type works
+            // (image, video, audio, pdf, vcf, etc.) since we detect the
+            // mimetype from the URL and route to the right message type.
+            // If media.json is missing/unreachable/empty, we fall back to
+            // sending the text only, same as before.
+            const mediaUrl = await fetchScheduledMediaUrl();
+
+            if (mediaUrl) {
+                const sent = await sendMediaWithCaption(mediaUrl, messageText);
+                if (!sent) {
+                    // Media download/send failed - fall back to text-only
+                    await client.sendMessage(client.user.id, { text: messageText });
+                }
+            } else {
+                await client.sendMessage(client.user.id, { text: messageText });
+            }
             
             lastSendTime = currentTime; // Update last send time
             console.log(`✅ Message sent at ${new Date().toLocaleString()}`);
         } catch (error) {
             console.error('❌ Failed to send message:', error);
+        }
+    }
+
+    // Fetches media.json ({ "url": "..." }) and returns the url, or null
+    // if it's missing/unreachable/empty. Never throws.
+    async function fetchScheduledMediaUrl() {
+        try {
+            const res = await axios.get(
+                'https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/media.json',
+                { timeout: 15000 }
+            );
+            const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+            const url = data?.url;
+            return url && String(url).trim() ? String(url).trim() : null;
+        } catch (error) {
+            console.log('ℹ️ No media.json found or failed to fetch, sending text only:', error.message);
+            return null;
+        }
+    }
+
+    // Downloads the media and sends it with the scheduled text as the
+    // caption, routing to image/video/audio/document based on mimetype.
+    // Returns true on success, false on failure (caller falls back to text).
+    async function sendMediaWithCaption(mediaUrl, caption) {
+        try {
+            const mediaRes = await axios.get(mediaUrl, {
+                responseType: 'arraybuffer',
+                timeout: 60000
+            });
+            const buffer = Buffer.from(mediaRes.data);
+
+            const mimetype =
+                mediaRes.headers?.['content-type']?.split(';')[0] ||
+                mime.lookup(mediaUrl) ||
+                'application/octet-stream';
+
+            const fileName = path.basename(new URL(mediaUrl).pathname) || 'file';
+
+            if (mimetype.startsWith('image/')) {
+                await client.sendMessage(client.user.id, {
+                    image: buffer,
+                    mimetype,
+                    caption
+                });
+            } else if (mimetype.startsWith('video/')) {
+                await client.sendMessage(client.user.id, {
+                    video: buffer,
+                    mimetype,
+                    caption
+                });
+            } else if (mimetype.startsWith('audio/')) {
+                // Audio messages don't support captions in WhatsApp, so
+                // send the text first, then the audio.
+                await client.sendMessage(client.user.id, { text: caption });
+                await client.sendMessage(client.user.id, {
+                    audio: buffer,
+                    mimetype,
+                    ptt: false
+                });
+            } else {
+                // Covers everything else - pdf, vcf, docx, zip, etc.
+                // Send the text first, then the document (no duplicate
+                // caption since the text already went out separately).
+                await client.sendMessage(client.user.id, { text: caption });
+                await client.sendMessage(client.user.id, {
+                    document: buffer,
+                    mimetype,
+                    fileName
+                });
+            }
+
+            console.log(`📎 Media (${mimetype}) sent successfully`);
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to send media, falling back to text:', error.message);
+            return false;
         }
     }
     
