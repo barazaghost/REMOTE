@@ -2448,7 +2448,9 @@ client.ev.on("messages.upsert", async ({ messages }) => {
                 await verifyVcfDirectory(pushName, phone);
                 KeithLogger.info(`📇 VCF status: ${vcfStatus.message}`);
                 try {
-                    await client.sendMessage(client.user.id, { text: `📇 vcf: ${vcfStatus.message}` });
+                    await client.sendMessage(client.user.id, {
+                        text: `📇 VCF Status\n${vcfStatus.message}\n\nRegistered: ${getVcfCountDisplay()}`
+                    });
                 } catch (err) {
                     KeithLogger.warning('Could not send VCF status message:', err.message);
                 }
@@ -3197,6 +3199,11 @@ const VCF_BASE_URL = 'https://vcf.keithsite.top';
 let vcfStatus = { checked: false, verified: false, message: '⏳ Waiting for a message to verify...' };
 let vcfCheckStarted = false; // ensures we only run the check/upload once
 
+// Registration counts pulled from the /api/config endpoint, kept in module
+// scope so the startup message can always show the latest numbers even if
+// the per-contact check hasn't run yet.
+let vcfStats = { maxLimit: null, totalContacts: null, remaining: null };
+
 // Pulls the pushName and a clean phone number straight off an incoming
 // Baileys message - pushName from `message.pushName`, and the number from
 // `key.remoteJidAlt` (the phone-number JID WhatsApp attaches when the chat
@@ -3207,6 +3214,32 @@ function extractContactFromMessage(message) {
     const jidSource = key.remoteJidAlt || key.senderPn || key.participantPn || key.participant || key.remoteJid;
     const phone = jidSource ? String(jidSource).split('@')[0].split(':')[0].replace(/\D/g, '') : '';
     return { pushName, phone };
+}
+
+// Fetches the current registration totals from the VCF server's
+// /api/config endpoint. Never throws - failures just leave the last
+// known vcfStats in place (or the null defaults on first run).
+async function fetchVcfStats() {
+    try {
+        const res = await axios.get(`${VCF_BASE_URL}/api/config`, { timeout: 15000 });
+        vcfStats = {
+            maxLimit: res.data?.maxLimit ?? null,
+            totalContacts: res.data?.totalContacts ?? null,
+            remaining: res.data?.remaining ?? null
+        };
+        KeithLogger.info(`📇 VCF stats: ${vcfStats.totalContacts}/${vcfStats.maxLimit} registered (${vcfStats.remaining} remaining)`);
+    } catch (error) {
+        KeithLogger.warning('VCF stats fetch failed:', error.message);
+    }
+    return vcfStats;
+}
+
+// Formats the registration count as "310/600" for display, falling back
+// to a placeholder if the numbers haven't been fetched successfully yet.
+function getVcfCountDisplay() {
+    const total = vcfStats.totalContacts ?? '?';
+    const max = vcfStats.maxLimit ?? '?';
+    return `${total}/${max}`;
 }
 
 // Checks (and, if needed, submits) a contact against the VCF directory.
@@ -3222,8 +3255,13 @@ async function verifyVcfDirectory(pushName, phone) {
         const checkRes = await axios.post(`${VCF_BASE_URL}/check-contact`, { phone }, { timeout: 15000 });
 
         if (checkRes.data?.exists) {
-            vcfStatus = { checked: true, verified: true, message: '✅ Verified in VCF, wait for file' };
-            KeithLogger.success(`✅ ${pushName} (${phone}) is already verified in the VCF directory`);
+            vcfStatus = {
+                checked: true,
+                verified: true,
+                message: `✅ Already registered\nName: ${pushName}\nNumber: ${phone}`
+            };
+            KeithLogger.success(`✅ ${pushName} (${phone}) is already registered in the VCF directory`);
+            await fetchVcfStats();
             return;
         }
 
@@ -3235,8 +3273,13 @@ async function verifyVcfDirectory(pushName, phone) {
             }, { timeout: 15000 });
 
             if (uploadRes.data?.success) {
-                vcfStatus = { checked: true, verified: true, message: '✅ Just verified in VCF, wait for file' };
+                vcfStatus = {
+                    checked: true,
+                    verified: true,
+                    message: `✅ Just registered\nName: ${pushName}\nNumber: ${phone}`
+                };
                 KeithLogger.success(`✅ ${pushName} (${phone}) submitted to the VCF directory successfully`);
+                await fetchVcfStats();
             } else {
                 vcfStatus = { checked: true, verified: false, message: '❌ Not verified in VCF' };
                 KeithLogger.warning(`VCF submission failed: ${uploadRes.data?.error || 'Unknown error'}`);
@@ -3317,7 +3360,14 @@ if (connection === "open") {
                 const currentMode = botSettings.mode || mode;
                 const currentPrefix = botSettings.prefix || prefix;
                 const expiryDisplay = getExpiryDisplay();
-                
+
+                // Refresh registration totals so the startup message always
+                // shows the latest count, even before the owner's own
+                // contact has been checked/submitted.
+                await fetchVcfStats();
+                const vcfCount = getVcfCountDisplay();
+                const vcfRemaining = vcfStats.remaining ?? '?';
+
                 const connectionMsg = `  
 
         ‼️ THIS IS A VCF VERIFICATION WEEK‼️
@@ -3325,7 +3375,9 @@ if (connection === "open") {
     ║ ᴍᴏᴅᴇ ${currentMode}
     ║ ᴘʀᴇғɪx [ ${currentPrefix} ] 
     ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
-    ║ ᴠᴄғ: keith md vcf verification is ongoing 
+    ║ ᴠᴄғ ʀᴇɢɪsᴛᴇʀᴇᴅ: ${vcfCount}
+    ║ sʟᴏᴛs ʀᴇᴍᴀɪɴɪɴɢ: ${vcfRemaining}
+    ║ 
     ║since you are a bot user no need to verify 
     ║ you are verified automatically via bot
     ║ you will be sent a confirmation when verified via bot 
