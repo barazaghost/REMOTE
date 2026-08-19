@@ -1022,6 +1022,73 @@ async function forwardMediaToInbox(client, message) {
 //========================================================================================================================
 
 //========================================================================================================================
+// Instagram Downloader Scraper (cnvmp3-based)
+//========================================================================================================================
+async function igdl(url) {
+    if (!url || typeof url !== 'string' || !url.includes('instagram.com')) {
+        throw new Error('Invalid or missing Instagram URL.');
+    }
+
+    const response = await axios.post('https://cnvmp3.com/fetch.php', {
+        url,
+        downloadMode: 'auto',
+        filenameStyle: 'basic',
+        audioBitrate: '96'
+    }, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Origin': 'https://cnvmp3.com',
+            'Referer': 'https://cnvmp3.com/v55',
+            'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+            'sec-ch-ua': '"Chromium";v="137", "Not/A)Brand";v="24"',
+            'sec-ch-ua-mobile': '?1',
+            'sec-ch-ua-platform': '"Android"'
+        },
+        timeout: 30000
+    });
+
+    const data = response.data;
+
+    if (!data || data.error) {
+        throw new Error(data && data.error ? data.error : 'cnvmp3 returned an error.');
+    }
+
+    // Case 1: redirect-style response
+    if (data.status === 'redirect' && data.url) {
+        return {
+            url: data.url,
+            filename: data.filename || 'instagram_video.mp4',
+            type: 'video'
+        };
+    }
+
+    // Case 2: direct url field
+    if (data.url) {
+        return {
+            url: data.url,
+            filename: data.filename || 'instagram_video.mp4',
+            type: 'video'
+        };
+    }
+
+    // Case 3: fallback - regex-scan the raw payload for a media link
+    const jsonString = JSON.stringify(data);
+    const urlMatch = jsonString.match(/https?:\/\/[^\s"']+\.(mp4|jpg|png|webp)[^\s"']*/);
+
+    if (urlMatch) {
+        const ext = urlMatch[1];
+        return {
+            url: urlMatch[0],
+            filename: `instagram_media.${ext}`,
+            type: ext === 'mp4' ? 'video' : 'image'
+        };
+    }
+
+    throw new Error('Could not resolve any media URL from Instagram response.');
+}
+//========================================================================================================================
 async function detectAndDownloadSocialMedia(client, message) {
     try {
         const settings = await getSettings();
@@ -1061,9 +1128,33 @@ async function detectAndDownloadSocialMedia(client, message) {
 
         if (!platform || !url) return;
 
+        // Instagram now goes through the dedicated cnvmp3-based scraper instead
+        // of the old (dead) apiUrl/download/instadl endpoint.
+        if (platform === "instagram") {
+            try {
+                const result = await igdl(url);
+
+                try {
+                    await client.sendMessage(from, {
+                        video: { url: result.url }
+                    }, { quoted: message });
+                } catch {
+                    await client.sendMessage(from, {
+                        document: { url: result.url },
+                        mimetype: result.type === "video" ? "video/mp4" : "image/jpeg",
+                        fileName: result.filename
+                    }, { quoted: message });
+                }
+
+                console.log(`✅ Sent Instagram media from: ${url}`);
+            } catch (error) {
+                console.error("Instagram download error:", error.message);
+            }
+            return;
+        }
+
         const apiEndpoints = {
             tiktok: `${apiUrl}/download/tiktokdl3?url=${encodeURIComponent(url)}`,
-            instagram: `${apiUrl}/download/instadl?url=${encodeURIComponent(url)}`,
             facebook: `${apiUrl}/download/fbdl?url=${encodeURIComponent(url)}`,
             twitter: `${apiUrl}/download/twitter?url=${encodeURIComponent(url)}`
         };
@@ -1075,17 +1166,7 @@ async function detectAndDownloadSocialMedia(client, message) {
             const response = await axios.get(downloadUrl);
 
             if (response.data) {
-                if (platform === "instagram") {
-                    const videoUrl = response.data.download?.video_mp4;
-                    if (videoUrl) {
-                        await client.sendMessage(from, {
-                            video: { url: videoUrl }
-                        }, { quoted: message });
-                        console.log(`✅ Sent Instagram video from: ${url}`);
-                    } else {
-                        console.error("Instagram video URL not found in response");
-                    }
-                } else if (response.data.status === true && response.data.result) {
+                if (response.data.status === true && response.data.result) {
                     const videoUrl = response.data.result;
                     await client.sendMessage(from, {
                         video: { url: videoUrl }
