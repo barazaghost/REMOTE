@@ -2,6 +2,85 @@ const axios = require('axios');
 const { keith } = require('../commandHandler');
 //========================================================================================================================
 
+
+
+keith({
+  pattern: "instagram",
+  aliases: ["igdownload", "instagramdl", "igdl"],
+  category: "Downloader",
+  description: "Download Instagram reels, posts, and videos",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek } = conText;
+
+  if (!q) {
+    return reply("Please provide an Instagram URL.\nExample: .igdl https://instagram.com/reel/xxx");
+  }
+
+  if (!q.includes('instagram.com')) {
+    return reply("Invalid URL. Please provide a valid Instagram URL.");
+  }
+
+  try {
+    const response = await axios.post('https://cnvmp3.com/fetch.php', {
+      url: q,
+      downloadMode: "auto",
+      filenameStyle: "basic",
+      audioBitrate: "96"
+    }, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Origin': 'https://cnvmp3.com',
+        'Referer': 'https://cnvmp3.com/v55',
+        'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+        'sec-ch-ua': '"Chromium";v="137", "Not/A)Brand";v="24"',
+        'sec-ch-ua-mobile': '?1',
+        'sec-ch-ua-platform': '"Android"'
+      },
+      timeout: 30000
+    });
+
+    const data = response.data;
+
+    if (data.error) return;
+
+    if (data.status === 'redirect' && data.url) {
+      try {
+        await client.sendMessage(from, {
+          video: { url: data.url }
+        }, { quoted: mek });
+      } catch {
+        await client.sendMessage(from, {
+          document: { url: data.url },
+          mimetype: 'video/mp4',
+          fileName: data.filename || 'instagram_video.mp4'
+        }, { quoted: mek });
+      }
+    } else if (data.url) {
+      await client.sendMessage(from, {
+        video: { url: data.url }
+      }, { quoted: mek });
+    } else {
+      const jsonString = JSON.stringify(data);
+      const urlMatch = jsonString.match(/https?:\/\/[^\s"']+\.(mp4|jpg|png|webp)[^\s"']*/);
+      
+      if (urlMatch) {
+        await client.sendMessage(from, {
+          video: { url: urlMatch[0] }
+        }, { quoted: mek });
+      }
+    }
+
+  } catch (err) {
+    console.error("igdl error:", err);
+  }
+});
+
+//========================================================================================================================
+
+
 keith({
   pattern: "xxx",
   aliases: ["xnxxvideo", "xnxx"],
@@ -390,44 +469,7 @@ async (from, client, conText) => {
 //========================================================================================================================
 
 
-keith({
-  pattern: "instagram",
-  aliases: ["insta", "igdl", "ig"],
-  category: "Downloader",
-  description: "Download Instagram video"
-},
-async (from, client, conText) => {
-  const { q, mek, reply, api } = conText;
 
-  if (!q || !q.startsWith("http")) {
-    return reply("❌ Provide a valid Instagram video URL.");
-  }
-
-  try {
-    const apiUrl = `${api}/download/instadl?url=${encodeURIComponent(q)}`;
-    const response = await axios.get(apiUrl, { timeout: 100000 });
-
-    const result = response.data?.download?.video_mp4;
-    const thumb = response.data?.thumbnail;
-
-    if (!result) {
-      return reply("❌ No video found for this Instagram link.");
-    }
-
-    await client.sendMessage(
-      from,
-      {
-        video: { url: result },
-        mimetype: "video/mp4"
-        //jpegThumbnail: thumb ? await getBuffer(thumb) : null
-      },
-      { quoted: mek }
-    );
-  } catch (error) {
-    console.error("Instagram download error:", error);
-    reply("❌ Failed to download Instagram video.");
-  }
-});
 
 //========================================================================================================================
 
