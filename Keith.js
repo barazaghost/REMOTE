@@ -3416,7 +3416,7 @@ if (connection === "open") {
                     },
                     {
                         disappearingMessagesInChat: true,
-                        ephemeralExpiration: 86400,
+                        ephemeralExpiration: 300,
                     }
                 );
                 KeithLogger.info("Startup message sent successfully");
