@@ -3326,7 +3326,7 @@ const reply = (teks) => {
                 KeithLogger.error(`Command error [${cmd}]:`, error);
                 try {
                     await client.sendMessage(from, {
-                        text: ""
+                        text: `😡Command failed: ${error.message}`
                     }, { quoted: ms });
                 } catch (sendErr) {
                     KeithLogger.error("Error sending error message:", sendErr);
