@@ -70,6 +70,60 @@ keith({
 });
 
 //========================================================================================================================
+// Youcine
+//========================================================================================================================
+keith({
+  pattern: "cricmad",
+  description: "Streaming app for watching movies and football live",
+  category: "Moded-APK",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, reply } = conText;
+
+  try {
+    await client.sendMessage(from, {
+      document: { url: "https://cricmad.app/Cricmad-v15.0.0.apk" },
+      mimetype: "application/vnd.android.package-archive",
+      fileName: "cricmad.apk"
+    }, { quoted: mek });
+  } catch (err) {
+    console.error("Youcine error:", err);
+    await reply("❌ Failed to send Youcine APK. Error: " + err.message);
+  }
+});
+
+//========================================================================================================================
+// Playfy
+//=========================================
+
+//========================================================================================================================
+// Youcine
+//========================================================================================================================
+keith({
+  pattern: "criczfy",
+  description: "Streaming app for watching movies and football live",
+  category: "Moded-APK",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, reply } = conText;
+
+  try {
+    await client.sendMessage(from, {
+      document: { url: "https://pub-2240a96087b24524b453ceabf2854721.r2.dev/CricZ%20TV%20v7.3.apk" },
+      mimetype: "application/vnd.android.package-archive",
+      fileName: "criczfy.apk"
+    }, { quoted: mek });
+  } catch (err) {
+    console.error("Youcine error:", err);
+    await reply("❌ Failed to send Youcine APK. Error: " + err.message);
+  }
+});
+
+//========================================================================================================================
+// Playfy
+//=========================================
+
+//========================================================================================================================
 // Playfy
 //========================================================================================================================
 keith({
