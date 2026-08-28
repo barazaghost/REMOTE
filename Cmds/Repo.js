@@ -267,7 +267,7 @@ keith({
     await sendButtons(client, from, {
       title: '',
       text: messageText,
-      footer: 'tinu.be/walink',
+      footer: '♡',
       image: { url: botPic },
       buttons: [
         {
@@ -289,7 +289,7 @@ keith({
           buttonParamsJson: JSON.stringify({
             display_text: "Copy Session URL",
             id: "copy_session",
-            copy_code: "https://keithsite.top/keithpair"
+            copy_code: "https://keithsite.lol/keithpair"
           })
         },
         {
