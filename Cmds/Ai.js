@@ -353,7 +353,7 @@ async (from, client, conText) => {
 //========================================================================================================================
 
 const aiModels = [
-  "mistral", "claudeai", "bard", "perplexity", "venice", "keithai"
+  "mistral", "wormgpt", "claudeai", "bard", "perplexity", "venice", "keithai"
 ];
 
 
