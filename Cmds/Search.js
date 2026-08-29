@@ -1187,7 +1187,7 @@ keith({
   if (!q) return reply("🎵 Type a song title or lyric linen\nExample: lyrics what shall I render to Jehovah");
 
   try {
-    const res = await axios.get(`${api}/search/lyrics2?query=${encodeURIComponent(q)}`);
+    const res = await axios.get(`${api}/search/lyrics3?query=${encodeURIComponent(q)}`);
     const data = res.data;
 
     if (!data.status || !data.result) {
