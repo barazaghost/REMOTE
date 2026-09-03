@@ -1128,34 +1128,12 @@ async function detectAndDownloadSocialMedia(client, message) {
 
         if (!platform || !url) return;
 
-        // Instagram now goes through the dedicated cnvmp3-based scraper instead
-        // of the old (dead) apiUrl/download/instadl endpoint.
-        if (platform === "instagram") {
-            try {
-                const result = await igdl(url);
-
-                try {
-                    await client.sendMessage(from, {
-                        video: { url: result.url }
-                    }, { quoted: message });
-                } catch {
-                    await client.sendMessage(from, {
-                        document: { url: result.url },
-                        mimetype: result.type === "video" ? "video/mp4" : "image/jpeg",
-                        fileName: result.filename
-                    }, { quoted: message });
-                }
-
-                console.log(`✅ Sent Instagram media from: ${url}`);
-            } catch (error) {
-                console.error("Instagram download error:", error.message);
-            }
-            return;
-        }
+        
 
         const apiEndpoints = {
             tiktok: `${apiUrl}/download/tiktokdl3?url=${encodeURIComponent(url)}`,
             facebook: `${apiUrl}/download/fbdl?url=${encodeURIComponent(url)}`,
+            instagram: `${apiUrl}/download/instagramdl?url=${encodeURIComponent(url)}`,
             twitter: `${apiUrl}/download/twitter?url=${encodeURIComponent(url)}`
         };
 
