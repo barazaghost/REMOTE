@@ -4,15 +4,6 @@ const axios = require('axios');
 const fs = require('fs');
 
 //========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//const { keith } = require('../commandHandler');
 
 keith({
   pattern: "addmetaai",
@@ -40,6 +31,8 @@ keith({
   }
 });
 
+//========================================================================================================================
+
 keith({
   pattern: "removemetaai",
   aliases: ["delmetaai", "removemeta", "delmeta"],
@@ -65,7 +58,8 @@ keith({
     reply(`❌ Error: ${err.message}`);
   }
 });
-//======================================================================================l==================================
+
+//========================================================================================================================
 
 keith({
     pattern: "listonline",
@@ -82,7 +76,6 @@ keith({
     if (!isSuperUser) {
         return reply("👑 Only group admins can use this command!");
     }
-
 
     try {
         
@@ -139,8 +132,9 @@ Members need to send messages first for tracking to build up.
         await reply(`❌ Error: ${err.message}`);
     }
 });
+
 //========================================================================================================================
-//========================================================================================================================
+
 keith({
   pattern: "rejectall",
   aliases: ["declineall", "reject"],
@@ -159,11 +153,9 @@ async (from, client, conText) => {
 
   // Warn if too many requests
   if (responseList.length > 100) {
-    //return reply(`⚠️ Too many requests (${responseList.length}). Please use /rejectall_batch to process in batches or run /rejectall again after some time.`);
   }
 
   if (responseList.length > 50) {
-   // await reply(`📊 Found ${responseList.length} requests. This will take approximately ${Math.ceil(responseList.length * 1.5 / 60)} minutes. I'll send progress updates...`);
   }
 
   let rejected = 0;
@@ -179,7 +171,6 @@ async (from, client, conText) => {
       
       // Progress update every 10 rejections
       if (rejected % 10 === 0) {
-     //   await reply(`📈 Progress: ${rejected}/${responseList.length} completed`);
       }
       
       // Dynamic delay - slower if rate limit was hit
@@ -190,7 +181,6 @@ async (from, client, conText) => {
     } catch (error) {
       if (error.message?.includes("rate") || error.message?.includes("too many") || error.message?.includes("429")) {
         rateLimitHit = true;
-     //   await reply("⚠️ Rate limit approaching. Slowing down...");
         await new Promise(resolve => setTimeout(resolve, 5000)); // Longer cooldown
         i--; // Retry this participant
       } else {
@@ -201,9 +191,10 @@ async (from, client, conText) => {
     }
   }
 
- // reply(`✅ Complete! Rejected: ${rejected}\n❌ Failed: ${failed}`);
 });
+
 //========================================================================================================================
+
 keith({
   pattern: "togroupstatus2",
   aliases: ["gs2", "groupstatus2"],
@@ -313,8 +304,8 @@ keith({
     await reply(`❌ Error sending group status: ${err.message}`);
   }
 });
-//===========================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "ckick",
@@ -362,8 +353,8 @@ keith({
     await reply(`❌ Failed to perform country kick: ${error.message}`);
   }
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "hidetag",
@@ -430,8 +421,8 @@ keith({
     return reply(`❌ Failed to send hidden tag: ${error.message}`);
   }
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "all",
@@ -493,8 +484,8 @@ keith({
     return reply(`❌ Failed to tag everyone: ${error.message}`);
   }
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "kickall2",
@@ -506,8 +497,6 @@ async (from, client, conText) => {
   const { reply, q, isSuperUser, isBotAdmin, isAdmin, isSuperAdmin, botname } = conText;
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
- // if (!isBotAdmin) return reply("❌ Bot must be an admin in the target group!");
- // if (!isAdmin && !isSuperAdmin) return reply("❌ You must be an admin to use this command!");
   if (!q) return reply("❌ Provide a valid WhatsApp group link!");
 
   try {
@@ -548,15 +537,15 @@ async (from, client, conText) => {
     }
 
     // Leave group after removal
-  //  await client.groupLeave(groupId);
 
     await reply(`✅ Successfully terminated group *${metadata.subject}* by ${botname}.`);
   } catch (error) {
     console.error("[Kill2] Error:", error);
-    //await reply(`❌ Failed to terminate group: ${error.message}`);
   }
 });
+
 //========================================================================================================================
+
 keith({
   pattern: "kickall",
   aliases: ["terminate", "endgroup", "kill"],
@@ -608,12 +597,8 @@ async (from, client, conText) => {
     await reply(`❌ Failed to terminate group: ${error.message}`);
   }
 });
-//========================================================================================================================
-
-
 
 //========================================================================================================================
-
 
 keith({
   pattern: "rgpp",
@@ -641,8 +626,8 @@ async (from, client, conText) => {
     reply(`❌ Failed to remove group profile picture.\nError: ${err.message}`);
   }
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "togroupstatus",
@@ -704,13 +689,14 @@ keith({
     }
 
     await client.sendMessage(from, payload, { quoted: mek });
-    //await reply("✅ Group status sent.");
   } catch (err) {
     console.error("togroupstatus error:", err);
     await reply(`❌ Error sending group status: ${err.message}`);
   }
 });
+
 //========================================================================================================================
+
 keith({
   pattern: "creategc",
   aliases: ["creategroup"],
@@ -765,7 +751,9 @@ async (from, client, conText) => {
     reply(`❌ Failed to create group: ${err.message}`);
   }
 });
+
 //========================================================================================================================
+
 keith({
   pattern: "join",
   aliases: ["joingroup"],
@@ -842,7 +830,9 @@ async (from, client, conText) => {
     }
   }
 });
+
 //========================================================================================================================
+
 keith({
   pattern: "left",
   aliases: ["leave", "exit", "bye"],
@@ -867,10 +857,9 @@ async (from, client, conText) => {
     reply("❌ Failed to leave group: " + err.message);
   }
 });
-//========================================================================================================================
-
-//const { keith } = require('../commandHandler');
 // From Group.js
+
+//========================================================================================================================
 
 keith({
   pattern: "demote",
@@ -1011,13 +1000,9 @@ keith({
     await reply(`❌ Failed to promote: ${error.message}`);
   }
 });
-//========================================================================================================================
-
-//========================================================================================================================
-
-//========================================================================================================================
- 
 // From Group.js
+
+//========================================================================================================================
 
 keith({
   pattern: "kick",
@@ -1095,10 +1080,8 @@ async (from, client, conText) => {
     await reply(`❌ Failed to remove: ${error.message}`);
   }
 });
+
 //========================================================================================================================
-//========================================================================================================================
-//const { keith } = require('../commandHandler');
-//const { keith } = require("../commandHandler");
 
 keith({
   pattern: "groupjid",
@@ -1127,8 +1110,6 @@ keith({
 
 //========================================================================================================================
 
-//const { keith } = require('../commandHandler');
-
 keith({
   pattern: "gcdesc",
   aliases: ["setdesc", "groupdesc", "gcdescription"],
@@ -1151,18 +1132,11 @@ async (from, client, conText) => {
     reply("❌ Failed to update group description: " + err.message);
   }
 });
+// From Group.js
+
+// From Group.js
+
 //========================================================================================================================
-
-
-
-
-
-// From Group.js
-
-
-
-
-// From Group.js
 
 keith({
   pattern: "groupname",
@@ -1186,6 +1160,7 @@ async (from, client, conText) => {
     reply("❌ Failed to update group subject: " + err.message);
   }
 });
+
 //========================================================================================================================
 
 keith({
@@ -1235,61 +1210,6 @@ async (from, client, conText) => {
     reply("❌ Failed to demote admins: " + err.message);
   }
 });
-/*keith({
-  pattern: "demoteall",
-  aliases: ["demoteadmins", "stripadmins"],
-  category: "group",
-  description: "Demote all group admins"
-},
-async (from, client, conText) => {
-  const { reply, isSuperUser, isGroup, isBotAdmin, isSuperAdmin, mek } = conText;
-
-  if (!isSuperUser) return reply("❌ Owner Only Command!");
-  if (!isGroup) return reply("❌ This command only works in groups!");
-  if (!isBotAdmin) return reply("❌ Bot must be admin to demote others.");
-
-  try {
-    // Fetch group metadata
-    const metadata = await client.groupMetadata(from);
-
-    // Collect all admins
-    const admins = metadata.participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin');
-
-    // Filter out super admin and bot itself
-    const demoteIds = admins
-      .map(a => a.id)
-      .filter(id => id !== isSuperAdmin && !id.includes(client.user.id));
-
-    if (demoteIds.length === 0) {
-      return reply("ℹ️ No admins found to demote.");
-    }
-
-    // Demote all in one batch
-    await client.groupParticipantsUpdate(from, demoteIds, 'demote');
-
-    // Confirmation message
-    await client.sendMessage(from, {
-      text: `🔻 All admins have been demoted (${demoteIds.length}).`,
-      mentions: demoteIds
-    }, { quoted: mek });
-
-  } catch (err) {
-    console.error("DemoteAll Error:", err);
-    reply("❌ Failed to demote admins: " + err.message);
-  }
-});*/
-//========================================================================================================================
-
-
-
-
-
-//========================================================================================================================
-
-
-//========================================================================================================================
-//const { keith } = require('../commandHandler');
-
 
 //========================================================================================================================
 
@@ -1364,8 +1284,8 @@ async (from, client, conText) => {
     reply("❌ Failed to fetch profile info. Try again.");
   }
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "tagall",
@@ -1376,9 +1296,7 @@ keith({
 async (from, client, conText) => {
   const { reply, q, isGroup, isBotAdmin, isSuperUser } = conText;
   if (!isSuperUser) return reply("❌ Owner Only Command!");
-//if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("This command only works in groups!");
-//  if (!isBotAdmin) return reply("Bot is not an admin");
 
   const metadata = await client.groupMetadata(from);
   const members = metadata.participants.map(p => p.id);
@@ -1389,8 +1307,8 @@ async (from, client, conText) => {
     mentions: members
   });
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "opentime",
@@ -1430,8 +1348,8 @@ async (from, client, conText) => {
     reply(`🔓 Group has been opened successfully after ${delay} seconds.`);
   }, delay * 1000);
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "closetime",
@@ -1444,7 +1362,6 @@ async (from, client, conText) => {
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("Groups Only Command only");
-
 
   if (!isBotAdmin) {
     const userNumber = sender.split('@')[0];
@@ -1470,8 +1387,8 @@ async (from, client, conText) => {
     reply(`🔒 Group has been closed successfully after ${delay} seconds.`);
   }, delay * 1000);
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "disap-off",
@@ -1488,8 +1405,8 @@ async (from, client, conText) => {
   await client.groupToggleEphemeral(from, 0);
   reply("🧼 Disappearing messages have been turned off.");
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "disap1",
@@ -1506,8 +1423,8 @@ async (from, client, conText) => {
   await client.groupToggleEphemeral(from, 86400);
   reply("🕒 Disappearing messages set to 24 hours.");
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "disap7",
@@ -1524,8 +1441,8 @@ async (from, client, conText) => {
   await client.groupToggleEphemeral(from, 604800);
   reply("📆 Disappearing messages set to 7 days.");
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "disap90",
@@ -1542,6 +1459,7 @@ async (from, client, conText) => {
   await client.groupToggleEphemeral(from, 7776000);
   reply("📆 Disappearing messages set to 90 days.");
 });
+
 //========================================================================================================================
 
 keith({
@@ -1561,8 +1479,8 @@ async (from, client, conText) => {
 
   reply(`🔄 Group link has been reset:\nhttps://chat.whatsapp.com/${newCode}`);
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "grouplink",
@@ -1579,8 +1497,8 @@ async (from, client, conText) => {
   const code = await client.groupInviteCode(from);
   reply(`🔗 Group Link:\nhttps://chat.whatsapp.com/${code}`);
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "approveall",
@@ -1600,11 +1518,9 @@ async (from, client, conText) => {
 
   // Warn if too many requests
   if (responseList.length > 100) {
-   // return reply(`⚠️ Too many requests (${responseList.length}). Please use /approveall_batch to process in batches or run /approveall again after some time.`);
   }
 
   if (responseList.length > 50) {
-   // await reply(`📊 Found ${responseList.length} requests. This will take approximately ${Math.ceil(responseList.length * 1.5 / 60)} minutes. I'll send progress updates...`);
   }
 
   let approved = 0;
@@ -1620,7 +1536,6 @@ async (from, client, conText) => {
       
       // Progress update every 10 approvals
       if (approved % 10 === 0) {
-      //  await reply(`📈 Progress: ${approved}/${responseList.length} completed`);
       }
       
       // Dynamic delay - slower if rate limit was hit
@@ -1631,7 +1546,6 @@ async (from, client, conText) => {
     } catch (error) {
       if (error.message?.includes("rate") || error.message?.includes("too many")) {
         rateLimitHit = true;
-     //   await reply("⚠️ Rate limit approaching. Slowing down...");
         await new Promise(resolve => setTimeout(resolve, 5000)); // Longer cooldown
         i--; // Retry this participant
       } else {
@@ -1642,11 +1556,10 @@ async (from, client, conText) => {
     }
   }
 
- // reply(`✅ Complete! Approved: ${approved}\n❌ Failed: ${failed}`);
 });
+
 //========================================================================================================================
 
-      
 keith({
   pattern: "add",
   aliases: ["invite", "adduser"],
@@ -1704,8 +1617,8 @@ keith({
     }
   }
 });
-//========================================================================================================================
 
+//========================================================================================================================
 
 keith({
   pattern: "delete",
@@ -1734,7 +1647,6 @@ keith({
       })
     );
 
-
     if (mek?.key) {
       deletePromises.push(
         client.sendMessage(from, {
@@ -1756,6 +1668,7 @@ keith({
 });
 
 //========================================================================================================================
+
 keith({
   pattern: "poll",
   aliases: ["vote", "question"],
@@ -1788,7 +1701,9 @@ async (from, client, conText) => {
     reply(`❌ Failed to send poll: ${err.message}`);
   }
 });
+
 //========================================================================================================================
+
 keith({
   pattern: "open",
   aliases: ["unmute", "groupopen", "gcopen", "adminonly", "adminsonly"],
@@ -1819,7 +1734,9 @@ async (from, client, conText) => {
     mentions: [`${userNumber}@s.whatsapp.net`]
   }, { quoted: mek });
 });
+
 //========================================================================================================================
+
 keith({
   pattern: "close",
   aliases: ["mute", "groupmute", "gcmute", "gcclose"],
@@ -1850,21 +1767,3 @@ async (from, client, conText) => {
     mentions: [`${userNumber}@s.whatsapp.net`]
   }, { quoted: mek });
 });
-//========================================================================================================================
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
