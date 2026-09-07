@@ -312,3 +312,274 @@ keith({
     }
   });
 });
+
+
+//========================================================================================================================
+
+//========================================================================================================================
+
+keith({
+  pattern: "livescore",
+  aliases: ["live", "score", "fixtures"],
+  description: "Get live, finished, or upcoming football matches",
+  category: "sports",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, reply, timezone, api } = conText;
+
+  const caption = `╭═════════════════⊷
+║  ⚽ *Football Scores* ⚽
+║━━━━━━━━━━━━━━━━━
+║ 𝗥𝗘𝗣𝗟𝗔𝗬 𝗪𝗜𝗧𝗛 𝗡𝗨𝗠𝗕𝗘𝗥
+║ 1. Live Matches 🔴
+║ 2. Finished Matches ✅
+║ 3. Upcoming Matches ⏰
+╰═════════════════⊷`;
+
+  const sent = await client.sendMessage(from, { text: caption }, { quoted: mek });
+  const messageId = sent.key.id;
+
+  client.ev.on("messages.upsert", async (update) => {
+    const msg = update.messages[0];
+    if (!msg.message) return;
+
+    const responseText = msg.message.conversation || msg.message.extendedTextMessage?.text;
+    const isReply = msg.message.extendedTextMessage?.contextInfo?.stanzaId === messageId;
+    const chatId = msg.key.remoteJid;
+
+    if (!isReply || chatId !== from) return;
+
+    const choice = responseText.trim();
+    
+    const optionMap = {
+      "1": { name: "Live", emoji: "🔴" },
+      "2": { name: "Finished", emoji: "✅" },
+      "3": { name: "Upcoming", emoji: "⏰" }
+    };
+
+    if (!optionMap[choice]) {
+      return client.sendMessage(chatId, {
+        text: "❌ Invalid option. Reply with 1, 2, or 3.",
+        quoted: msg
+      });
+    }
+
+    const selected = optionMap[choice];
+
+    try {
+      await client.sendMessage(chatId, { react: { text: selected.emoji, key: msg.key } });
+
+      // Fetch all matches
+      const res = await axios.get(`${api}/livescore`);
+      const data = res.data;
+
+      if (!data.status || !data.result || !data.result.games) {
+        return client.sendMessage(chatId, {
+          text: `❌ No match data available at the moment.`,
+          quoted: msg
+        });
+      }
+
+      const games = Object.values(data.result.games);
+      
+      // Get user's timezone from context or default
+      const userTimeZone = timezone || "Africa/Nairobi";
+      
+      // Get current time in user's timezone
+      const now = new Date();
+      const currentUserTimeStr = now.toLocaleTimeString("en-US", {
+        timeZone: userTimeZone,
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      
+      // Filter matches based on status
+      let filteredGames = [];
+
+      games.forEach(game => {
+        const matchStatus = game.R?.st || ""; // Get status from R.st
+        
+        // Convert match time to user's timezone
+        const userMatchTime = convertToUserTime(game.tm, game.dt, userTimeZone);
+        
+        // Categorize based on status (following HTML logic)
+        let category = "";
+        
+        if (matchStatus === '1T' || matchStatus === '2T' || matchStatus === 'HT') {
+          category = "live";
+        } else if (matchStatus === 'FT' || matchStatus === 'Pen') {
+          category = "finished";
+        } else if (matchStatus === '' || matchStatus === 'Pst' || matchStatus === 'Canc') {
+          category = "upcoming";
+        }
+        
+        if (category && (
+          (choice === "1" && category === "live") ||
+          (choice === "2" && category === "finished") ||
+          (choice === "3" && category === "upcoming")
+        )) {
+          filteredGames.push({
+            ...game,
+            category,
+            userMatchTime: userMatchTime ? userMatchTime.time : game.tm,
+            userMatchDate: userMatchTime ? userMatchTime.date : game.dt
+          });
+        }
+      });
+
+      if (filteredGames.length === 0) {
+        return client.sendMessage(chatId, {
+          text: `⚽ *${selected.name} Matches*\n\nNo ${selected.name.toLowerCase()} matches found at the moment.`,
+          quoted: msg
+        });
+      }
+
+      // Group by date
+      const matchesByDate = {};
+      
+      filteredGames.forEach(game => {
+        const date = game.userMatchDate || game.dt || "Today";
+        
+        if (!matchesByDate[date]) {
+          matchesByDate[date] = [];
+        }
+        
+        matchesByDate[date].push(game);
+      });
+
+      // Create formatted output
+      let output = `⚽ *${selected.name} Matches* ${selected.emoji}\n`;
+      output += `🌍 Timezone: ${userTimeZone}\n`;
+      output += `🕐 Current Time: ${currentUserTimeStr}\n\n`;
+      
+      let totalMatches = 0;
+      
+      Object.entries(matchesByDate).forEach(([date, dateGames]) => {
+        output += `📅 *${date}*\n`;
+        output += "─".repeat(30) + "\n";
+        
+        dateGames.forEach(game => {
+          const status = getMatchDisplay(game);
+          const score = getScoreDisplay(game);
+          
+          output += `${status} *${game.p1} vs ${game.p2}*\n`;
+          output += `   ${score}\n`;
+          
+          // Show converted user time
+          if (game.userMatchTime) {
+            output += `   🕒 ${game.userMatchTime}`;
+            
+            // Add match status info
+            const statusText = getMatchStatusText(game.R?.st);
+            if (statusText) {
+              output += ` (${statusText})`;
+            }
+          } else if (game.tm) {
+            output += `   🕒 ${game.tm}`;
+          }
+          
+          output += "\n\n";
+          totalMatches++;
+        });
+      });
+
+      output += `📊 Total: ${totalMatches} match(es)`;
+
+      await client.sendMessage(chatId, { text: output }, { quoted: msg });
+
+    } catch (err) {
+      console.error("livescore error:", err);
+      await client.sendMessage(chatId, {
+        text: `❌ Error fetching ${selected.name} matches: ${err.message}`,
+        quoted: msg
+      });
+    }
+  });
+});
+
+// Helper functions
+function convertToUserTime(timeStr, dateStr, userTimeZone) {
+  if (!timeStr || !dateStr) return null;
+  
+  try {
+    // Parse the API date and time (assume it's in UTC)
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    
+    // Create UTC date
+    const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
+    
+    // Convert to user's timezone
+    const userDateStr = utcDate.toLocaleDateString("en-US", {
+      timeZone: userTimeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    
+    const userTimeStr = utcDate.toLocaleTimeString("en-US", {
+      timeZone: userTimeZone,
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    
+    // Format date back to YYYY-MM-DD format
+    const [userMonth, userDay, userYear] = userDateStr.split('/');
+    const formattedDate = `${userYear}-${userMonth.padStart(2, '0')}-${userDay.padStart(2, '0')}`;
+    
+    return {
+      date: formattedDate,
+      time: userTimeStr
+    };
+  } catch (e) {
+    console.error("Time conversion error:", e);
+    return null;
+  }
+}
+
+function getMatchDisplay(game) {
+  const status = game.R?.st || "";
+  
+  if (status === 'HT') return "⏸️";
+  if (status === 'FT' || status === 'Pen') return "✅";
+  if (status === '1T' || status === '2T') return "🔴";
+  
+  return game.category === "upcoming" ? "⏰" : "⚽";
+}
+
+function getMatchStatusText(status) {
+  const statusMap = {
+    '': 'Not Started',
+    'FT': 'Full Time',
+    '1T': 'First Half',
+    '2T': 'Second Half',
+    'HT': 'Half Time',
+    'Pst': 'Postponed',
+    'Canc': 'Cancelled',
+    'Pen': 'Penalties'
+  };
+  
+  return statusMap[status] || status;
+}
+
+function getScoreDisplay(game) {
+  if (game.R && game.R.r1 !== undefined && game.R.r2 !== undefined) {
+    return `📊 ${game.R.r1} - ${game.R.r2}`;
+  }
+  return "📊 0 - 0";
+}
+
+//========================================================================================================================
+//========================================================================================================================
+
+// Helper: convert timestamp to readable date
+function formatDate(ts) {
+  try {
+    const d = new Date(Number(ts));
+    return d.toDateString(); // e.g. "Fri Dec 05 2025"
+  } catch {
+    return "Unknown Date";
+  }
+}
