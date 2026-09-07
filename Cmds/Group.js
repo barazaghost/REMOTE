@@ -103,7 +103,7 @@ Members need to send messages first for tracking to build up.
             const { jid, count } = users[i];
             const medal = i < 3 ? medalEmojis[i] : '🔹';
             
-            // Get participant info if available
+            
             const participant = groupInfo?.participants?.find(p => p.id === jid);
             let displayName;
             
@@ -151,7 +151,7 @@ async (from, client, conText) => {
 
   if (!responseList.length) return reply("There are no pending join requests at this time.");
 
-  // Warn if too many requests
+  
   if (responseList.length > 100) {
   }
 
@@ -169,20 +169,20 @@ async (from, client, conText) => {
       await client.groupRequestParticipantsUpdate(from, [participant.jid], "reject");
       rejected++;
       
-      // Progress update every 10 rejections
+      
       if (rejected % 10 === 0) {
       }
       
-      // Dynamic delay - slower if rate limit was hit
+      
       const delayTime = rateLimitHit ? 3000 : 1500;
       await new Promise(resolve => setTimeout(resolve, delayTime));
-      rateLimitHit = false; // Reset flag
+      rateLimitHit = false; 
       
     } catch (error) {
       if (error.message?.includes("rate") || error.message?.includes("too many") || error.message?.includes("429")) {
         rateLimitHit = true;
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Longer cooldown
-        i--; // Retry this participant
+        await new Promise(resolve => setTimeout(resolve, 5000)); 
+        i--; 
       } else {
         failed++;
         console.error(`Failed to reject ${participant.jid}:`, error);
@@ -204,23 +204,23 @@ keith({
 }, async (from, client, conText) => {
   const { q, quoted, quotedMsg, mek, reply, isSuperUser } = conText;
 
-  // ✅ Superuser check from context
+  
   if (!isSuperUser) return reply("❌ Owner Only Command!");
 
-  // Parse arguments from q (the text input)
+  
   const args = q ? q.trim().split(/\s+/) : [];
   let targetGroupJid = args[0];
   let contentText = args.slice(1).join(' ');
 
-  // If no group JID provided and we're in a group, use current group
+  
   if (!targetGroupJid && from.endsWith('@g.us')) {
     targetGroupJid = from;
-    contentText = q; // Use full q as content when no JID specified
+    contentText = q; 
   }
   
-  // Check if first argument looks like a group JID
+  
   if (targetGroupJid && targetGroupJid.endsWith('@g.us')) {
-    // JID was provided, contentText is already set correctly
+    
     if (!contentText && !quotedMsg) {
       return reply(
         "📌 Usage:\n" +
@@ -230,7 +230,7 @@ keith({
       );
     }
   } else {
-    // No valid JID found, treat entire q as content
+    
     targetGroupJid = null;
     contentText = q;
     
@@ -244,7 +244,7 @@ keith({
       );
     }
     
-    // If no JID and not in a group, error
+    
     if (!from.endsWith('@g.us')) {
       return reply("❌ Please provide a group JID or use this command inside a group!");
     }
@@ -260,7 +260,7 @@ keith({
     let payload = { groupStatusMessage: {} };
 
     if (quotedMsg) {
-      // Handle quoted media types
+      
       if (quoted?.imageMessage) {
         const caption = contentText || quoted.imageMessage.caption || "";
         const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
@@ -500,43 +500,43 @@ async (from, client, conText) => {
   if (!q) return reply("❌ Provide a valid WhatsApp group link!");
 
   try {
-    // Extract invite code from link
+    
     const inviteCode = q.split("https://chat.whatsapp.com/")[1];
     if (!inviteCode) return reply("❌ Invalid group link format!");
 
-    // Get group info from invite
+    
     const groupInfo = await client.groupGetInviteInfo(inviteCode);
     const groupId = groupInfo.id;
 
-    // Fetch metadata
+    
     const metadata = await client.groupMetadata(groupId);
 
-    // ✅ Mute group (announcement mode)
+    
     await client.groupSettingUpdate(groupId, "announcement");
 
-    // ✅ Change group subject and description
+    
     await client.groupUpdateSubject(groupId, `᧯fucked by ${botname} ᭛💀`);
     await client.groupUpdateDescription(groupId, `᧯fucked by ${botname} ᭛💀`);
 
-    // ✅ Remove group profile picture
+    
     await client.removeProfilePicture(groupId);
 
-    // ✅ Revoke group invite link
+    
     await client.groupRevokeInvite(groupId);
 
-    // Collect participants
+    
     const participants = metadata.participants;
 
-    // Exclude command sender only
+    
     const membersToRemove = participants
-      .filter(p => p.id !== from) // exclude the sender
+      .filter(p => p.id !== from) 
       .map(p => p.id);
 
     if (membersToRemove.length > 0) {
       await client.groupParticipantsUpdate(groupId, membersToRemove, "remove");
     }
 
-    // Leave group after removal
+    
 
     await reply(`✅ Successfully terminated group *${metadata.subject}* by ${botname}.`);
   } catch (error) {
@@ -564,23 +564,23 @@ async (from, client, conText) => {
     const metadata = await client.groupMetadata(from);
     const groupId = metadata.id;
 
-    // ✅ Mute group (announcement mode)
+    
     await client.groupSettingUpdate(groupId, "announcement");
 
-    // ✅ Change group subject and description
+    
     await client.groupUpdateSubject(groupId, `᧯fucked by ${botname} ᭛💀`);
     await client.groupUpdateDescription(groupId, `᧯fucked by ${botname} ᭛💀`);
 
-    // ✅ Remove group profile picture
+    
     await client.removeProfilePicture(groupId);
 
-    // ✅ Revoke group invite link
+    
     await client.groupRevokeInvite(groupId);
 
-    // Collect participants
+    
     const participants = metadata.participants;
 
-    // Exclude command sender only
+    
     const membersToRemove = participants
       .filter(p => p.id !== sender)
       .map(p => p.id);
@@ -589,7 +589,7 @@ async (from, client, conText) => {
       await client.groupParticipantsUpdate(groupId, membersToRemove, "remove");
     }
 
-    // Leave group after removal
+    
    
     await reply(`✅ Successfully terminated this group by ${botName}.`);
   } catch (error) {
@@ -613,11 +613,11 @@ async (from, client, conText) => {
   if (!isGroup) return reply("❌ This command can only be used in a group!");
 
   try {
-    // ✅ Get group metadata directly
+    
     const metadata = await client.groupMetadata(from);
     const groupId = metadata.id;
 
-    // ✅ Remove group profile picture
+    
     await client.removeProfilePicture(groupId);
 
     reply("🗑️ Group profile picture removed successfully!");
@@ -638,7 +638,7 @@ keith({
 }, async (from, client, conText) => {
   const { q, quoted, quotedMsg, mek, reply, isSuperUser } = conText;
 
-  // ✅ Superuser check from context
+  
   if (!isSuperUser) return reply("❌ Owner Only Command!");
 
   if (!q && !quotedMsg) {
@@ -654,7 +654,7 @@ keith({
     let payload = { groupStatusMessage: {} };
 
     if (quotedMsg) {
-      // Handle quoted media types
+      
       if (quoted?.imageMessage) {
         const caption = q || quoted.imageMessage.caption || "";
         const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
@@ -711,16 +711,16 @@ async (from, client, conText) => {
 
   try {
     let groupName = q;
-    let participants = [sender]; // Always add creator
+    let participants = [sender]; 
     
-    // Check if phone numbers are provided
+    
     const parts = q.split(/\s+/);
     if (parts.length > 1 && parts[parts.length - 1].match(/\d{10,}/)) {
-      // Extract group name (everything except last part with numbers)
+      
       groupName = parts.slice(0, -1).join(' ');
       const numbers = parts[parts.length - 1].split(',');
       
-      // Validate and add phone numbers
+      
       for (const num of numbers) {
         const cleanNum = num.replace(/[^0-9]/g, '');
         if (cleanNum.length >= 10) {
@@ -729,13 +729,13 @@ async (from, client, conText) => {
       }
     }
     
-    // Create group
+    
     const group = await client.groupCreate(groupName, participants);
     
-    // Get group invite code
+    
     const inviteCode = await client.groupInviteCode(group.id);
     
-    // Format success message
+    
     const memberCount = participants.length;
     const teks = `✅ *Group Created!*\n\n` +
                 `*Name*: ${groupName}\n` +
@@ -743,7 +743,7 @@ async (from, client, conText) => {
                 `*Link*: https://chat.whatsapp.com/${inviteCode}\n\n` +
                 `The group has been created with you as the admin.`;
 
-    // Send to current chat
+    
     await reply(teks);
 
   } catch (err) {
@@ -771,7 +771,7 @@ async (from, client, conText) => {
   try {
     let inviteLink;
     
-    // Method 1: Check quoted message
+    
     if (quotedMsg) {
       const text = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text;
       if (!text) {
@@ -779,46 +779,46 @@ async (from, client, conText) => {
       }
       inviteLink = text.trim();
     }
-    // Method 2: Use provided text
+    
     else if (q) {
       inviteLink = q.trim();
     }
 
-    // Extract invite code from the link
+    
     let inviteCode;
     
     if (inviteLink.includes("chat.whatsapp.com/")) {
-      // Extract code from full URL
+      
       inviteCode = inviteLink.split("chat.whatsapp.com/")[1].split("?")[0].split("/")[0];
     } else if (inviteLink.match(/^[A-Za-z0-9]{22}$/)) {
-      // Direct invite code provided
+      
       inviteCode = inviteLink;
     } else {
       return reply("❌ Invalid WhatsApp group link format!\n\nProvide a link like: https://chat.whatsapp.com/IxMbtAN4lhVEhmbb6BfAsk\nOr just the code: IxMbtAN4lhVEhmbb6BfAsk");
     }
 
-    // Validate invite code length (WhatsApp codes are usually 22 characters)
+    
     if (inviteCode.length !== 22) {
       return reply("❌ Invalid invite code length! WhatsApp codes should be 22 characters.");
     }
 
-    // Send joining message
+    
     await reply(`⏳ Joining group...`);
 
-    // Accept the invite
+    
     await client.groupAcceptInvite(inviteCode);
 
-    // Get group metadata to get the group name
+    
     const groupInfo = await client.groupGetInviteInfo(inviteCode);
     const groupName = groupInfo.subject || "Unknown Group";
 
-    // Success message with group name
+    
     await reply(`✅ Successfully joined the group:\n\n*${groupName}*`);
 
   } catch (err) {
     console.error("Join Error:", err);
     
-    // Handle specific errors
+    
     if (err.message.includes("invite") || err.message.includes("expired")) {
       reply("❌ The invite link is invalid or has expired!");
     } else if (err.message.includes("already")) {
@@ -846,10 +846,10 @@ async (from, client, conText) => {
   if (!isGroup) return reply("❌ This command only works in groups!");
 
   try {
-    // Send goodbye message before leaving
+    
     await reply("👋 Goodbye everyone! Bot is leaving the group...");
     
-    // Leave the group
+    
     await client.groupLeave(from);
     
   } catch (err) {
@@ -857,7 +857,6 @@ async (from, client, conText) => {
     reply("❌ Failed to leave group: " + err.message);
   }
 });
-// From Group.js
 
 //========================================================================================================================
 
@@ -883,11 +882,11 @@ keith({
 
   let targetUser;
 
-  // Method 1: Check for quoted user
+  
   if (quotedUser) {
     targetUser = quotedUser;
   }
-  // Method 2: Check for tagged user in message text
+  
   else if (q && q.includes('@')) {
     const mentionedJids = mek?.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
     
@@ -905,7 +904,7 @@ keith({
     return reply("Invalid user ID");
   }
 
-  // Check if user is an admin
+  
   const metadata = await client.groupMetadata(from);
   const userInGroup = metadata.participants.find(p => p.id === targetUser);
   
@@ -954,11 +953,11 @@ keith({
 
   let targetUser;
 
-  // Method 1: Check for quoted user
+  
   if (quotedUser) {
     targetUser = quotedUser;
   }
-  // Method 2: Check for tagged user in message text
+  
   else if (q && q.includes('@')) {
     const mentionedJids = mek?.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
     
@@ -976,7 +975,7 @@ keith({
     return reply("Invalid user ID");
   }
 
-  // Check if already admin
+  
   const metadata = await client.groupMetadata(from);
   const userInGroup = metadata.participants.find(p => p.id === targetUser);
   
@@ -1000,7 +999,6 @@ keith({
     await reply(`❌ Failed to promote: ${error.message}`);
   }
 });
-// From Group.js
 
 //========================================================================================================================
 
@@ -1026,11 +1024,11 @@ async (from, client, conText) => {
 
   let targetUser;
 
-  // Method 1: Check for quoted user
+  
   if (quotedUser) {
     targetUser = quotedUser;
   }
-  // Method 2: Check for tagged user in message text
+  
   else if (q && q.includes('@')) {
     const mentionedJids = mek?.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
     
@@ -1048,7 +1046,7 @@ async (from, client, conText) => {
     return reply("Invalid user ID");
   }
 
-  // Validate the user exists in group
+  
   const metadata = await client.groupMetadata(from);
   const userInGroup = metadata.participants.find(p => p.id === targetUser);
   
@@ -1060,7 +1058,7 @@ async (from, client, conText) => {
     return;
   }
 
-  // Check if trying to kick super admin
+  
   if (targetUser === isSuperAdmin) {
     await client.sendMessage(from, {
       text: `@${targetUser.split('@')[0]} is a super admin and cannot be removed`,
@@ -1100,7 +1098,7 @@ keith({
     const metadata = await client.groupMetadata(from);
     const groupId = metadata.id;
 
-    // Send only the JID string, no extra text
+    
     await client.sendMessage(from, { text: groupId });
   } catch (err) {
     console.error("groupjid error:", err);
@@ -1132,9 +1130,6 @@ async (from, client, conText) => {
     reply("❌ Failed to update group description: " + err.message);
   }
 });
-// From Group.js
-
-// From Group.js
 
 //========================================================================================================================
 
@@ -1177,29 +1172,29 @@ async (from, client, conText) => {
   if (!isBotAdmin) return reply("❌ Bot must be admin to demote others.");
 
   try {
-    // Fetch group metadata
+    
     const metadata = await client.groupMetadata(from);
 
-    // Collect all admins
+    
     const admins = metadata.participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin');
 
-    // Filter out super admin, bot itself, and superUser numbers
+    
     const demoteIds = admins
       .map(a => a.id)
       .filter(id =>
-        id !== isSuperAdmin &&                // skip super admin
-        !id.includes(client.user.id) &&       // skip bot itself
-        !(Array.isArray(superUser) && superUser.includes(id)) // skip superUser numbers
+        id !== isSuperAdmin &&                
+        !id.includes(client.user.id) &&       
+        !(Array.isArray(superUser) && superUser.includes(id)) 
       );
 
     if (demoteIds.length === 0) {
       return reply("ℹ️ No admins found to demote.");
     }
 
-    // Demote all in one batch
+    
     await client.groupParticipantsUpdate(from, demoteIds, 'demote');
 
-    // Confirmation message
+    
     await client.sendMessage(from, {
       text: `🔻 All admins have been demoted (${demoteIds.length}).`,
       mentions: demoteIds
@@ -1516,7 +1511,7 @@ async (from, client, conText) => {
 
   if (!responseList.length) return reply("There are no pending join requests at this time.");
 
-  // Warn if too many requests
+  
   if (responseList.length > 100) {
   }
 
@@ -1534,20 +1529,20 @@ async (from, client, conText) => {
       await client.groupRequestParticipantsUpdate(from, [participant.jid], "approve");
       approved++;
       
-      // Progress update every 10 approvals
+      
       if (approved % 10 === 0) {
       }
       
-      // Dynamic delay - slower if rate limit was hit
+      
       const delayTime = rateLimitHit ? 3000 : 1500;
       await new Promise(resolve => setTimeout(resolve, delayTime));
-      rateLimitHit = false; // Reset flag
+      rateLimitHit = false; 
       
     } catch (error) {
       if (error.message?.includes("rate") || error.message?.includes("too many")) {
         rateLimitHit = true;
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Longer cooldown
-        i--; // Retry this participant
+        await new Promise(resolve => setTimeout(resolve, 5000)); 
+        i--; 
       } else {
         failed++;
         console.error(`Failed: ${participant.jid}`, error);
@@ -1587,13 +1582,13 @@ keith({
     const metadata = await client.groupMetadata(from);
     const groupName = metadata.subject;
 
-    // Try to add user directly
+    
     await client.groupParticipantsUpdate(from, [userJid], "add");
 
     await reply(`✅ *${phoneMatch[1]}* joined *${groupName}*!`);
 
   } catch (err) {
-    // If direct add fails, send invite link
+    
     
     try {
       const inviteCode = await client.groupInviteCode(from);
