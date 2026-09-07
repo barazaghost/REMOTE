@@ -5,357 +5,9 @@ const path = require('path');
 const FormData = require('form-data');
 const mime = require('mime-types');
 
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//const axios = require('axios');
-
-/*const STYLES = {
-  flataipro: 'Flat AI Pro',
-  flatai: 'Flat AI Base',
-  runware_quality: 'Standard',
-  runware_new_quality: 'Quality+',
-  realistic: 'Realistic',
-  photo_skin: 'Real Skin',
-  cinema: 'Cinematic',
-  retro_anime: 'Retro Anime',
-  'ghibli-style': 'Ghibli Style',
-  midjourney_art: 'Midjourney Art',
-  fantasy_armor: 'Fantasy Armor',
-  robot_cyborg: 'Robot & Cyborg',
-  disney_princess: 'Princess',
-  amateurp: 'Daily Life',
-  scifi_enviroments: 'Sci-Fi Environments',
-  mythic_fantasy: 'Mythic Fantasy',
-  pixel_art: 'Pixel Art',
-  watercolor_painting: 'Watercolor Painting',
-  diesel_punk: 'Diesel Punk',
-  architectural: 'Architectural',
-  style_1930s: '1930s',
-  flat_anime: 'Flat Anime',
-  mystical_realms: 'Mystical Realms',
-  ecommerce: 'E-Commerce',
-  cinema_style: 'Cinema'
-};
-
-async function getNonce() {
-  try {
-    const { data } = await axios.get('https://flatai.org/ai-image-generator-free-no-signup/', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10)'
-      }
-    });
-
-    const nonce =
-      data.match(/ai_generate_image_nonce["']\s*:\s*["']([a-f0-9]{10})["']/i)?.[1] ||
-      data.match(/"nonce"\s*:\s*"([a-f0-9]{10})"/i)?.[1];
-    
-    if (!nonce) throw new Error('Nonce not found');
-    return nonce;
-  } catch (error) {
-    console.error('GetNonce Error:', error);
-    throw new Error('Failed to get nonce');
-  }
-}
-
-// Main AI Image Generator Command
-keith({
-  pattern: "aiphoto",
-  aliases: ["flatai", "generate", "aimage"],
-  category: "Ai",
-  description: "Generate AI images with various styles"
-},
-async (from, client, conText) => {
-  const { q, reply, mek } = conText;
-
-  if (!q) {
-    const styleList = Object.entries(STYLES)
-      .map(([key, name]) => `• ${key}: ${name}`)
-      .join('\n');
-    
-    return reply(`🎨 *AI Photo Generator*\n\n*Usage:* .aiphoto prompt | style\n*Example:* .aiphoto cute cat | ghibli-style\n\n*Available Styles:*\n${styleList}\n\n*Quick Examples:*\n.aiphoto anime girl | retro_anime\n.aiphoto fantasy landscape | mythic_fantasy\n.aiphoto portrait | realistic`);
-  }
-
-  try {
-    await reply("🎨 Generating AI image...");
-
-    // Parse prompt and style
-    const parts = q.split('|').map(p => p.trim());
-    const prompt = parts[0];
-    const style = parts[1] || 'realistic'; // Default style
-    
-    if (!prompt) {
-      return reply("❌ Please provide a prompt!\nExample: .aiphoto beautiful sunset");
-    }
-
-    // Validate style
-    if (!STYLES[style]) {
-      const validStyles = Object.keys(STYLES).join(', ');
-      return reply(`❌ Invalid style! Available: ${validStyles}`);
-    }
-
-    // Get nonce
-    const nonce = await getNonce();
-
-    // Prepare request
-    const body = new URLSearchParams({
-      action: 'ai_generate_image',
-      nonce,
-      prompt,
-      aspect_ratio: '1:1',
-      seed: Math.floor(Math.random() * 4294967295),
-      style_model: style
-    }).toString();
-
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 10)',
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'X-Requested-With': 'XMLHttpRequest',
-      'Origin': 'https://flatai.org',
-      'Referer': 'https://flatai.org/ai-image-generator-free-no-signup/'
-    };
-
-    // Generate image
-    const response = await axios.post(
-      'https://flatai.org/wp-admin/admin-ajax.php',
-      body,
-      { headers, timeout: 30000 }
-    );
-
-    if (!response.data?.success) {
-      throw new Error(response.data?.data?.message || 'Generation failed');
-    }
-
-    const imageUrl = response.data.data.images?.[0];
-    if (!imageUrl) {
-      throw new Error('No image URL received');
-    }
-
-    // Send the generated image
-    await client.sendMessage(from, {
-      image: { url: imageUrl },
-      caption: `🖼️ *AI Generated Image*\n\n*Prompt:* ${prompt}\n*Style:* ${STYLES[style]}\n*Model:* flatai.org`
-    }, { quoted: mek });
-
-  } catch (error) {
-    console.error("AIPhoto Error:", error);
-    reply(`❌ Failed to generate image: ${error.message}`);
-  }
-});
-
-// Style-specific commands for quick access
-Object.keys(STYLES).forEach(style => {
-  keith({
-    pattern: style,
-    aliases: [style.replace(/_/g, '')],
-    category: "Aiphoto",
-    description: `Generate AI image with ${STYLES[style]} style`
-  },
-  async (from, client, conText) => {
-    const { q, reply, mek } = conText;
-
-    if (!q) {
-      return reply(`🎨 *${STYLES[style]} Style*\n\nUsage: .${style} your prompt\nExample: .${style} beautiful landscape\n\nStyle: ${STYLES[style]}`);
-    }
-
-    try {
-      await reply(`🎨 Generating ${STYLES[style]} image...`);
-
-      // Get nonce
-      const nonce = await getNonce();
-
-      // Prepare request
-      const body = new URLSearchParams({
-        action: 'ai_generate_image',
-        nonce,
-        prompt: q,
-        aspect_ratio: '1:1',
-        seed: Math.floor(Math.random() * 4294967295),
-        style_model: style
-      }).toString();
-
-      const headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10)',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Origin': 'https://flatai.org',
-        'Referer': 'https://flatai.org/ai-image-generator-free-no-signup/'
-      };
-
-      // Generate image
-      const response = await axios.post(
-        'https://flatai.org/wp-admin/admin-ajax.php',
-        body,
-        { headers, timeout: 30000 }
-      );
-
-      if (!response.data?.success) {
-        throw new Error(response.data?.data?.message || 'Generation failed');
-      }
-
-      const imageUrl = response.data.data.images?.[0];
-      if (!imageUrl) {
-        throw new Error('No image URL received');
-      }
-
-      // Send the generated image
-      await client.sendMessage(from, {
-        image: { url: imageUrl },
-        caption: `🖼️ *${STYLES[style]} Style*\n\n*Prompt:* ${q}\n*Style:* ${STYLES[style]}\n*Model:* flatai.org`
-      }, { quoted: mek });
-
-    } catch (error) {
-      console.error(`${style} Error:`, error);
-      reply(`❌ Failed to generate ${STYLES[style]} image: ${error.message}`);
-    }
-  });
-});*/
-//========================================================================================================================
-
-
-/*const STYLES = {
-  flataipro: 'Flat AI Pro',
-  flatai: 'Flat AI Base',
-  runware_quality: 'Standard',
-  runware_new_quality: 'Quality+',
-  realistic: 'Realistic',
-  photo_skin: 'Real Skin',
-  cinema: 'Cinematic',
-  retro_anime: 'Retro Anime',
-  'ghibli-style': 'Ghibli Style',
-  midjourney_art: 'Midjourney Art',
-  fantasy_armor: 'Fantasy Armor',
-  robot_cyborg: 'Robot & Cyborg',
-  disney_princess: 'Princess',
-  amateurp: 'Daily Life',
-  scifi_enviroments: 'Sci-Fi Environments',
-  mythic_fantasy: 'Mythic Fantasy',
-  pixel_art: 'Pixel Art',
-  watercolor_painting: 'Watercolor Painting',
-  diesel_punk: 'Diesel Punk',
-  architectural: 'Architectural',
-  style_1930s: '1930s',
-  flat_anime: 'Flat Anime',
-  mystical_realms: 'Mystical Realms',
-  ecommerce: 'E-Commerce',
-  cinema_style: 'Cinema'
-};
-
-async function getNonce() {
-  try {
-    const { data } = await axios.get('https://flatai.org/ai-image-generator-free-no-signup/', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10)'
-      }
-    });
-
-    const nonce =
-      data.match(/ai_generate_image_nonce["']\s*:\s*["']([a-f0-9]{10})["']/i)?.[1] ||
-      data.match(/"nonce"\s*:\s*"([a-f0-9]{10})"/i)?.[1];
-    
-    if (!nonce) throw new Error('Nonce not found');
-    return nonce;
-  } catch (error) {
-    console.error('GetNonce Error:', error);
-    throw new Error('Failed to get nonce');
-  }
-}
-
-// Main AI Image Generator Command
-keith({
-  pattern: "aiphoto",
-  aliases: ["flatai", "generate"],
-  category: "Aiphoto",
-  description: "Generate AI images with various styles"
-},
-async (from, client, conText) => {
-  const { q, reply, mek } = conText;
-
-  if (!q) {
-    const styleList = Object.entries(STYLES)
-      .map(([key, name]) => `• ${key}: ${name}`)
-      .join('\n');
-    
-    return reply(`🎨 *AI Photo Generator*\n\n*Usage:* .aiphoto prompt | style\n*Example:* .aiphoto cute cat | ghibli-style\n\n*Available Styles:*\n${styleList}\n\n*Quick Examples:*\n.aiphoto anime girl | retro_anime\n.aiphoto fantasy landscape | mythic_fantasy\n.aiphoto portrait | realistic`);
-  }
-
-  try {
-    await reply("🎨 Generating AI image...");
-
-    // Parse prompt and style
-    const parts = q.split('|').map(p => p.trim());
-    const prompt = parts[0];
-    const style = parts[1] || 'realistic'; // Default style
-    
-    if (!prompt) {
-      return reply("❌ Please provide a prompt!\nExample: .aiphoto beautiful sunset");
-    }
-
-    // Validate style
-    if (!STYLES[style]) {
-      const validStyles = Object.keys(STYLES).join(', ');
-      return reply(`❌ Invalid style! Available: ${validStyles}`);
-    }
-
-    // Get nonce
-    const nonce = await getNonce();
-
-    // Prepare request
-    const body = new URLSearchParams({
-      action: 'ai_generate_image',
-      nonce,
-      prompt,
-      aspect_ratio: '1:1',
-      seed: Math.floor(Math.random() * 4294967295),
-      style_model: style
-    }).toString();
-
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 10)',
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'X-Requested-With': 'XMLHttpRequest',
-      'Origin': 'https://flatai.org',
-      'Referer': 'https://flatai.org/ai-image-generator-free-no-signup/'
-    };
-
-    // Generate image
-    const response = await axios.post(
-      'https://flatai.org/wp-admin/admin-ajax.php',
-      body,
-      { headers, timeout: 30000 }
-    );
-
-    if (!response.data?.success) {
-      throw new Error(response.data?.data?.message || 'Generation failed');
-    }
-
-    const imageUrl = response.data.data.images?.[0];
-    if (!imageUrl) {
-      throw new Error('No image URL received');
-    }
-
-    // Send the generated image
-    await client.sendMessage(from, {
-      image: { url: imageUrl },
-      caption: `🖼️ *AI Generated Image*\n\n*Prompt:* ${prompt}\n*Style:* ${STYLES[style]}\n*Model:* flatai.org`
-    }, { quoted: mek });
-
-  } catch (error) {
-    console.error("AIPhoto Error:", error);
-    reply(`❌ Failed to generate image: ${error.message}`);
-  }
-});*/
-
-//========================================================================================================================
-
 const aiModels = [
   "mistral", "wormgpt", "claudeai", "bard", "perplexity", "venice", "keithai"
 ];
-
 
 for (const pattern of aiModels) {
   keith({
@@ -375,27 +27,6 @@ for (const pattern of aiModels) {
     }
   });
 }
-//====================================================================================================================
-//==================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-
 
 function genSerial() {
   let s = "";
@@ -457,6 +88,8 @@ async function upscaleImage(buffer) {
   }
 }
 
+//========================================================================================================================
+
 keith({
   pattern: "hd",
   aliases: ["upscale", "enhance", "hdimage", "superres"],
@@ -490,78 +123,8 @@ keith({
     }
   }
 });
-//========================================================================================================================
-
-
-/*keith({
-  pattern: "sora",
-  aliases: ["text2video", "t2v"],
-  category: "AI",
-  description: "Generate video from text using Sora API"
-},
-async (from, client, conText) => {
-  const { q, mek, reply, api } = conText;
-
-  if (!q) {
-    return reply("❌ Provide a query, e.g. .sora monkey running");
-  }
-
-  try {
-    const apiUrl = `${api}/text2video?q=${encodeURIComponent(q)}`;
-    const response = await axios.get(apiUrl, { timeout: 120000 });
-    const result = response.data?.results;
-
-    if (!result) {
-      return reply("❌ No video result found.");
-    }
-
-    await client.sendMessage(from, {
-      video: { url: result },
-      mimetype: "video/mp4",
-      caption: `result for: ${q}`
-    }, { quoted: mek });
-
-  } catch (error) {
-    console.error("Sora error:", error);
-    reply("❌ Failed to fetch Sora video: " + error.message);
-  }
-});*/
 
 //========================================================================================================================
-/*
-keith({
-  pattern: "flux",
-  aliases: ["fluxai", "imageai"],
-  category: "ai",
-  description: "Generate an image using Flux API"
-},
-async (from, client, conText) => {
-  const { q, reply, api } = conText;
-
-  if (!q) return reply("❌ Provide a query, e.g. .flux dog");
-
-  try {
-    // Call Flux API (returns raw image)
-    const res = await axios.get(`${api}/ai/flux?q=${encodeURIComponent(q)}`, {
-      responseType: "arraybuffer"
-    });
-
-    // Save temporarily
-    const filePath = "./flux_img.jpg";
-    fs.writeFileSync(filePath, res.data);
-
-    // Send image to chat
-    await client.sendMessage(from, { image: { url: filePath }, caption: `Flux result for: ${q}` });
-
-    // Clean up
-    fs.unlinkSync(filePath);
-  } catch (err) {
-    console.error("flux Error:", err);
-    reply("❌ Failed to fetch Flux image: " + err.message);
-  }
-});*/
-//========================================================================================================================
-
 
 keith({
   pattern: "speechwriter",
@@ -641,8 +204,6 @@ async (from, client, conText) => {
     reply("❌ Failed to fetch MuslimAI response: " + err.message);
   }
 });
-//========================================================================================================================
-
 
 //========================================================================================================================
 
@@ -736,10 +297,6 @@ keith({
     reply("❌ Error fetching Bible answer: " + err.message);
   }
 });
-//==============================================================================
-
-
-
 function getMediaType(quoted) {
   if (quoted.imageMessage) return "image";
   if (quoted.videoMessage) return "video";
@@ -784,59 +341,6 @@ async function uploadToUguu(filePath) {
     throw new Error("Uguu upload failed or malformed response");
   }
 }
-//========================================================================================================================
-
-
-
-/*keith({
-  pattern: "removebg",
-  aliases: ["rmbg", "bgremove"],
-  description: "Remove background from quoted image",
-  category: "Ai",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { mek, quoted, quotedMsg, reply, api } = conText;
-
-  if (!quotedMsg) return reply("📌 Reply to an image message to remove its background");
-
-  const type = getMediaType(quotedMsg);
-  if (type !== "image") return reply("❌ Only image messages are supported");
-
-  const mediaNode = quoted?.imageMessage;
-  if (!mediaNode) return reply("❌ Could not extract image content");
-
-  let filePath;
-  try {
-    // Save quoted image locally
-    filePath = await saveMediaToTemp(client, mediaNode, type);
-
-    // Upload to Uguu to get a public URL
-    const imageUrl = await uploadToUguu(filePath);
-
-    // Call removebg API
-    const { data: result } = await axios.get(
-      `${api}/ai/removebg?url=${encodeURIComponent(imageUrl)}`
-    );
-
-    if (!result?.status || !result?.result) {
-      return reply("❌ No response from RemoveBG API");
-    }
-
-    const cutoutUrl = result.result;
-
-    // Send back the processed image
-    await client.sendMessage(from, { image: { url: cutoutUrl } }, { quoted: mek });
-
-  } catch (err) {
-    console.error("RemoveBG error:", err);
-    await reply("❌ Failed to remove background. Try a different image.");
-  } finally {
-    if (filePath && fs.existsSync(filePath)) {
-      try { fs.unlinkSync(filePath); } catch {}
-    }
-  }
-});*/
-
 
 //========================================================================================================================
 
@@ -877,6 +381,7 @@ keith({
     }
   }
 });
+
 //========================================================================================================================
 
 keith({
@@ -925,9 +430,6 @@ keith({
 
 //========================================================================================================================
 
-
-//========================================================================================================================
-
 keith({
   pattern: "transcribe",
   aliases: ["speech", "audio2text", "whisper"],
@@ -966,8 +468,6 @@ keith({
 });
 
 //========================================================================================================================
-
-// From Ai.js
 
 keith({
   pattern: "shazam",
