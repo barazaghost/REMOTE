@@ -1,1459 +1,9 @@
-
 const { keith } = require('../commandHandler');
 const axios = require('axios');
-//onst axios = require('axios');
-const { generateWAMessageContent, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
-//const { keith } = require('../commandHandler');
 
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-
-keith({
-  pattern: "bet",
-  aliases: ["prediction", "sureodds", "betslip", "footballbet", "soccerbet", "surebet"],
-  category: "Sports",
-  description: "Get football match predictions",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, reply, mek, api } = conText;
-
-  let leagueFilter = q ? q.trim().toLowerCase() : null;
-  
-  try {
-   // await reply("Fetching match predictions...");
-
-    const response = await axios.get(`${api}/bet`);
-    const data = response.data;
-
-    if (!data.status || !data.result || data.result.length === 0) {
-      return reply("No matches found.");
-    }
-
-    let allMatches = [];
-    let totalMatches = 0;
-
-    // Filter leagues if specific league is requested
-    let leagues = data.result;
-    if (leagueFilter) {
-      leagues = data.result.filter(l => 
-        l.league.toLowerCase().includes(leagueFilter)
-      );
-      if (leagues.length === 0) {
-        return reply(`No matches found for league: "${q}"`);
-      }
-    }
-
-    // Build response
-    let text = `⚽ *Football Predictions*\n`;
-    if (leagueFilter) {
-      text += `📌 *League:* ${leagueFilter.toUpperCase()}\n`;
-    }
-    text += `📅 *Date:* ${new Date().toLocaleDateString()}\n\n`;
-
-    for (const league of leagues) {
-      const matches = league.matches.filter(m => m.homeScore === '-' || m.awayScore === '-');
-      
-      if (matches.length === 0) continue;
-      
-      totalMatches += matches.length;
-      text += `━━━━━━━━━━━━━━━━━━━━\n`;
-      text += `📋 *${league.league}*\n`;
-      
-      for (const match of matches) {
-        const kickoff = new Date(match.kickoff);
-        const timeStr = kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const odd = match.prediction?.odd ? ` (${match.prediction.odd})` : '';
-        const tip = match.prediction?.tip || 'N/A';
-        
-        text += `\n🕐 ${timeStr}\n`;
-        text += `🏠 *${match.homeTeam}* vs *${match.awayTeam}*\n`;
-        text += `📊 Prediction: *${tip}*${odd}\n`;
-        
-        allMatches.push(match);
-      }
-      text += `\n`;
-    }
-
-    if (totalMatches === 0) {
-      return reply(`No upcoming matches found${leagueFilter ? ` for "${q}"` : ''}.`);
-    }
-
-    text += `━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `📊 *Total Matches:* ${totalMatches}`;
-
-    // Split if too long
-    if (text.length > 4000) {
-      const parts = text.match(/.{1,4000}/g) || [];
-      for (let i = 0; i < parts.length; i++) {
-        await client.sendMessage(from, { text: parts[i] }, { quoted: mek });
-      }
-    } else {
-      await client.sendMessage(from, { text }, { quoted: mek });
-    }
-
-  } catch (err) {
-    console.error("bet error:", err);
-    reply(`Error: ${err.message}`);
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "fifa",
-  aliases: ["worldcup", "wc"],
-  category: "Sports",
-  description: "FIFA World Cup knockout bracket"
-}, async (from, client, conText) => {
-  const { mek, api } = conText;
-
-  try {
-    const res = await axios.get(`${api}/fifastandings`);
-    const data = res.data;
-
-    if (!data?.status) {
-      return client.sendMessage(from, { text: "❌ FIFA data unavailable." }, { quoted: mek });
-    }
-
-    const playoff = data.result?.playoff;
-
-    if (!playoff?.rounds?.length) {
-      return client.sendMessage(from, { text: "❌ Knockout bracket not available yet." }, { quoted: mek });
-    }
-
-    const season = data.result.details?.selectedSeason || "2026";
-
-    const stageLabels = {
-      "1/16":  "🔵 ROUND OF 32",
-      "1/8":   "🟢 ROUND OF 16",
-      "1/4":   "🟡 QUARTER-FINALS",
-      "1/2":   "🟠 SEMI-FINALS",
-      "final": "🏆 FINAL"
-    };
-
-    // ── Build ID → Team Name map from ALL rounds ─────────────────
-    const teamNameMap = {};
-    for (const round of playoff.rounds) {
-      for (const matchup of round.matchups) {
-        if (matchup.homeTeamId && matchup.homeTeam) {
-          teamNameMap[matchup.homeTeamId] = matchup.homeTeam;
-        }
-        if (matchup.awayTeamId && matchup.awayTeam) {
-          teamNameMap[matchup.awayTeamId] = matchup.awayTeam;
-        }
-        // Also pull from match-level data
-        const match = matchup.matches?.[0];
-        if (match?.home?.id && match?.home?.name) {
-          teamNameMap[match.home.id] = match.home.name;
-        }
-        if (match?.away?.id && match?.away?.name) {
-          teamNameMap[match.away.id] = match.away.name;
-        }
-      }
-    }
-
-    // Also pull from bronze final
-    const bronze = playoff.bronzeFinal;
-    if (bronze?.matchups?.length) {
-      const bm = bronze.matchups[0];
-      if (bm.homeTeamId && bm.homeTeam) teamNameMap[bm.homeTeamId] = bm.homeTeam;
-      if (bm.awayTeamId && bm.awayTeam) teamNameMap[bm.awayTeamId] = bm.awayTeam;
-    }
-
-    // ── Resolve ID to name safely ─────────────────────────────────
-    const resolveName = (id, fallbackName) => {
-      if (fallbackName) return fallbackName;
-      if (id && teamNameMap[id]) return teamNameMap[id];
-      return "TBD";
-    };
-
-    const isRoundFinished = (round) =>
-      round.matchups.every(m => m.matches?.[0]?.status?.finished === true);
-
-    const getWinner = (matchup) => matchup.aggregatedWinner || null;
-
-    const activeRound = playoff.rounds.find(r => !isRoundFinished(r));
-    const finalRound = playoff.rounds.find(r => r.stage === "final");
-    const isFinalDay = activeRound?.stage === "final";
-    const allDone = playoff.rounds.every(r => isRoundFinished(r));
-
-    let txt = `🏆 *FIFA WORLD CUP ${season}*\n`;
-    txt += `🎯 *KNOCKOUT BRACKET*\n\n`;
-
-    if (allDone) {
-      const finalMatchup = finalRound?.matchups?.[0];
-      const winner = getWinner(finalMatchup);
-      const fm = finalMatchup?.matches?.[0];
-      txt += `🎉 *WORLD CUP CHAMPION!*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      txt += `🏆 *${winner || "Champion"}*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      if (fm) {
-        const h = resolveName(finalMatchup.homeTeamId, finalMatchup.homeTeam);
-        const a = resolveName(finalMatchup.awayTeamId, finalMatchup.awayTeam);
-        txt += `Final: *${h} ${fm.home?.score} - ${fm.away?.score} ${a}*\n`;
-      }
-
-    } else if (isFinalDay) {
-      const finalMatchup = finalRound.matchups[0];
-      const home = resolveName(finalMatchup.homeTeamId, finalMatchup.homeTeam);
-      const away = resolveName(finalMatchup.awayTeamId, finalMatchup.awayTeam);
-      const fm = finalMatchup.matches?.[0];
-
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      txt += `*🏆 FINAL*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      if (fm?.status?.started && !fm?.status?.finished) {
-        txt += `🔴 *LIVE*\n`;
-        txt += `*${home} ${fm.home?.score} - ${fm.away?.score} ${away}*\n`;
-      } else {
-        const date = fm?.status?.utcTime
-          ? new Date(fm.status.utcTime).toLocaleDateString("en-GB", {
-              day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
-            })
-          : "TBD";
-        txt += `⚽ *${home}* 🆚 *${away}*\n`;
-        txt += `📅 _(${date})_\n`;
-      }
-
-    } else {
-      const label = stageLabels[activeRound.stage] || `🔘 ${activeRound.stage.toUpperCase()}`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      txt += `*${label}*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      for (const matchup of activeRound.matchups) {
-        const match = matchup.matches?.[0];
-        const home = resolveName(matchup.homeTeamId, matchup.homeTeam);
-        const away = resolveName(matchup.awayTeamId, matchup.awayTeam);
-
-        if (!match || !match.status?.started) {
-          const date = match?.status?.utcTime
-            ? new Date(match.status.utcTime).toLocaleDateString("en-GB", {
-                day: "2-digit", month: "short"
-              })
-            : "TBD";
-          txt += `⚽ ${home} 🆚 ${away}  _(${date})_\n`;
-        } else if (match.status?.finished) {
-          const winner = getWinner(matchup);
-          txt += `✅ *${home} ${match.home?.score} - ${match.away?.score} ${away}*`;
-          if (winner) txt += `  → *${winner}* advances`;
-          txt += `\n`;
-        } else {
-          txt += `🔴 *LIVE* ${home} ${match.home?.score} - ${match.away?.score} ${away}\n`;
-        }
-      }
-
-      // ── POSSIBLE NEXT ROUND ───────────────────────────────────
-      const currentIndex = playoff.rounds.findIndex(r => r.stage === activeRound.stage);
-      const nextRound = playoff.rounds[currentIndex + 1];
-
-      if (nextRound) {
-        const nextLabel = stageLabels[nextRound.stage] || nextRound.stage.toUpperCase();
-        txt += `\n━━━━━━━━━━━━━━━━━\n`;
-        txt += `*🔮 POSSIBLE ${nextLabel}*\n`;
-        txt += `━━━━━━━━━━━━━━━━━\n`;
-
-        const sorted = [...activeRound.matchups].sort((a, b) => a.drawOrder - b.drawOrder);
-
-        for (let i = 0; i < sorted.length; i += 2) {
-          const m1 = sorted[i];
-          const m2 = sorted[i + 1];
-
-          const getTeamLabel = (matchup) => {
-            const winner = getWinner(matchup);
-            if (winner) return `*${winner}*`;
-            // Use resolved names not IDs
-            const home = resolveName(matchup.homeTeamId, matchup.homeTeam);
-            const away = resolveName(matchup.awayTeamId, matchup.awayTeam);
-            return `_${home}/${away}_`;
-          };
-
-          const t1 = getTeamLabel(m1);
-          const t2 = m2 ? getTeamLabel(m2) : "_TBD_";
-
-          txt += `🔮 ${t1} 🆚 ${t2}\n`;
-        }
-      }
-    }
-
-    // ── BRONZE FINAL ─────────────────────────────────────────────
-    const semisRound = playoff.rounds.find(r => r.stage === "1/2");
-    const semisFinished = semisRound && isRoundFinished(semisRound);
-
-    if (semisFinished && bronze?.matchups?.length) {
-      const bMatch = bronze.matchups[0];
-      const bHome = resolveName(bMatch.homeTeamId, bMatch.homeTeam);
-      const bAway = resolveName(bMatch.awayTeamId, bMatch.awayTeam);
-      const bm = bMatch.matches?.[0];
-
-      txt += `\n━━━━━━━━━━━━━━━━━\n`;
-      txt += `*🥉 THIRD PLACE*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      if (bm?.status?.finished) {
-        txt += `✅ *${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}*\n`;
-      } else if (bm?.status?.started) {
-        txt += `🔴 *LIVE* ${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}\n`;
-      } else {
-        const date = bm?.status?.utcTime
-          ? new Date(bm.status.utcTime).toLocaleDateString("en-GB", {
-              day: "2-digit", month: "short"
-            })
-          : "TBD";
-        txt += `⚽ ${bHome} 🆚 ${bAway}  _(${date})_\n`;
-      }
-    }
-
-    await client.sendMessage(from, { text: txt }, { quoted: mek });
-
-  } catch (error) {
-    console.error("FIFA Playoff Error:", error);
-    await client.sendMessage(from, { text: "❌ Error fetching FIFA bracket." }, { quoted: mek });
-  }
-});
-//========================================================================================================================
-/*keith({
-  pattern: "fifa",
-  aliases: ["worldcup", "wc"],
-  category: "Sports",
-  description: "FIFA World Cup knockout bracket"
-}, async (from, client, conText) => {
-  const { mek, api } = conText;
-
-  try {
-    const res = await axios.get(`${api}/fifastandings`);
-    const data = res.data;
-
-    if (!data?.status) {
-      return client.sendMessage(from, { text: "❌ FIFA data unavailable." }, { quoted: mek });
-    }
-
-    const playoff = data.result?.playoff;
-
-    if (!playoff?.rounds?.length) {
-      return client.sendMessage(from, { text: "❌ Knockout bracket not available yet." }, { quoted: mek });
-    }
-
-    const season = data.result.details?.selectedSeason || "2026";
-
-    const stageLabels = {
-      "1/16":  "🔵 ROUND OF 32",
-      "1/8":   "🟢 ROUND OF 16",
-      "1/4":   "🟡 QUARTER-FINALS",
-      "1/2":   "🟠 SEMI-FINALS",
-      "final": "🏆 FINAL"
-    };
-
-    const isRoundFinished = (round) =>
-      round.matchups.every(m => m.matches?.[0]?.status?.finished === true);
-
-    const getWinner = (matchup) =>
-      matchup.aggregatedWinner || null;
-
-    // Build a map of drawOrder → winner name for already-played matches
-    // so future rounds can reference them
-    const winnerMap = {}; // drawOrder -> winner name
-    for (const round of playoff.rounds) {
-      for (const matchup of round.matchups) {
-        const winner = getWinner(matchup);
-        if (winner && matchup.drawOrder != null) {
-          winnerMap[matchup.drawOrder] = winner;
-        }
-      }
-    }
-
-    const activeRound = playoff.rounds.find(r => !isRoundFinished(r));
-    const finalRound = playoff.rounds.find(r => r.stage === "final");
-    const isFinalDay = activeRound?.stage === "final";
-    const allDone = playoff.rounds.every(r => isRoundFinished(r));
-
-    let txt = `🏆 *FIFA WORLD CUP ${season}*\n`;
-    txt += `🎯 *KNOCKOUT BRACKET*\n\n`;
-
-    // ── Helper to format a single matchup line ──────────────────
-    const formatMatchup = (matchup, showPossible = false) => {
-      const match = matchup.matches?.[0];
-      const home = matchup.homeTeam || (matchup.tbdTeam1 ? "TBD" : "TBD");
-      const away = matchup.awayTeam || (matchup.tbdTeam2 ? "TBD" : "TBD");
-      let line = "";
-
-      if (!match || !match.status?.started) {
-        const date = match?.status?.utcTime
-          ? new Date(match.status.utcTime).toLocaleDateString("en-GB", {
-              day: "2-digit", month: "short"
-            })
-          : "TBD";
-        line += `⚽ ${home} 🆚 ${away}  _(${date})_\n`;
-      } else if (match.status?.finished) {
-        const winner = getWinner(matchup);
-        line += `✅ *${home} ${match.home?.score} - ${match.away?.score} ${away}*`;
-        if (winner) line += `  → *${winner}* advances`;
-        line += `\n`;
-      } else {
-        line += `🔴 *LIVE* ${home} ${match.home?.score} - ${match.away?.score} ${away}\n`;
-      }
-
-      return line;
-    };
-
-    // ── Helper: build possible future matchups from next round ──
-    const formatPossibleMatchups = (round) => {
-      if (!round?.matchups?.length) return "";
-      let out = "";
-
-      // Group next round matchups in pairs by drawOrder
-      const sorted = [...round.matchups].sort((a, b) => a.drawOrder - b.drawOrder);
-
-      for (const matchup of sorted) {
-        const home = matchup.homeTeam || "?";
-        const away = matchup.awayTeam || "?";
-
-        // If both teams known already (seeded)
-        if (matchup.homeTeam && matchup.awayTeam) {
-          out += `🔮 *${matchup.homeTeam}* vs *${matchup.awayTeam}*\n`;
-        } else if (matchup.homeTeam && !matchup.awayTeam) {
-          out += `🔮 *${matchup.homeTeam}* vs _Winner TBD_\n`;
-        } else if (!matchup.homeTeam && matchup.awayTeam) {
-          out += `🔮 _Winner TBD_ vs *${matchup.awayTeam}*\n`;
-        } else {
-          out += `🔮 _Match TBD_\n`;
-        }
-      }
-
-      return out;
-    };
-
-    // ────────────────────────────────────────────────────────────
-
-    if (allDone) {
-      const finalMatchup = finalRound?.matchups?.[0];
-      const winner = getWinner(finalMatchup);
-      const fm = finalMatchup?.matches?.[0];
-      txt += `🎉 *WORLD CUP CHAMPION!*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      txt += `🏆 *${winner || "Champion"}*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      if (fm) {
-        txt += `Final: *${finalMatchup.homeTeam} ${fm.home?.score} - ${fm.away?.score} ${finalMatchup.awayTeam}*\n`;
-      }
-
-    } else if (isFinalDay) {
-      const finalMatchup = finalRound.matchups[0];
-      const home = finalMatchup.homeTeam || "TBD";
-      const away = finalMatchup.awayTeam || "TBD";
-      const fm = finalMatchup.matches?.[0];
-
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      txt += `*🏆 FINAL*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      if (fm?.status?.started && !fm?.status?.finished) {
-        txt += `🔴 *LIVE*\n`;
-        txt += `*${home} ${fm.home?.score} - ${fm.away?.score} ${away}*\n`;
-      } else {
-        const date = fm?.status?.utcTime
-          ? new Date(fm.status.utcTime).toLocaleDateString("en-GB", {
-              day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
-            })
-          : "TBD";
-        txt += `⚽ *${home}* 🆚 *${away}*\n`;
-        txt += `📅 _(${date})_\n`;
-      }
-
-    } else {
-      const label = stageLabels[activeRound.stage] || `🔘 ${activeRound.stage.toUpperCase()}`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      txt += `*${label}*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      for (const matchup of activeRound.matchups) {
-        txt += formatMatchup(matchup);
-      }
-
-      // ── POSSIBLE NEXT ROUND MATCHUPS ──────────────────────────
-      const currentIndex = playoff.rounds.findIndex(r => r.stage === activeRound.stage);
-      const nextRound = playoff.rounds[currentIndex + 1];
-
-      if (nextRound) {
-        const nextLabel = stageLabels[nextRound.stage] || nextRound.stage.toUpperCase();
-        txt += `\n━━━━━━━━━━━━━━━━━\n`;
-        txt += `*🔮 POSSIBLE ${nextLabel}*\n`;
-        txt += `━━━━━━━━━━━━━━━━━\n`;
-
-        // Sort current active round matchups by drawOrder to pair them
-        const sorted = [...activeRound.matchups].sort((a, b) => a.drawOrder - b.drawOrder);
-
-        // Pair them: match 1 winner vs match 2 winner, etc.
-        for (let i = 0; i < sorted.length; i += 2) {
-          const m1 = sorted[i];
-          const m2 = sorted[i + 1];
-
-          // Use winner if match is done, else show both teams as "X/Y"
-          const getTeamLabel = (matchup) => {
-            const winner = getWinner(matchup);
-            if (winner) return `*${winner}*`;
-            const home = matchup.homeTeam || "TBD";
-            const away = matchup.awayTeam || "TBD";
-            return `_${home}/${away}_`;
-          };
-
-          const t1 = getTeamLabel(m1);
-          const t2 = m2 ? getTeamLabel(m2) : "_TBD_";
-
-          txt += `🔮 ${t1} 🆚 ${t2}\n`;
-        }
-      }
-    }
-
-    // ── BRONZE FINAL ─────────────────────────────────────────────
-    const semisRound = playoff.rounds.find(r => r.stage === "1/2");
-    const semisFinished = semisRound && isRoundFinished(semisRound);
-    const bronze = playoff.bronzeFinal;
-
-    if (semisFinished && bronze?.matchups?.length) {
-      const bMatch = bronze.matchups[0];
-      const bHome = bMatch.homeTeam || "TBD";
-      const bAway = bMatch.awayTeam || "TBD";
-      const bm = bMatch.matches?.[0];
-
-      txt += `\n━━━━━━━━━━━━━━━━━\n`;
-      txt += `*🥉 THIRD PLACE*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      if (bm?.status?.finished) {
-        txt += `✅ *${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}*\n`;
-      } else if (bm?.status?.started) {
-        txt += `🔴 *LIVE* ${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}\n`;
-      } else {
-        const date = bm?.status?.utcTime
-          ? new Date(bm.status.utcTime).toLocaleDateString("en-GB", {
-              day: "2-digit", month: "short"
-            })
-          : "TBD";
-        txt += `⚽ ${bHome} 🆚 ${bAway}  _(${date})_\n`;
-      }
-    }
-
-    await client.sendMessage(from, { text: txt }, { quoted: mek });
-
-  } catch (error) {
-    console.error("FIFA Playoff Error:", error);
-    await client.sendMessage(from, { text: "❌ Error fetching FIFA bracket." }, { quoted: mek });
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "fifa",
-  aliases: ["worldcup", "wc"],
-  category: "Sports",
-  description: "FIFA World Cup knockout bracket"
-}, async (from, client, conText) => {
-  const { mek, api } = conText;
-
-  try {
-    const res = await axios.get(`${api}/fifastandings`);
-    const data = res.data;
-
-    if (!data?.status) {
-      return client.sendMessage(from, { text: "❌ FIFA data unavailable." }, { quoted: mek });
-    }
-
-    const playoff = data.result?.playoff;
-
-    if (!playoff?.rounds?.length) {
-      return client.sendMessage(from, { text: "❌ Knockout bracket not available yet." }, { quoted: mek });
-    }
-
-    const season = data.result.details?.selectedSeason || "2026";
-
-    const stageLabels = {
-      "1/16":  "🔵 ROUND OF 32",
-      "1/8":   "🟢 ROUND OF 16",
-      "1/4":   "🟡 QUARTER-FINALS",
-      "1/2":   "🟠 SEMI-FINALS",
-      "final": "🏆 FINAL"
-    };
-
-    // Helper: check if all matches in a round are finished
-    const isRoundFinished = (round) =>
-      round.matchups.every(m => m.matches?.[0]?.status?.finished === true);
-
-    // Helper: check if a round has any live or upcoming matches
-    const isRoundActive = (round) =>
-      round.matchups.some(m => !m.matches?.[0]?.status?.finished);
-
-    // Find the current active round (first round that isn't fully finished)
-    const activeRound = playoff.rounds.find(r => !isRoundFinished(r));
-
-    // Check if final round specifically
-    const finalRound = playoff.rounds.find(r => r.stage === "final");
-    const isFinalDay = activeRound?.stage === "final";
-
-    // If all rounds done (champion crowned)
-    const allDone = playoff.rounds.every(r => isRoundFinished(r));
-
-    let txt = `🏆 *FIFA WORLD CUP ${season}*\n`;
-    txt += `🎯 *KNOCKOUT BRACKET*\n\n`;
-
-    if (allDone) {
-      // Tournament over — show champion
-      const finalMatchup = finalRound?.matchups?.[0];
-      const winner = finalMatchup?.aggregatedWinner;
-      const fm = finalMatchup?.matches?.[0];
-      txt += `🎉 *WORLD CUP CHAMPION!*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      txt += `🏆 *${winner || "Champion"}*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      if (fm) {
-        txt += `Final: *${finalMatchup.homeTeam} ${fm.home?.score} - ${fm.away?.score} ${finalMatchup.awayTeam}*\n`;
-      }
-
-    } else if (isFinalDay) {
-      // It's final day — only show the final
-      const finalMatchup = finalRound.matchups[0];
-      const home = finalMatchup.homeTeam || "TBD";
-      const away = finalMatchup.awayTeam || "TBD";
-      const fm = finalMatchup.matches?.[0];
-
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      txt += `*🏆 FINAL*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      if (fm?.status?.started && !fm?.status?.finished) {
-        txt += `🔴 *LIVE*\n`;
-        txt += `*${home} ${fm.home?.score} - ${fm.away?.score} ${away}*\n`;
-      } else {
-        const date = fm?.status?.utcTime
-          ? new Date(fm.status.utcTime).toLocaleDateString("en-GB", {
-              day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
-            })
-          : "TBD";
-        txt += `⚽ *${home}* 🆚 *${away}*\n`;
-        txt += `📅 _(${date})_\n`;
-      }
-
-    } else {
-      // Show only the current active round
-      const label = stageLabels[activeRound.stage] || `🔘 ${activeRound.stage.toUpperCase()}`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      txt += `*${label}*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      for (const matchup of activeRound.matchups) {
-        const match = matchup.matches?.[0];
-        const home = matchup.homeTeam || "TBD";
-        const away = matchup.awayTeam || "TBD";
-
-        if (!match || !match.status?.started) {
-          const date = match?.status?.utcTime
-            ? new Date(match.status.utcTime).toLocaleDateString("en-GB", {
-                day: "2-digit", month: "short"
-              })
-            : "TBD";
-          txt += `⚽ ${home} 🆚 ${away}  _(${date})_\n`;
-        } else if (match.status?.finished) {
-          const winner = matchup.aggregatedWinner;
-          txt += `✅ *${home} ${match.home?.score} - ${match.away?.score} ${away}*`;
-          if (winner) txt += `  → *${winner}* advances`;
-          txt += `\n`;
-        } else {
-          txt += `🔴 *LIVE* ${home} ${match.home?.score} - ${match.away?.score} ${away}\n`;
-        }
-      }
-
-      // Show who's next after this round (teaser)
-      const currentIndex = playoff.rounds.findIndex(r => r.stage === activeRound.stage);
-      const nextRound = playoff.rounds[currentIndex + 1];
-      if (nextRound) {
-        const nextLabel = stageLabels[nextRound.stage] || nextRound.stage.toUpperCase();
-        txt += `\n_⏭ Up next: ${nextLabel}_\n`;
-      }
-    }
-
-    // Bronze Final (only show if semis are done or it's active)
-    const semisRound = playoff.rounds.find(r => r.stage === "1/2");
-    const semisFinished = semisRound && isRoundFinished(semisRound);
-    const bronze = playoff.bronzeFinal;
-
-    if (semisFinished && bronze?.matchups?.length) {
-      const bMatch = bronze.matchups[0];
-      const bHome = bMatch.homeTeam || "TBD";
-      const bAway = bMatch.awayTeam || "TBD";
-      const bm = bMatch.matches?.[0];
-
-      txt += `\n━━━━━━━━━━━━━━━━━\n`;
-      txt += `*🥉 THIRD PLACE*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      if (bm?.status?.finished) {
-        txt += `✅ *${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}*\n`;
-      } else if (bm?.status?.started) {
-        txt += `🔴 *LIVE* ${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}\n`;
-      } else {
-        const date = bm?.status?.utcTime
-          ? new Date(bm.status.utcTime).toLocaleDateString("en-GB", {
-              day: "2-digit", month: "short"
-            })
-          : "TBD";
-        txt += `⚽ ${bHome} 🆚 ${bAway}  _(${date})_\n`;
-      }
-    }
-
-    await client.sendMessage(from, { text: txt }, { quoted: mek });
-
-  } catch (error) {
-    console.error("FIFA Playoff Error:", error);
-    await client.sendMessage(from, { text: "❌ Error fetching FIFA bracket." }, { quoted: mek });
-  }
-});
-//========================================================================================================================
-//========================================================================================================================
-keith({
-  pattern: "fifa",
-  aliases: ["worldcup", "wc"],
-  category: "Sports",
-  description: "FIFA World Cup knockout bracket"
-}, async (from, client, conText) => {
-  const { mek, api } = conText;
-
-  try {
-    const res = await axios.get(`${api}/fifastandings`);
-    const data = res.data;
-
-    if (!data?.status) {
-      return client.sendMessage(from, { text: "❌ FIFA data unavailable." }, { quoted: mek });
-    }
-
-    const playoff = data.result?.playoff;
-
-    if (!playoff?.rounds?.length) {
-      return client.sendMessage(from, { text: "❌ Knockout bracket not available yet." }, { quoted: mek });
-    }
-
-    const season = data.result.details?.selectedSeason || "2026";
-
-    const stageLabels = {
-      "1/16": "🔵 ROUND OF 32",
-      "1/8":  "🟢 ROUND OF 16",
-      "1/4":  "🟡 QUARTER-FINALS",
-      "1/2":  "🟠 SEMI-FINALS",
-      "final": "🏆 FINAL"
-    };
-
-    let txt = `🏆 *FIFA WORLD CUP ${season}*\n`;
-    txt += `🎯 *KNOCKOUT BRACKET*\n`;
-
-    for (const round of playoff.rounds) {
-      const label = stageLabels[round.stage] || `🔘 ${round.stage.toUpperCase()}`;
-      txt += `\n━━━━━━━━━━━━━━━━━\n`;
-      txt += `*${label}*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      for (const matchup of round.matchups) {
-        const match = matchup.matches?.[0];
-        const home = matchup.homeTeam || "TBD";
-        const away = matchup.awayTeam || "TBD";
-
-        if (!match || !match.status?.started) {
-          const date = match?.status?.utcTime
-            ? new Date(match.status.utcTime).toLocaleDateString("en-GB", {
-                day: "2-digit", month: "short"
-              })
-            : "TBD";
-          txt += `⚽ ${home} 🆚 ${away}  _(${date})_\n`;
-        } else if (match.status?.finished) {
-          const hScore = match.home?.score ?? 0;
-          const aScore = match.away?.score ?? 0;
-          const winner = matchup.aggregatedWinner;
-          txt += `✅ *${home} ${hScore} - ${aScore} ${away}*`;
-          if (winner) txt += `  → *${winner}* advances`;
-          txt += `\n`;
-        } else {
-          const hScore = match.home?.score ?? 0;
-          const aScore = match.away?.score ?? 0;
-          txt += `🔴 *LIVE* ${home} ${hScore} - ${aScore} ${away}\n`;
-        }
-      }
-    }
-
-    // Bronze Final
-    const bronze = playoff.bronzeFinal;
-    if (bronze?.matchups?.length) {
-      txt += `\n━━━━━━━━━━━━━━━━━\n`;
-      txt += `*🥉 THIRD PLACE*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-      const bMatch = bronze.matchups[0];
-      const bHome = bMatch.homeTeam || "TBD";
-      const bAway = bMatch.awayTeam || "TBD";
-      const bm = bMatch.matches?.[0];
-      if (bm?.status?.finished) {
-        txt += `✅ *${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}*\n`;
-      } else if (bm?.status?.started) {
-        txt += `🔴 *LIVE* ${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}\n`;
-      } else {
-        const date = bm?.status?.utcTime
-          ? new Date(bm.status.utcTime).toLocaleDateString("en-GB", {
-              day: "2-digit", month: "short"
-            })
-          : "TBD";
-        txt += `⚽ ${bHome} 🆚 ${bAway}  _(${date})_\n`;
-      }
-    }
-
-    await client.sendMessage(from, { text: txt }, { quoted: mek });
-
-  } catch (error) {
-    console.error("FIFA Playoff Error:", error);
-    await client.sendMessage(from, { text: "❌ Error fetching FIFA bracket." }, { quoted: mek });
-  }
-});
-//========================================================================================================================
-keith({
-  pattern: "fifa2",
-  aliases: ["worldcup", "wc"],
-  category: "Sports",
-  description: "FIFA World Cup standings & playoff bracket"
-}, async (from, client, conText) => {
-  const { mek, api } = conText;
-
-  try {
-    const res = await axios.get(`${api}/fifastandings`);
-    const data = res.data;
-
-    if (!data?.status) {
-      return client.sendMessage(from, { text: "❌ FIFA standings unavailable." }, { quoted: mek });
-    }
-
-    const result = data.result;
-    const season = result.details?.selectedSeason || "2026";
-    const groups = result.table?.[0]?.data?.tables || [];
-    const playoff = result.playoff;
-
-    // ── GROUP STANDINGS ──────────────────────────────────────────
-    if (!groups.length) {
-      return client.sendMessage(from, { text: "❌ No standings found." }, { quoted: mek });
-    }
-
-    let txt = `🏆 *FIFA WORLD CUP ${season}*\n`;
-    txt += `📊 *GROUP STANDINGS*\n`;
-
-    groups.forEach(group => {
-      const teams = group.table?.all || [];
-      const groupName = group.leagueName.replace("Grp.", "Group").trim();
-
-      txt += `\n━━━━━━━━━━━━━━━━━\n`;
-      txt += `🚩 *${groupName}*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      teams.forEach((team, index) => {
-        const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🔹";
-        const gd = Number(team.goalConDiff) > 0 ? `+${team.goalConDiff}` : team.goalConDiff;
-        const qual = team.qualColor === "#2AD572" ? " ✅" : team.qualColor === "#FFD908" ? " 🟡" : "";
-
-        txt += `${medal} *${team.name}*${qual}\n`;
-        txt += `   Pl:${team.played} W:${team.wins} D:${team.draws} L:${team.losses} GD:${gd} | *${team.pts} pts*\n`;
-      });
-    });
-
-    txt += `\n_✅ Qualified  🟡 Possible qualification_\n`;
-
-    // ── PLAYOFF BRACKET ──────────────────────────────────────────
-    if (playoff?.rounds?.length) {
-      const stageLabels = {
-        "1/16": "🔵 ROUND OF 32",
-        "1/8":  "🟢 ROUND OF 16",
-        "1/4":  "🟡 QUARTER-FINALS",
-        "1/2":  "🟠 SEMI-FINALS",
-        "final":"🏆 FINAL"
-      };
-
-      txt += `\n\n━━━━━━━━━━━━━━━━━\n`;
-      txt += `🎯 *KNOCKOUT BRACKET*\n`;
-      txt += `━━━━━━━━━━━━━━━━━`;
-
-      for (const round of playoff.rounds) {
-        const label = stageLabels[round.stage] || `🔘 ${round.stage.toUpperCase()}`;
-        txt += `\n\n*${label}*\n`;
-
-        for (const matchup of round.matchups) {
-          const match = matchup.matches?.[0];
-          const home = matchup.homeTeam || "TBD";
-          const away = matchup.awayTeam || "TBD";
-
-          if (!match || !match.status?.started) {
-            // Not played yet
-            const date = match?.status?.utcTime
-              ? new Date(match.status.utcTime).toLocaleDateString("en-GB", {
-                  day: "2-digit", month: "short"
-                })
-              : "TBD";
-            txt += `⚽ ${home} 🆚 ${away}  _(${date})_\n`;
-          } else if (match.status?.finished) {
-            // Finished
-            const hScore = match.home?.score ?? 0;
-            const aScore = match.away?.score ?? 0;
-            const winner = matchup.aggregatedWinner;
-            txt += `✅ *${home} ${hScore} - ${aScore} ${away}*`;
-            if (winner) txt += `  → *${winner}* advances`;
-            txt += `\n`;
-          } else {
-            // Live
-            const hScore = match.home?.score ?? 0;
-            const aScore = match.away?.score ?? 0;
-            txt += `🔴 *LIVE* ${home} ${hScore} - ${aScore} ${away}\n`;
-          }
-        }
-      }
-
-      // Bronze Final
-      const bronze = playoff.bronzeFinal;
-      if (bronze?.matchups?.length) {
-        txt += `\n*🥉 THIRD PLACE*\n`;
-        const bMatch = bronze.matchups[0];
-        const bHome = bMatch.homeTeam || "TBD";
-        const bAway = bMatch.awayTeam || "TBD";
-        const bm = bMatch.matches?.[0];
-        if (bm?.status?.finished) {
-          txt += `✅ *${bHome} ${bm.home?.score} - ${bm.away?.score} ${bAway}*\n`;
-        } else {
-          txt += `⚽ ${bHome} 🆚 ${bAway}\n`;
-        }
-      }
-    }
-
-    await client.sendMessage(from, { text: txt }, { quoted: mek });
-
-  } catch (error) {
-    console.error("FIFA Error:", error);
-    await client.sendMessage(from, { text: "❌ Error fetching FIFA standings." }, { quoted: mek });
-  }
-});
-//========================================================================================================================
-
-keith({
-  pattern: "fifa",
-  aliases: ["worldcup", "wc"],
-  category: "Sports",
-  description: "FIFA World Cup standings"
-}, async (from, client, conText) => {
-  const { mek, api } = conText;
-
-  try {
-    const res = await axios.get(`${api}/fifastandings`);
-    const data = res.data;
-
-    if (!data?.status) {
-      return client.sendMessage(
-        from,
-        { text: "❌ FIFA standings unavailable." },
-        { quoted: mek }
-      );
-    }
-
-    const season = data.result.details?.selectedSeason || "2026";
-    const groups = data.result.table?.[0]?.data?.tables || [];
-
-    if (!groups.length) {
-      return client.sendMessage(
-        from,
-        { text: "❌ No standings found." },
-        { quoted: mek }
-      );
-    }
-
-    let txt = `🏆 *FIFA WORLD CUP ${season}*\n`;
-    txt += `📊 *GROUP STANDINGS*\n`;
-
-    groups.forEach(group => {
-      const teams = group.table?.all || [];
-
-      txt += `\n━━━━━━━━━━━━━━━━━\n`;
-      txt += `🚩 *${group.leagueName.replace("Grp.", "Group").trim()}*\n`;
-      txt += `━━━━━━━━━━━━━━━━━\n`;
-
-      teams.forEach((team, index) => {
-        let medal = "🔹";
-
-        if (index === 0) medal = "🥇";
-        else if (index === 1) medal = "🥈";
-        else if (index === 2) medal = "🥉";
-
-        const gd =
-          Number(team.goalConDiff) > 0
-            ? `+${team.goalConDiff}`
-            : team.goalConDiff;
-
-        txt += `${medal} *${team.name || team.shortName}*\n`;
-        txt += `   Pl:${team.played} W:${team.wins} D:${team.draws} L:${team.losses} GD:${gd} | *${team.pts} pts*\n`;
-      });
-    });
-
-    await client.sendMessage(
-      from,
-      { text: txt },
-      { quoted: mek }
-    );
-
-  } catch (error) {
-    console.error("FIFA Error:", error);
-
-    await client.sendMessage(
-      from,
-      { text: "❌ Error fetching FIFA standings." },
-      { quoted: mek }
-    );
-  }
-});*/
-
-
-
-
-//========================================================================================================================
-
-//========================================================================================================================
-
-keith({
-  pattern: "livescore",
-  aliases: ["live", "score", "fixtures"],
-  description: "Get live, finished, or upcoming football matches",
-  category: "sports",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { mek, reply, timezone, api } = conText;
-
-  const caption = `╭═════════════════⊷
-║  ⚽ *Football Scores* ⚽
-║━━━━━━━━━━━━━━━━━
-║ 𝗥𝗘𝗣𝗟𝗔𝗬 𝗪𝗜𝗧𝗛 𝗡𝗨𝗠𝗕𝗘𝗥
-║ 1. Live Matches 🔴
-║ 2. Finished Matches ✅
-║ 3. Upcoming Matches ⏰
-╰═════════════════⊷`;
-
-  const sent = await client.sendMessage(from, { text: caption }, { quoted: mek });
-  const messageId = sent.key.id;
-
-  client.ev.on("messages.upsert", async (update) => {
-    const msg = update.messages[0];
-    if (!msg.message) return;
-
-    const responseText = msg.message.conversation || msg.message.extendedTextMessage?.text;
-    const isReply = msg.message.extendedTextMessage?.contextInfo?.stanzaId === messageId;
-    const chatId = msg.key.remoteJid;
-
-    if (!isReply || chatId !== from) return;
-
-    const choice = responseText.trim();
-    
-    const optionMap = {
-      "1": { name: "Live", emoji: "🔴" },
-      "2": { name: "Finished", emoji: "✅" },
-      "3": { name: "Upcoming", emoji: "⏰" }
-    };
-
-    if (!optionMap[choice]) {
-      return client.sendMessage(chatId, {
-        text: "❌ Invalid option. Reply with 1, 2, or 3.",
-        quoted: msg
-      });
-    }
-
-    const selected = optionMap[choice];
-
-    try {
-      await client.sendMessage(chatId, { react: { text: selected.emoji, key: msg.key } });
-
-      // Fetch all matches
-      const res = await axios.get(`${api}/livescore`);
-      const data = res.data;
-
-      if (!data.status || !data.result || !data.result.games) {
-        return client.sendMessage(chatId, {
-          text: `❌ No match data available at the moment.`,
-          quoted: msg
-        });
-      }
-
-      const games = Object.values(data.result.games);
-      
-      // Get user's timezone from context or default
-      const userTimeZone = timezone || "Africa/Nairobi";
-      
-      // Get current time in user's timezone
-      const now = new Date();
-      const currentUserTimeStr = now.toLocaleTimeString("en-US", {
-        timeZone: userTimeZone,
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-      
-      // Filter matches based on status
-      let filteredGames = [];
-
-      games.forEach(game => {
-        const matchStatus = game.R?.st || ""; // Get status from R.st
-        
-        // Convert match time to user's timezone
-        const userMatchTime = convertToUserTime(game.tm, game.dt, userTimeZone);
-        
-        // Categorize based on status (following HTML logic)
-        let category = "";
-        
-        if (matchStatus === '1T' || matchStatus === '2T' || matchStatus === 'HT') {
-          category = "live";
-        } else if (matchStatus === 'FT' || matchStatus === 'Pen') {
-          category = "finished";
-        } else if (matchStatus === '' || matchStatus === 'Pst' || matchStatus === 'Canc') {
-          category = "upcoming";
-        }
-        
-        if (category && (
-          (choice === "1" && category === "live") ||
-          (choice === "2" && category === "finished") ||
-          (choice === "3" && category === "upcoming")
-        )) {
-          filteredGames.push({
-            ...game,
-            category,
-            userMatchTime: userMatchTime ? userMatchTime.time : game.tm,
-            userMatchDate: userMatchTime ? userMatchTime.date : game.dt
-          });
-        }
-      });
-
-      if (filteredGames.length === 0) {
-        return client.sendMessage(chatId, {
-          text: `⚽ *${selected.name} Matches*\n\nNo ${selected.name.toLowerCase()} matches found at the moment.`,
-          quoted: msg
-        });
-      }
-
-      // Group by date
-      const matchesByDate = {};
-      
-      filteredGames.forEach(game => {
-        const date = game.userMatchDate || game.dt || "Today";
-        
-        if (!matchesByDate[date]) {
-          matchesByDate[date] = [];
-        }
-        
-        matchesByDate[date].push(game);
-      });
-
-      // Create formatted output
-      let output = `⚽ *${selected.name} Matches* ${selected.emoji}\n`;
-      output += `🌍 Timezone: ${userTimeZone}\n`;
-      output += `🕐 Current Time: ${currentUserTimeStr}\n\n`;
-      
-      let totalMatches = 0;
-      
-      Object.entries(matchesByDate).forEach(([date, dateGames]) => {
-        output += `📅 *${date}*\n`;
-        output += "─".repeat(30) + "\n";
-        
-        dateGames.forEach(game => {
-          const status = getMatchDisplay(game);
-          const score = getScoreDisplay(game);
-          
-          output += `${status} *${game.p1} vs ${game.p2}*\n`;
-          output += `   ${score}\n`;
-          
-          // Show converted user time
-          if (game.userMatchTime) {
-            output += `   🕒 ${game.userMatchTime}`;
-            
-            // Add match status info
-            const statusText = getMatchStatusText(game.R?.st);
-            if (statusText) {
-              output += ` (${statusText})`;
-            }
-          } else if (game.tm) {
-            output += `   🕒 ${game.tm}`;
-          }
-          
-          output += "\n\n";
-          totalMatches++;
-        });
-      });
-
-      output += `📊 Total: ${totalMatches} match(es)`;
-
-      await client.sendMessage(chatId, { text: output }, { quoted: msg });
-
-    } catch (err) {
-      console.error("livescore error:", err);
-      await client.sendMessage(chatId, {
-        text: `❌ Error fetching ${selected.name} matches: ${err.message}`,
-        quoted: msg
-      });
-    }
-  });
-});
-
-// Helper functions
-function convertToUserTime(timeStr, dateStr, userTimeZone) {
-  if (!timeStr || !dateStr) return null;
-  
-  try {
-    // Parse the API date and time (assume it's in UTC)
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    
-    // Create UTC date
-    const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-    
-    // Convert to user's timezone
-    const userDateStr = utcDate.toLocaleDateString("en-US", {
-      timeZone: userTimeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    });
-    
-    const userTimeStr = utcDate.toLocaleTimeString("en-US", {
-      timeZone: userTimeZone,
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-    
-    // Format date back to YYYY-MM-DD format
-    const [userMonth, userDay, userYear] = userDateStr.split('/');
-    const formattedDate = `${userYear}-${userMonth.padStart(2, '0')}-${userDay.padStart(2, '0')}`;
-    
-    return {
-      date: formattedDate,
-      time: userTimeStr
-    };
-  } catch (e) {
-    console.error("Time conversion error:", e);
-    return null;
-  }
-}
-
-function getMatchDisplay(game) {
-  const status = game.R?.st || "";
-  
-  if (status === 'HT') return "⏸️";
-  if (status === 'FT' || status === 'Pen') return "✅";
-  if (status === '1T' || status === '2T') return "🔴";
-  
-  return game.category === "upcoming" ? "⏰" : "⚽";
-}
-
-function getMatchStatusText(status) {
-  const statusMap = {
-    '': 'Not Started',
-    'FT': 'Full Time',
-    '1T': 'First Half',
-    '2T': 'Second Half',
-    'HT': 'Half Time',
-    'Pst': 'Postponed',
-    'Canc': 'Cancelled',
-    'Pen': 'Penalties'
-  };
-  
-  return statusMap[status] || status;
-}
-
-function getScoreDisplay(game) {
-  if (game.R && game.R.r1 !== undefined && game.R.r2 !== undefined) {
-    return `📊 ${game.R.r1} - ${game.R.r2}`;
-  }
-  return "📊 0 - 0";
-}
-
-//========================================================================================================================
-//========================================================================================================================
-
-// Helper: convert timestamp to readable date
-function formatDate(ts) {
-  try {
-    const d = new Date(Number(ts));
-    return d.toDateString(); // e.g. "Fri Dec 05 2025"
-  } catch {
-    return "Unknown Date";
-  }
-}
-
-keith({
-  pattern: "sportnews",
-  aliases: ["footballnews", "soccernews"],
-  category: "sports",
-  description: "Get latest football news",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { mek, api } = conText;
-
-  try {
-    const apiUrl = `${api}/football/news`;
-    const res = await axios.get(apiUrl, { timeout: 100000 });
-    const items = res.data?.result?.data?.items;
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return;
-    }
-
-    const news = items.slice(0, 8); // limit to 8 cards
-    const cards = await Promise.all(news.map(async (item) => ({
-      header: {
-        title: `📰 ${item.title}`,
-        hasMediaAttachment: true,
-        imageMessage: (await generateWAMessageContent({ image: { url: item.cover?.url } }, {
-          upload: client.waUploadToServer
-        })).imageMessage
-      },
-      body: {
-        text: `${item.summary}`
-      },
-      footer: { text: formatDate(item.createdAt) },
-      nativeFlowMessage: {
-        buttons: [
-          {
-            name: "cta_url",
-            buttonParamsJson: JSON.stringify({
-              display_text: "🔗 Read More",
-              url: "https://keithsite.vercel.app/sports"
-            })
-          },
-          {
-            name: "cta_copy",
-            buttonParamsJson: JSON.stringify({
-              display_text: "📋 Copy Link",
-              copy_code: "https://keithsite.vercel.app/sports"
-            })
-          }
-        ]
-      }
-    })));
-
-    const message = generateWAMessageFromContent(from, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
-          },
-          interactiveMessage: {
-            body: { text: `⚽ Latest Football News` },
-            footer: { text: `📂 Showing ${news.length} stories` },
-            carouselMessage: { cards }
-          }
-        }
-      }
-    }, { quoted: mek });
-
-    await client.relayMessage(from, message.message, { messageId: message.key.id });
-
-  } catch (err) {
-    console.error("sportnews command error:", err);
-  }
-});
-//========================================================================================================================
-
-
-keith({
-  pattern: "topscorers",
-  aliases: ["scorers", "goals"],
-  description: "View top goal scorers across major football leagues",
-  category: "sports",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { mek, reply, api } = conText;
-
-  const caption = `╭═════════════════⊷
-║  ⚽ *Top Scorers* ⚽
-║━━━━━━━━━━━━━━━━━
-║ 𝗥𝗘𝗣𝗟𝗬 𝗪𝗜𝗧𝗛 𝗟𝗘𝗔𝗚𝗨𝗘 𝗡𝗨𝗠𝗕𝗘𝗥
-║ 1. Premier League
-║ 2. Bundesliga
-║ 3. La Liga
-║ 4. Ligue 1
-║ 5. Serie A
-║ 6. UEFA Champions League
-║ 7. FIFA International
-║ 8. UEFA Euro
-╰═════════════════⊷`;
-
-  const sent = await client.sendMessage(from, { text: caption }, { quoted: mek });
-  const messageId = sent.key.id;
-
-  client.ev.on("messages.upsert", async (update) => {
-    const msg = update.messages[0];
-    if (!msg.message) return;
-
-    const responseText = msg.message.conversation || msg.message.extendedTextMessage?.text;
-    const isReply = msg.message.extendedTextMessage?.contextInfo?.stanzaId === messageId;
-    const chatId = msg.key.remoteJid;
-
-    if (!isReply) return;
-
-    const leagueMap = {
-      "1": { name: "Premier League", url: `${api}/epl/scorers` },
-      "2": { name: "Bundesliga", url: `${api}/bundesliga/scorers` },
-      "3": { name: "La Liga", url: `${api}/laliga/scorers` },
-      "4": { name: "Ligue 1", url: `${api}/ligue1/scorers` },
-      "5": { name: "Serie A", url: `${api}/seriea/scorers` },
-      "6": { name: "UEFA Champions League", url: `${api}/ucl/scorers` },
-      "7": { name: "FIFA International", url: `${api}/fifa/scorers` },
-      "8": { name: "UEFA Euro", url: `${api}/euros/scorers` }
-    };
-
-    const selected = leagueMap[responseText.trim()];
-    if (!selected) {
-      return client.sendMessage(chatId, {
-        text: "❌ Invalid league number. Reply with a number between 1 and 8.",
-        quoted: msg
-      });
-    }
-
-    try {
-      await client.sendMessage(chatId, { react: { text: "⚽", key: msg.key } });
-
-      const res = await axios.get(selected.url);
-      const data = res.data;
-
-      if (!data.status || !Array.isArray(data.result?.topScorers)) {
-        return client.sendMessage(chatId, {
-          text: `❌ Failed to fetch ${selected.name} scorers.`,
-          quoted: msg
-        });
-      }
-
-      const scorers = data.result.topScorers.map(scorer => {
-        let medal = "";
-        if (scorer.rank === 1) medal = "🥇";
-        else if (scorer.rank === 2) medal = "🥈";
-        else if (scorer.rank === 3) medal = "🥉";
-
-        return `${medal} *${scorer.rank}. ${scorer.player}* (${scorer.team})\n` +
-               `⚽ Goals: ${scorer.goals} | 🎯 Assists: ${scorer.assists}\n` +
-               `🎯 Penalties: ${scorer.penalties}`;
-      }).join("\n\n");
-
-      const caption = `📊 *Top Scorers – ${data.result.competition}*\n\n${scorers}`;
-
-      await client.sendMessage(chatId, { text: caption }, { quoted: msg });
-    } catch (err) {
-      console.error("topscorers error:", err);
-      await client.sendMessage(chatId, {
-        text: `❌ Error fetching ${selected.name} scorers: ${err.message}`,
-        quoted: msg
-      });
-    }
-  });
-});
-//========================================================================================================================
-
+// ============================================================
+// STANDINGS COMMAND WITH TABLE
+// ============================================================
 keith({
   pattern: "standings",
   aliases: ["leaguetable", "league"],
@@ -1522,20 +72,30 @@ keith({
         });
       }
 
-      const standings = data.result.standings.map(team => {
-        let tag = "🧱"; // mid-table default
-        if (team.position <= 4) tag = "🏆"; // Champions League
-        else if (team.position === 5 || team.position === 6) tag = "🥈"; // Europa League
-        else if (team.position >= 18) tag = "⚠️"; // Relegation
+      // Prepare table data - CONVERT ALL VALUES TO STRINGS
+      const tableHeaders = ['#', 'Team', 'P', 'W', 'D', 'L', 'GD', 'Pts'];
+      const tableRows = data.result.standings.map(team => [
+        String(team.position || ''),
+        String(team.team || ''),
+        String(team.played || ''),
+        String(team.won || ''),
+        String(team.draw || ''),
+        String(team.lost || ''),
+        String(team.goalDifference || ''),
+        String(team.points || '')
+      ]);
 
-        return `${tag} *${team.position}. ${team.team}*\n` +
-               `Played: ${team.played} | W:${team.won} D:${team.draw} L:${team.lost}\n` +
-               `Points: ${team.points} | GD: ${team.goalDifference}`;
-      }).join("\n\n");
+      // Send as rich message with table
+      await client.sendAIRich(from, [
+        { type: 'text', text: `📊 *${data.result.competition} Standings*\n\nCurrent league standings.` },
+        { type: 'table', table: [tableHeaders, ...tableRows] },
+        { type: 'tip', text: `💡 *Update:* Standings as of ${new Date().toLocaleDateString()}` },
+        { type: 'suggest', suggestion: ['Show top scorers', 'View fixtures', 'Another league'] }
+      ], {
+        title: '📊 League Standings',
+        footer: '⚡ Data provided by Keith-MD Bot'
+      });
 
-      const caption = `📊 *${data.result.competition} Standings*\n\n${standings}`;
-
-      await client.sendMessage(chatId, { text: caption }, { quoted: msg });
     } catch (err) {
       console.error("standings error:", err);
       await client.sendMessage(chatId, {
@@ -1545,8 +105,114 @@ keith({
     }
   });
 });
-//========================================================================================================================
 
+// ============================================================
+// TOPSCORERS COMMAND WITH TABLE
+// ============================================================
+keith({
+  pattern: "topscorers",
+  aliases: ["scorers", "goals"],
+  description: "View top goal scorers across major football leagues",
+  category: "sports",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, reply, api } = conText;
+
+  const caption = `╭═════════════════⊷
+║  ⚽ *Top Scorers* ⚽
+║━━━━━━━━━━━━━━━━━
+║ 𝗥𝗘𝗣𝗟𝗬 𝗪𝗜𝗧𝗛 𝗟𝗘𝗔𝗚𝗨𝗘 𝗡𝗨𝗠𝗕𝗘𝗥
+║ 1. Premier League
+║ 2. Bundesliga
+║ 3. La Liga
+║ 4. Ligue 1
+║ 5. Serie A
+║ 6. UEFA Champions League
+║ 7. FIFA International
+║ 8. UEFA Euro
+╰═════════════════⊷`;
+
+  const sent = await client.sendMessage(from, { text: caption }, { quoted: mek });
+  const messageId = sent.key.id;
+
+  client.ev.on("messages.upsert", async (update) => {
+    const msg = update.messages[0];
+    if (!msg.message) return;
+
+    const responseText = msg.message.conversation || msg.message.extendedTextMessage?.text;
+    const isReply = msg.message.extendedTextMessage?.contextInfo?.stanzaId === messageId;
+    const chatId = msg.key.remoteJid;
+
+    if (!isReply) return;
+
+    const leagueMap = {
+      "1": { name: "Premier League", url: `${api}/epl/scorers` },
+      "2": { name: "Bundesliga", url: `${api}/bundesliga/scorers` },
+      "3": { name: "La Liga", url: `${api}/laliga/scorers` },
+      "4": { name: "Ligue 1", url: `${api}/ligue1/scorers` },
+      "5": { name: "Serie A", url: `${api}/seriea/scorers` },
+      "6": { name: "UEFA Champions League", url: `${api}/ucl/scorers` },
+      "7": { name: "FIFA International", url: `${api}/fifa/scorers` },
+      "8": { name: "UEFA Euro", url: `${api}/euros/scorers` }
+    };
+
+    const selected = leagueMap[responseText.trim()];
+    if (!selected) {
+      return client.sendMessage(chatId, {
+        text: "❌ Invalid league number. Reply with a number between 1 and 8.",
+        quoted: msg
+      });
+    }
+
+    try {
+      await client.sendMessage(chatId, { react: { text: "⚽", key: msg.key } });
+
+      const res = await axios.get(selected.url);
+      const data = res.data;
+
+      if (!data.status || !Array.isArray(data.result?.topScorers)) {
+        return client.sendMessage(chatId, {
+          text: `❌ Failed to fetch ${selected.name} scorers.`,
+          quoted: msg
+        });
+      }
+
+      const scorers = data.result.topScorers;
+
+      // CONVERT ALL VALUES TO STRINGS
+      const tableHeaders = ['#', 'Player', 'Team', 'Goals', 'Assists', 'Penalties'];
+      const tableRows = scorers.map(scorer => [
+        String(scorer.rank || ''),
+        String(scorer.player || ''),
+        String(scorer.team || ''),
+        String(scorer.goals || ''),
+        String(scorer.assists || ''),
+        String(scorer.penalties || '')
+      ]);
+
+      await client.sendAIRich(from, [
+        { type: 'text', text: `⚽ *Top Scorers - ${data.result.competition}*\n\nTop goal scorers in the competition.` },
+        { type: 'table', table: [tableHeaders, ...tableRows] },
+        { type: 'tip', text: `💡 *Top Scorer:* ${scorers[0]?.player} (${scorers[0]?.goals} goals)` },
+        { type: 'suggest', suggestion: ['Show standings', 'View fixtures', 'Another league'] }
+      ], {
+        title: '⚽ Top Scorers',
+        footer: '⚡ Data provided by Keith-MD Bot'
+      });
+
+    } catch (err) {
+      console.error("topscorers error:", err);
+      await client.sendMessage(chatId, {
+        text: `❌ Error fetching ${selected.name} scorers: ${err.message}`,
+        quoted: msg
+      });
+    }
+  });
+});
+
+// ============================================================
+// UPCOMING MATCHES COMMAND WITH TABLE
+// ============================================================
 keith({
   pattern: "upcomingmatches",
   aliases: ["fixtures", "upcoming", "nextgames"],
@@ -1615,13 +281,28 @@ keith({
         });
       }
 
-      const fixtures = data.result.upcomingMatches.map(match =>
-        `📅 *Matchday ${match.matchday}*\n🕒 ${match.date}\n🏟️ ${match.homeTeam} vs ${match.awayTeam}`
-      ).join("\n\n");
+      const matches = data.result.upcomingMatches;
 
-      const caption = `🏆 *Upcoming ${selected.name} Matches*\n\n${fixtures}`;
+      // Prepare table data - CONVERT ALL VALUES TO STRINGS
+      const tableHeaders = ['#', 'Matchday', 'Date', 'Home', 'Away'];
+      const tableRows = matches.map((match, index) => [
+        String(index + 1),
+        String(match.matchday || ''),
+        String(match.date || ''),
+        String(match.homeTeam || ''),
+        String(match.awayTeam || '')
+      ]);
 
-      await client.sendMessage(chatId, { text: caption }, { quoted: msg });
+      await client.sendAIRich(from, [
+        { type: 'text', text: `🏆 *Upcoming ${selected.name} Matches*\n\nNext matches scheduled.` },
+        { type: 'table', table: [tableHeaders, ...tableRows] },
+        { type: 'tip', text: `📅 *Total:* ${matches.length} matches scheduled` },
+        { type: 'suggest', suggestion: ['Show standings', 'Show top scorers', 'Another league'] }
+      ], {
+        title: '📅 Upcoming Matches',
+        footer: '⚡ Data provided by Keith-MD Bot'
+      });
+
     } catch (err) {
       console.error("upcomingmatches error:", err);
       await client.sendMessage(chatId, {
@@ -1630,186 +311,4 @@ keith({
       });
     }
   });
-});
-
-
-      
-//========================================================================================================================
-
-keith({
-  pattern: "gamehistory",
-  aliases: ["matchevents", "gameevents"],
-  description: "View historical or upcoming game events between teams",
-  category: "sports",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, reply, mek, api } = conText;
-
-  if (!q || !q.includes("vs")) {
-    return reply("❌ Provide a valid match query.\n\nExample: gamehistory Arsenal vs Chelsea");
-  }
-
-  try {
-    const res = await axios.get(`${api}/sport/gameevents?q=${encodeURIComponent(q)}`);
-    const data = res.data;
-
-    if (!data.status || !Array.isArray(data.result) || data.result.length === 0) {
-      return reply("❌ No game events found for that matchup.");
-    }
-
-    for (const match of data.result.slice(0, 3)) {
-      const { teams, league, venue, dateTime, status, season, media } = match;
-      const caption = `⚽ *${match.match}*\n\n` +
-        `🏆 League: ${league.name} (${season})\n` +
-        `📅 Date: ${dateTime.date} at ${dateTime.time}\n` +
-        `📍 Venue: ${venue.name || "—"} (${venue.country || "—"})\n` +
-        `🔢 Round: ${match.round}\n` +
-        `📶 Status: ${status}\n\n` +
-        `🔴 ${teams.home.name}: ${teams.home.score ?? "—"}\n` +
-        `🔵 ${teams.away.name}: ${teams.away.score ?? "—"}\n\n` +
-        (match.media.video ? `▶️ Video: ${match.media.video}` : "");
-
-      const mediaMsg = match.media?.poster || match.media?.thumb
-        ? { image: { url: match.media.poster || match.media.thumb }, caption }
-        : { text: caption };
-
-      await client.sendMessage(from, mediaMsg, { quoted: mek });
-    }
-  } catch (err) {
-    console.error("gamehistory error:", err);
-    reply("❌ Error fetching game history: " + err.message);
-  }
-});
-//========================================================================================================================
-
-keith({
-  pattern: "venuesearch",
-  aliases: ["venue", "stadium"],
-  description: "Search for sports venues by name",
-  category: "sports",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, reply, mek, api } = conText;
-
-  if (!q) return reply("❌ Provide a venue name.\n\nExample: venuesearch Emirates");
-
-  try {
-    const res = await axios.get(`${api}/sport/venuesearch?q=${encodeURIComponent(q)}`);
-    const data = res.data;
-
-    if (!data.status || !Array.isArray(data.result) || data.result.length === 0) {
-      return reply("❌ No matching venues found. Try a different name.");
-    }
-
-    for (const venue of data.result.slice(0, 3)) {
-      const caption = `🏟️ *${venue.name}*\n\n` +
-        `📛 Alternate Name: ${venue.alternateName || "—"}\n` +
-        `⚽ Sport: ${venue.sport || "—"}\n` +
-        `📍 Location: ${venue.location || "—"}\n` +
-        `🌍 Country: ${venue.country || "—"}\n` +
-        `📅 Built: ${venue.yearBuilt || "—"}\n` +
-        `👥 Capacity: ${venue.capacity || "—"}\n` +
-        `🕒 Timezone: ${venue.timezone || "—"}\n\n` +
-        `📝 *Description*\n${venue.description?.split("\r\n").slice(0, 2).join("\n") || "—"}`;
-
-      const media = venue.media?.thumb
-        ? { image: { url: venue.media.thumb }, caption }
-        : { text: caption };
-
-      await client.sendMessage(from, media, { quoted: mek });
-    }
-  } catch (err) {
-    console.error("venuesearch error:", err);
-    reply("❌ Error fetching venue data: " + err.message);
-  }
-});
-//========================================================================================================================
-
-
-keith({
-  pattern: "teamsearch",
-  aliases: ["team", "club"],
-  description: "Search for sports teams by name",
-  category: "sports",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, reply, mek, api } = conText;
-
-  if (!q) return reply("❌ Provide a team name.\n\nExample: teamsearch Arsenal");
-
-  try {
-    const res = await axios.get(`${api}/sport/teamsearch?q=${encodeURIComponent(q)}`);
-    const data = res.data;
-
-    if (!data.status || !Array.isArray(data.result) || data.result.length === 0) {
-      return reply("❌ No matching teams found. Try a different name.");
-    }
-
-    const team = data.result[0];
-    const caption = `🏟️ *${team.name}*\n\n` +
-      `📛 Alternate Names: ${team.alternateName}\n` +
-      `📅 Formed: ${team.formedYear}\n` +
-      `⚽ Sport: ${team.sport}\n` +
-      `🏆 League: ${team.league}\n` +
-      `📍 Location: ${team.location}, ${team.country}\n` +
-      `🚻 Gender: ${team.gender}\n` +
-      `🏟️ Stadium: ${team.stadium} (${team.stadiumCapacity} capacity)\n\n` +
-      `🌐 *Social Links*\n` +
-      `🔗 Website: ${team.social.website}\n` +
-      `📘 Facebook: ${team.social.facebook}\n` +
-      `🐦 Twitter: ${team.social.twitter}\n` +
-      `📸 Instagram: ${team.social.instagram}\n` +
-      `📺 YouTube: ${team.social.youtube}\n\n` +
-      `📝 *Description*\n${team.description.split("\r\n").slice(0, 3).join("\n")}`;
-
-    await client.sendMessage(from, {
-      image: { url: team.badges.large },
-      caption
-    }, { quoted: mek });
-  } catch (err) {
-    console.error("teamsearch error:", err);
-    reply("❌ Error fetching team data: " + err.message);
-  }
-});
-//========================================================================================================================
-//
-keith({
-  pattern: "playersearch",
-  aliases: ["player", "athlete"],
-  description: "Search for sports players by name",
-  category: "sports",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { q, reply, mek, api } = conText;
-
-  if (!q) return reply("❌ Provide a player name.\n\nExample: playersearch Bukayo Saka");
-
-  try {
-    const res = await axios.get(`${api}/sport/playersearch?q=${encodeURIComponent(q)}`);
-    const data = res.data;
-
-    if (!data.status || !Array.isArray(data.result) || data.result.length === 0) {
-      return reply("❌ No matching players found. Try a different name.");
-    }
-
-    for (const player of data.result.slice(0, 3)) {
-      const caption = `🏅 *${player.name}*\n\n` +
-        `🏟️ Team: ${player.team}\n` +
-        `⚽ Sport: ${player.sport}\n` +
-        `🌍 Nationality: ${player.nationality}\n` +
-        `🎂 Birthdate: ${player.birthDate}\n` +
-        `📌 Position: ${player.position}\n` +
-        `📶 Status: ${player.status}\n` +
-        `🚻 Gender: ${player.gender}`;
-
-      const media = player.thumbnail
-        ? { image: { url: player.thumbnail }, caption }
-        : { text: caption };
-
-      await client.sendMessage(from, media, { quoted: mek });
-    }
-  } catch (err) {
-    console.error("playersearch error:", err);
-    reply("❌ Error fetching player data: " + err.message);
-  }
 });
