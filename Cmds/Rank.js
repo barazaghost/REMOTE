@@ -182,7 +182,7 @@ keith({
 
   try {
     await client.sendMessage(from, {
-      document: { url: "https://cricfypro.com.in/app/Cricfy-v6.8-latest.apk" },
+      document: { url: "https://cricfypro.com.in/file/Cricfy-v6.8-latest.apk" },
       mimetype: "application/vnd.android.package-archive",
       fileName: "Cricfy-v6.8.apk"
     }, { quoted: mek });
