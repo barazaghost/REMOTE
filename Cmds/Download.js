@@ -1,273 +1,5 @@
 const axios = require('axios');
 const { keith } = require('../commandHandler');
-const vm = require('vm');
-const sharp = require('sharp');
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-//========================================================================================================================
-
-
-
-const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0";
-const site = "https://igram.world";
-const hub = "https://api-wh.igram.world";
-const ocrKeys = ["helloworld", "K81634588988957", "K87899142388957"];
-const headers = { "user-agent": ua, origin: site, referer: site + "/" };
-
-async function getChunk() {
-    const home = await (await fetch(site + "/en1/", { headers: { ...headers, accept: "text/html" } })).text();
-    const appPath = (home.match(/\/js\/app\.js\?id=[a-f0-9]+/) || ["/js/app.js"])[0];
-    const app = await (await fetch(site + appPath, { headers: { ...headers, accept: "*/*" } })).text();
-    const chunk = (app.match(/js\/link\.chunk\.js\?ch=[0-9a-f]+\.js/) || ["js/link.chunk.js"])[0];
-    return await (await fetch(site + "/" + chunk, { headers: { ...headers, accept: "*/*" } })).text();
-}
-
-function createSigner(code) {
-    const nodeCrypto = require("crypto");
-    const reals = {};
-    for (const k of ["Object", "Array", "Function", "Boolean", "Number", "String", "Symbol", "Math", "JSON", "Date", "RegExp", "Error", "TypeError", "RangeError", "SyntaxError", "Promise", "parseInt", "parseFloat", "isNaN", "isFinite", "encodeURIComponent", "decodeURIComponent", "encodeURI", "decodeURI", "Map", "Set", "WeakMap", "WeakSet", "ArrayBuffer", "Uint8Array", "Uint16Array", "Uint32Array", "Int8Array", "Int16Array", "Int32Array", "Float32Array", "Float64Array", "DataView", "TextEncoder", "TextDecoder", "Reflect", "Proxy", "BigInt", "escape", "unescape", "Intl"]) reals[k] = global[k];
-    reals.crypto = global.crypto || nodeCrypto.webcrypto;
-    reals.console = { log() {}, warn() {}, error() {}, info() {}, debug() {} };
-    reals.performance = global.performance;
-    reals.atob = global.atob;
-    reals.btoa = global.btoa;
-    reals.setTimeout = () => 0; reals.clearTimeout = () => {}; reals.setInterval = () => 0; reals.clearInterval = () => {};
-    reals.requestIdleCallback = () => 0; reals.cancelIdleCallback = () => {}; reals.requestAnimationFrame = () => 0; reals.cancelAnimationFrame = () => {};
-    reals.queueMicrotask = f => Promise.resolve().then(f);
-    reals.URL = global.URL; reals.URLSearchParams = global.URLSearchParams; reals.Blob = global.Blob; reals.fetch = global.fetch;
-    reals.AbortController = global.AbortController; reals.AbortSignal = global.AbortSignal;
-    reals.Event = global.Event || function () {}; reals.CustomEvent = global.CustomEvent || function () {}; reals.EventTarget = global.EventTarget || function () {};
-    reals.MessageChannel = global.MessageChannel || function () { this.port1 = {}; this.port2 = {} };
-    reals.structuredClone = global.structuredClone;
-    const storage = () => { const m = new Map(); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), clear: () => m.clear(), key: i => [...m.keys()][i] ?? null, get length() { return m.size } } };
-    reals.localStorage = storage(); reals.sessionStorage = storage();
-    reals.navigator = { userAgent: ua, language: "en-US", languages: ["en-US", "en"], platform: "Win32", hardwareConcurrency: 8, deviceMemory: 8, webdriver: false, vendor: "Google Inc.", plugins: { length: 0 }, maxTouchPoints: 0 };
-    reals.location = { href: site + "/en1/", origin: site, protocol: "https:", host: "igram.world", hostname: "igram.world", pathname: "/en1/", search: "", hash: "", reload() {}, replace() {}, assign() {}, toString() { return this.href } };
-    const el = (tag = "DIV") => ({ tagName: tag, nodeName: tag, nodeType: 1, ownerDocument: null, [Symbol.toStringTag]: "HTML" + tag[0] + tag.slice(1).toLowerCase() + "Element", setAttribute() {}, getAttribute() { return null }, hasAttribute() { return false }, appendChild(x) { return x }, removeChild(x) { return x }, insertBefore(x) { return x }, addEventListener() {}, removeEventListener() {}, dispatchEvent() { return true }, style: {}, dataset: {}, classList: { add() {}, remove() {}, contains() { return false }, toggle() {} }, getContext() { return null }, remove() {}, cloneNode() { return el(tag) }, set src(v) {}, get src() { return "" }, set onload(v) {}, set onerror(v) {}, set innerHTML(v) {}, get innerHTML() { return "" }, children: [], childNodes: [] });
-    reals.document = { [Symbol.toStringTag]: "HTMLDocument", nodeType: 9, nodeName: "#document", createElement: t => el((t || "div").toUpperCase()), createElementNS: (ns, t) => el((t || "div").toUpperCase()), createTextNode: t => ({ nodeType: 3, textContent: t }), createComment: () => ({ nodeType: 8 }), createDocumentFragment: () => el("FRAGMENT"), getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], getElementsByTagName: () => [], getElementsByClassName: () => [], addEventListener() {}, removeEventListener() {}, dispatchEvent() { return true }, head: el("HEAD"), body: el("BODY"), documentElement: el("HTML"), cookie: "", currentScript: null, readyState: "complete", visibilityState: "visible", hidden: false, referrer: "", title: "igram", characterSet: "UTF-8", contentType: "text/html", compatMode: "CSS1Compat", hasFocus: () => true };
-    reals.screen = { width: 1920, height: 1080, availWidth: 1920, availHeight: 1040, colorDepth: 24, pixelDepth: 24 };
-    reals.history = { pushState() {}, replaceState() {}, length: 1, state: null };
-    reals.addEventListener = () => {}; reals.removeEventListener = () => {}; reals.dispatchEvent = () => true;
-    reals.matchMedia = () => ({ matches: false, media: "", addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} });
-    reals.getComputedStyle = () => ({ getPropertyValue: () => "" });
-    reals.XMLHttpRequest = function () { this.open = () => {}; this.send = () => {}; this.setRequestHeader = () => {}; this.addEventListener = () => {} };
-    reals.WebSocket = function () { this.close = () => {}; this.send = () => {}; this.addEventListener = () => {} };
-    reals.Worker = function () { this.postMessage = () => {}; this.terminate = () => {}; this.addEventListener = () => {} };
-    reals.Image = function () {}; reals.CSS = { supports: () => false };
-
-    let captured = [];
-    const handler = {
-        get(t, p, r) { if (p in t) return t[p]; if (["self", "window", "globalThis", "global", "top", "parent", "frames"].includes(p)) return r; return undefined },
-        set(t, p, v) { t[p] = v; if (Array.isArray(v)) captured.push(v); return true }
-    };
-    const ctx = new Proxy(reals, handler);
-    reals.self = ctx; reals.window = ctx; reals.globalThis = ctx; reals.global = ctx; reals.top = ctx; reals.parent = ctx; reals.frames = ctx;
-    reals.document.defaultView = ctx; reals.document.location = reals.location;
-
-    vm.createContext(ctx);
-    vm.runInContext(code, ctx, { filename: "link.chunk.js" });
-
-    let modules = null;
-    for (const arr of captured) for (const e of arr) if (Array.isArray(e) && Array.isArray(e[0]) && e[1] && typeof e[1] === "object") modules = e[1];
-    if (!modules || !modules[3508]) throw new Error("signer module not found");
-
-    const cache = {};
-    function req(id) {
-        if (cache[id]) return cache[id].exports;
-        const m = cache[id] = { exports: {} };
-        try { modules[id].call(ctx, m, m.exports, req); } catch {}
-        return m.exports;
-    }
-    req.d = (e, defs) => { for (const k in defs) if (Object.prototype.hasOwnProperty.call(defs, k) && !Object.prototype.hasOwnProperty.call(e, k)) Object.defineProperty(e, k, { enumerable: true, get: defs[k] }) };
-    req.o = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
-    req.r = e => { try { Object.defineProperty(e, Symbol.toStringTag, { value: "Module" }) } catch {} Object.defineProperty(e, "__esModule", { value: true }) };
-    req.n = m => { const g = m && m.__esModule ? () => m.default : () => m; req.d(g, { a: g }); return g };
-    req.e = () => Promise.resolve(); req.g = ctx; req.p = site + "/"; req.b = req.p; req.u = () => ""; req.f = {}; req.m = modules; req.c = cache; req.x = () => {}; req.h = () => "";
-
-    req(2871).evaluateEnvironment = () => ({ hardFail: false, hardReasons: [], score: 0, flags: 0, signals: {} });
-    req(9267).checkDomainAdvanced = () => ({ ok: true, hardFail: false, hardReason: "", score: 0, flags: 0, signals: {}, host: "igram.world" });
-    req(9267).isProbablyNative = () => true;
-
-    const pending = req(3508).default;
-    let fn = null;
-    return async body => { if (!fn) fn = await pending; return await fn(body) };
-}
-
-async function ocr(png) {
-    for (const key of ocrKeys) {
-        const form = new FormData();
-        form.append("file", new Blob([png], { type: "image/png" }), "c.png");
-        form.append("language", "eng"); form.append("OCREngine", "2"); form.append("scale", "true"); form.append("isOverlayRequired", "false");
-        try {
-            const res = await fetch("https://api.ocr.space/parse/image", { method: "POST", headers: { apikey: key }, body: form });
-            const j = await res.json().catch(() => null);
-            if (j && !j.IsErroredOnProcessing && Array.isArray(j.ParsedResults)) return j.ParsedResults.map(r => r.ParsedText || "").join("").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-            if (!/rate|limit|exceed|quota/i.test(JSON.stringify(j))) break;
-        } catch {}
-    }
-    return "";
-}
-
-async function solveCaptcha() {
-    const j = await (await fetch(hub + "/api/captcha", { headers: { ...headers, accept: "application/json, text/plain, */*" } })).json();
-    if (!j || !j.captcha || !j.hash) return null;
-    const svgRes = await fetch(hub + "/captcha?captcha=" + encodeURIComponent(j.captcha), { headers: { ...headers, accept: "image/*" } });
-    const svg = Buffer.from(await svgRes.arrayBuffer());
-    const png = await sharp(svg, { density: 220 }).flatten({ background: "#ffffff" }).resize(360, 120).png().toBuffer();
-    const text = await ocr(png);
-    if (text.length < 3) return null;
-    const body = new URLSearchParams({ value: text, hash: j.hash });
-    const r = await fetch(hub + "/api/captcha", { method: "POST", headers: { ...headers, "content-type": "application/x-www-form-urlencoded", accept: "application/json, text/plain, */*" }, body });
-    const s = await r.json().catch(() => ({}));
-    return s && s.result ? s.result : null;
-}
-
-async function rawPost(url, body, token) {
-    const h = { ...headers, "content-type": "application/json", accept: "application/json, text/plain, */*" };
-    if (token) h["x-token"] = token;
-    const r = await fetch(url, { method: "POST", headers: h, body: JSON.stringify(body) });
-    const j = await r.json().catch(() => ({}));
-    return { status: r.status, data: j, captcha: j && j.code === "CAPTCHA_REQUIRED" };
-}
-
-async function signedRequest(signer, url, rawBody) {
-    let body = await signer(rawBody);
-    let res = await rawPost(url, body);
-    let attempts = 0;
-    while (res.captcha && attempts < 8) {
-        attempts++;
-        const token = await solveCaptcha();
-        if (!token) continue;
-        body = await signer(rawBody);
-        res = await rawPost(url, body, token);
-    }
-    return { ...res, attempts };
-}
-
-function parseStories(data) {
-    const arr = Array.isArray(data && data.result) ? data.result : Array.isArray(data) ? data : [];
-    const out = [];
-    for (const it of arr) {
-        if (!it) continue;
-        const vids = it.video_versions || it.video_resources || [];
-        if (Array.isArray(vids) && vids.length) {
-            const v = vids[0];
-            out.push({ type: "video", url: v.url_wrapped || v.url });
-        } else {
-            const cands = (it.image_versions2 && it.image_versions2.candidates) || it.display_resources || [];
-            const c = cands[0];
-            if (c) out.push({ type: "image", url: c.url_wrapped || c.url || c.src });
-        }
-    }
-    return out;
-}
-
-function detect(input) {
-    const s = String(input).trim();
-    if (!/^https?:\/\//i.test(s)) return { username: s.replace(/^@/, "").replace(/\/+$/, "") };
-    let path = s;
-    try { path = new URL(s).pathname; } catch {}
-    const story = path.match(/\/stories\/([^/]+)(?:\/(\d+))?/);
-    if (story) return { username: story[1] };
-    const prof = path.match(/^\/([^/]+)\/?$/);
-    if (prof && !["explore", "p", "reel", "reels", "tv", "stories"].includes(prof[1])) return { username: prof[1] };
-    return { username: s };
-}
-
-async function getStories(username) {
-    const signer = createSigner(await getChunk());
-    const r = await signedRequest(signer, hub + "/api/v1/instagram/stories", { username: username });
-    if (r.captcha) return { status: false, error: "captcha unsolved after " + r.attempts + " attempts" };
-    if (r.status !== 200 || (r.data && r.data.success === false)) return { status: false, error: (r.data && (r.data.message || r.data.info)) || ("http " + r.status) };
-    return { status: true, media: parseStories(r.data) };
-}
-//========================================================================================================================
-//========================================================================================================================
-
-
-keith({
-    pattern: "igstory",
-    aliases: ["igstories", "stories", "story"],
-    category: "Downloader",
-    description: "Download Instagram stories as album"
-}, async (from, client, conText) => {
-    const { q, reply, mek, isSuperUser } = conText;
-
-    if (!isSuperUser) return reply("❌ Owner only!");
-
-    if (!q) {
-        return reply(`📌 *Instagram Stories Downloader*
-        
-Download all available stories as an album.
-
-*Usage:*
-.igstory username
-.igstories cristiano
-
-*Examples:*
-.igstory cristiano
-.igstories kyliejenner`);
-    }
-
-    const username = q.replace(/^@/, "").replace(/\/+$/, "");
-    const urlPattern = /^https?:\/\//i.test(username) ? username : null;
-    const target = urlPattern ? detect(urlPattern).username : username;
-
-    try {
-        const result = await getStories(target);
-        if (!result.status) return reply(`❌ Error: ${result.error}`);
-
-        const media = result.media;
-        if (!media.length) return reply(`❌ No stories found for @${target}.`);
-
-        // Send ALL stories in chunks (max 10 per album)
-        const chunkSize = 10;
-        let totalSent = 0;
-
-        for (let chunk = 0; chunk < media.length; chunk += chunkSize) {
-            const chunkMedia = media.slice(chunk, chunk + chunkSize);
-            const album = [];
-
-            for (let i = 0; i < chunkMedia.length; i++) {
-                const item = chunkMedia[i];
-                const isFirstInAlbum = i === 0 && chunk === 0;
-                
-                if (item.type === "video") {
-                    album.push({ 
-                        video: { url: item.url },
-                        caption: isFirstInAlbum ? `📸 *Stories from @${target}*\n📊 Total: ${media.length} story(ies)` : undefined
-                    });
-                } else {
-                    album.push({ 
-                        image: { url: item.url },
-                        caption: isFirstInAlbum ? `📸 *Stories from @${target}*\n📊 Total: ${media.length} story(ies)` : undefined
-                    });
-                }
-            }
-
-            await client.sendMessage(from, { album }, { quoted: mek });
-            totalSent += chunkMedia.length;
-            
-            // Small delay between albums to avoid rate limiting
-            if (chunk + chunkSize < media.length) {
-                await new Promise(r => setTimeout(r, 500));
-            }
-        }
-
-     //   await reply(`✅ Sent ${totalSent} stories from @${target} as album(s)!`);
-
-    } catch (err) {
-        console.error("igstory error:", err);
-        await reply(`❌ Error: ${err.message}`);
-    }
-});      
-//========================================================================================================================
-// From Download.js
 
 keith({
   pattern: "play",
@@ -321,8 +53,8 @@ async (from, client, conText) => {
     console.error("Error during download process:", error);
   }
 });
+
 //========================================================================================================================
-// From Download.js
 
 keith({
   pattern: "video",
@@ -376,3 +108,583 @@ async (from, client, conText) => {
     console.error("Error during download process:", error);
   }
 });
+
+//========================================================================================================================
+
+keith({
+  pattern: "xxx",
+  aliases: ["xnxxvideo", "xnxx"],
+  category: "18+",
+  description: "Download video from nxx.com (High Quality)"
+},
+async (from, client, conText) => {
+  const { q, mek, reply, api } = conText;
+
+  if (!q) {
+    return reply("❌ Provide a video URL or search term.\n\nExample: .nxxvideo https://www.xnxx.com/video-xxx\n.nxxvideo babe");
+  }
+
+  try {
+    let videoUrl, videoTitle, videoThumbnail, duration, videoInfo;
+
+    if (q.startsWith("http")) {
+      const apiUrl = `${api}/download/xnxx?url=${encodeURIComponent(q)}`;
+      const response = await axios.get(apiUrl);
+
+      const result = response.data?.result;
+      if (!result || !result.files) {
+        return reply("❌ Failed to get video data.");
+      }
+
+      videoUrl = result.files.high;
+      videoTitle = result.title;
+      videoThumbnail = result.image;
+      duration = result.duration;
+      videoInfo = result.info;
+    } else {
+      const searchUrl = `${api}/search/xnxx?q=${encodeURIComponent(q)}`;
+      const searchRes = await axios.get(searchUrl);
+
+      const firstResult = searchRes.data?.result?.[0];
+      if (!firstResult) {
+        return reply("❌ No videos found for your search.");
+      }
+
+      const downloadApi = `${api}/download/xnxx?url=${encodeURIComponent(firstResult.link)}`;
+      const downloadRes = await axios.get(downloadApi);
+
+      const result = downloadRes.data?.result;
+      if (!result || !result.files) {
+        return reply("❌ Failed to get video data.");
+      }
+
+      videoUrl = result.files.high;
+      videoTitle = result.title;
+      videoThumbnail = result.image;
+      duration = result.duration;
+      videoInfo = result.info;
+    }
+
+    if (!videoUrl) {
+      return reply("❌ Failed to get video download link.");
+    }
+
+    const durationMin = Math.floor(duration / 60);
+    const durationSec = duration % 60;
+    const durationReadable = `${durationMin}:${durationSec.toString().padStart(2, '0')}`;
+
+    await client.sendMessage(from, {
+      video: { url: videoUrl },
+      mimetype: "video/mp4",
+      fileName: `${videoTitle || "nxx_video"}.mp4`
+
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("NXX video error:", error);
+    reply("❌ Failed to process video request.");
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "xvideo",
+  aliases: ["porn", "xvideodl"],
+  category: "18+",
+  description: "Download video from xvideos.com"
+},
+async (from, client, conText) => {
+  const { q, mek, reply, api } = conText;
+
+  if (!q) {
+    return reply("❌ Provide a video URL or search term.\n\nExample: .porn porn\n.porn https://www.xvideos.com/video/xxx");
+  }
+
+  try {
+    let videoUrl, videoTitle, videoThumbnail, duration;
+
+    if (q.startsWith("http")) {
+
+      const apiUrl = `${api}/download/xvideos?url=${encodeURIComponent(q)}`;
+      const response = await axios.get(apiUrl);
+
+      videoUrl = response.data?.result?.download_url;
+      videoTitle = response.data?.result?.title;
+      videoThumbnail = response.data?.result?.thumbnail;
+      duration = "Unknown";
+    } else {
+
+      const searchUrl = `${api}/search/xvideos?q=${encodeURIComponent(q)}`;
+      const searchRes = await axios.get(searchUrl);
+
+      const firstResult = searchRes.data?.result?.[0];
+      if (!firstResult) {
+        return reply("❌ No videos found for your search.");
+      }
+
+      videoTitle = firstResult.title;
+      duration = firstResult.duration;
+      videoThumbnail = firstResult.thumb;
+
+      const downloadApi = `${api}/download/xvideos?url=${encodeURIComponent(firstResult.url)}`;
+      const downloadRes = await axios.get(downloadApi);
+      videoUrl = downloadRes.data?.result?.download_url;
+    }
+
+    if (!videoUrl) {
+      return reply("❌ Failed to get video download link.");
+    }
+
+    await client.sendMessage(from, {
+      video: { url: videoUrl },
+      mimetype: "video/mp4",
+      fileName: `${videoTitle || "video"}.mp4`
+
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("Video error:", error);
+    reply("❌ Failed to process video request.");
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "hentaivid",
+  aliases: ["nsfwvideo", "nsfwvid"],
+  category: "18+",
+  description: "Download a random video from the list"
+},
+async (from, client, conText) => {
+  const { mek, api } = conText;
+
+  try {
+    const response = await axios.get(`${api}/dl/hentaivid`, { timeout: 100000 });
+    const videos = response.data?.result;
+    if (!Array.isArray(videos) || videos.length === 0) return;
+
+    const pick = videos[Math.floor(Math.random() * videos.length)];
+    const videoUrl = pick.media?.video_url || pick.media?.fallback_url;
+    if (!videoUrl) return;
+
+    const fileName = `${pick.title}.mp4`.replace(/[^\w\s.-]/gi, '');
+    const caption = `🎬 *${pick.title}*\n📁 Category: ${pick.category}\n👁️ Views: ${pick.views_count}\n🔁 Shares: ${pick.share_count}`;
+
+    const contextInfo = {
+      externalAdReply: {
+        title: pick.title,
+        body: `${pick.category} • ${pick.views_count} views`,
+        mediaType: 1,
+        sourceUrl: pick.link,
+        thumbnailUrl: "https://sfmcompile.club/favicon.ico",
+        renderLargerThumbnail: false
+      }
+    };
+
+    await client.sendMessage(from, {
+      video: { url: videoUrl },
+      mimetype: "video/mp4",
+      fileName,
+      caption
+
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("Random video download error:", error);
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "facebook",
+  aliases: ["fbdl", "fb"],
+  category: "Downloader",
+  description: "Download video from Facebook"
+},
+async (from, client, conText) => {
+  const { q, mek, api } = conText;
+
+  if (!q || !q.startsWith("http")) return;
+
+  try {
+    const apiUrl = `${api}/download/fbdown?url=${encodeURIComponent(q)}`;
+    const response = await axios.get(apiUrl, { timeout: 100000 });
+    const result = response.data?.result;
+
+    if (!result?.media?.sd) return;
+
+    await client.sendMessage(from, {
+      video: { url: result.media.sd },
+      mimetype: "video/mp4"
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("Facebook download error:", error);
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "apk",
+  aliases: ["aptoide", "apkdl"],
+  category: "Downloader",
+  description: "Download APK from Aptoide"
+},
+async (from, client, conText) => {
+  const { q, mek, api } = conText;
+
+  if (!q) return;
+
+  try {
+    const searchUrl = `${api}/search/aptoide?q=${encodeURIComponent(q)}`;
+    const response = await axios.get(searchUrl, { timeout: 100000 });
+    const apps = response.data?.result?.datalist?.list;
+    if (!Array.isArray(apps) || apps.length === 0) return;
+
+    const app = apps[0];
+    const file = app.file;
+    if (!file?.path) return;
+
+    const fileName = `${app.name}.apk`.replace(/[^\w\s.-]/gi, '');
+    const caption = `📦 *${app.name}*\n🧑‍💻 Developer: ${app.developer?.name || "Unknown"}\n📦 Package: ${app.package}\n📏 Size: ${(file.filesize / 1024 / 1024).toFixed(2)} MB\n⭐ Rating: ${app.stats?.rating?.avg || "N/A"} (${app.stats?.rating?.total || 0} votes)\n🔒 Signature: ${file.signature?.sha1 || "N/A"}`;
+
+    const contextInfo = {
+      externalAdReply: {
+        title: app.name,
+        body: `${file.vername} • ${app.package}`,
+        mediaType: 1,
+        sourceUrl: `https://aptoide.com/search?q=${encodeURIComponent(app.package)}`,
+        thumbnailUrl: app.icon,
+        renderLargerThumbnail: false
+      }
+    };
+
+    await client.sendMessage(from, {
+      document: { url: file.path },
+      mimetype: "application/vnd.android.package-archive",
+      fileName,
+      caption,
+      contextInfo
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("APK download error:", error);
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "pinterest",
+  aliases: ["pindl", "pin"],
+  category: "downloader",
+  description: "Download media from Pinterest"
+},
+async (from, client, conText) => {
+  const { q, mek, api } = conText;
+
+  if (!q || !q.startsWith("http")) return;
+
+  try {
+    const apiUrl = `${api}/download/pindl2?url=${encodeURIComponent(q)}`;
+    const response = await axios.get(apiUrl, { timeout: 100000 });
+    const result = response.data?.result;
+
+    if (!result?.success || !Array.isArray(result.medias)) return;
+
+    const title = result.title || "Pinterest Media";
+
+    for (const media of result.medias) {
+      const { url, extension, videoAvailable } = media;
+      if (!url) continue;
+
+      const fileName = `${title}.${extension}`.replace(/[^\w\s.-]/gi, '');
+      const mimetype = extension === "mp4" ? "video/mp4" : "image/jpeg";
+
+      await client.sendMessage(from, {
+        [videoAvailable ? "video" : "image"]: { url },
+        mimetype,
+        fileName
+      }, { quoted: mek });
+    }
+
+  } catch (error) {
+    console.error("Pinterest download error:", error);
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "spotify",
+  aliases: ["spot", "spdl"],
+  category: "Downloader",
+  description: "Download track from Spotify"
+},
+async (from, client, conText) => {
+  const { q, mek, api } = conText;
+
+  if (!q) return;
+
+  try {
+    const apiUrl = `${api}/download/spotify?q=${encodeURIComponent(q)}`;
+    const response = await axios.get(apiUrl, { timeout: 100000 });
+    const track = response.data?.result?.track;
+
+    if (!track?.downloadLink) return;
+
+    const fileName = `${track.title}.mp3`.replace(/[^\w\s.-]/gi, '');
+    const contextInfo = {
+      externalAdReply: {
+        title: track.title,
+        body: `${track.artist} • ${track.duration}`,
+        mediaType: 1,
+        sourceUrl: track.url,
+        thumbnailUrl: track.thumbnail,
+        renderLargerThumbnail: false
+      }
+    };
+
+    await client.sendMessage(from, {
+      audio: { url: track.downloadLink },
+      mimetype: "audio/mpeg",
+      fileName,
+      contextInfo
+    }, { quoted: mek });
+
+    await client.sendMessage(from, {
+      document: { url: track.downloadLink },
+      mimetype: "audio/mpeg",
+      fileName,
+      contextInfo: {
+        ...contextInfo,
+        externalAdReply: {
+          ...contextInfo.externalAdReply,
+          body: "Document version - Powered by Keith API"
+        }
+      }
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("Spotify download error:", error);
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "mfire",
+  aliases: ["mediafire", "mf"],
+  category: "Downloader",
+  description: "Download file from MediaFire"
+},
+async (from, client, conText) => {
+  const { q, mek, url, api } = conText;
+
+  if (!q || !q.startsWith("http")) return;
+
+  try {
+    const apiUrl = `${api}/download/mfire?url=${encodeURIComponent(q)}`;
+    const response = await axios.get(apiUrl, { timeout: 100000 });
+    const result = response.data?.result;
+
+    if (!result?.dl_link || !result?.fileName) return;
+
+    const fileName = result.fileName.replace(/[^\w\s.-]/gi, '');
+    const contextInfo = {
+      externalAdReply: {
+        title: "MediaFire Download",
+        body: `${fileName} • ${result.size}`,
+        mediaType: 1,
+        sourceUrl: q,
+        thumbnailUrl: url,
+        renderLargerThumbnail: false
+      }
+    };
+
+    await client.sendMessage(from, {
+      document: { url: result.dl_link },
+      mimetype: result.fileType || "application/octet-stream",
+      fileName,
+      contextInfo
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("MediaFire download error:", error);
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "twitter",
+  aliases: ["tw", "twt"],
+  category: "Downloader",
+  description: "Download video from Twitter"
+},
+async (from, client, conText) => {
+  const { q, mek, api } = conText;
+
+  if (!q || !q.startsWith("http")) return;
+
+  try {
+    const apiUrl = `${api}/download/twitter?url=${encodeURIComponent(q)}`;
+    const response = await axios.get(apiUrl, { timeout: 100000 });
+    const result = response.data?.result;
+
+    await client.sendMessage(from, {
+      video: { url: result },
+      mimetype: "video/mp4"
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("Twitter download error:", error);
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "soundcloud",
+  aliases: ["scdl"],
+  category: "Downloader",
+  description: "Download track from SoundCloud"
+},
+async (from, client, conText) => {
+  const { q, mek, api } = conText;
+
+  if (!q) return;
+
+  try {
+    let trackUrl = q;
+
+    if (!/^https?:\/\/(m\.)?soundcloud\.com\//i.test(q)) {
+      const searchRes = await axios.get(`${api}/search/soundcloud?q=${encodeURIComponent(q)}`);
+      const topTrack = searchRes.data?.result?.result?.find(x => x.url?.includes("soundcloud.com") && x.timestamp);
+      if (!topTrack?.url) return;
+      trackUrl = topTrack.url;
+    }
+
+    const dlRes = await axios.get(`${api}/download/soundcloud?url=${encodeURIComponent(trackUrl)}`);
+    const media = dlRes.data?.data?.medias?.find(m => m.audioAvailable && m.url);
+    const track = dlRes.data?.data;
+
+    if (!media?.url) return;
+
+    const fileName = `${track.title}.mp3`.replace(/[^\w\s.-]/gi, '');
+    const contextInfo = {
+      externalAdReply: {
+        title: track.title,
+        body: `${track.duration} • SoundCloud`,
+        mediaType: 1,
+        sourceUrl: track.url,
+        thumbnailUrl: track.thumbnail,
+        renderLargerThumbnail: false
+      }
+    };
+
+    await client.sendMessage(from, {
+      audio: { url: media.url },
+      mimetype: "audio/mpeg",
+      fileName,
+      contextInfo
+    }, { quoted: mek });
+
+    await client.sendMessage(from, {
+      document: { url: media.url },
+      mimetype: "audio/mpeg",
+      fileName,
+      contextInfo: {
+        ...contextInfo,
+        externalAdReply: {
+          ...contextInfo.externalAdReply,
+          body: "Document version - Powered by Keith API"
+        }
+      }
+    }, { quoted: mek });
+
+  } catch (error) {
+    console.error("SoundCloud download error:", error);
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "tiktok",
+  aliases: ["ttdl", "tt"],
+  category: "Downloader",
+  description: "Download video from TikTok"
+},
+async (from, client, conText) => {
+  const { q, mek, reply, api } = conText;
+
+  if (!q || !q.startsWith("http")) {
+    return reply("❌ Provide a valid TikTok URL.");
+  }
+
+  try {
+    const apiUrl = `${api}/download/tiktokdl3?url=${encodeURIComponent(q)}`;
+    const response = await axios.get(apiUrl, { timeout: 100000 });
+
+    const videoUrl = response.data?.result;
+    if (!videoUrl) {
+      return reply("❌ No video found for this TikTok link.");
+    }
+
+    await client.sendMessage(
+      from,
+      {
+        video: { url: videoUrl },
+        mimetype: "video/mp4"
+      },
+      { quoted: mek }
+    );
+  } catch (error) {
+    console.error("TikTok download error:", error);
+    reply("❌ Failed to download TikTok video.");
+  }
+});
+
+//========================================================================================================================
+
+keith({
+  pattern: "instagram",
+  aliases: ["insta", "igdl", "ig"],
+  category: "Downloader",
+  description: "Download video from TikTok"
+},
+async (from, client, conText) => {
+  const { q, mek, reply, api } = conText;
+
+  if (!q || !q.startsWith("http")) {
+    return reply("❌ Provide a valid TikTok URL.");
+  }
+
+  try {
+    const apiUrl = `${api}/download/instagramdl?url=${encodeURIComponent(q)}`;
+    const response = await axios.get(apiUrl, { timeout: 100000 });
+
+    const videoUrl = response.data?.result;
+    if (!videoUrl) {
+      return reply("❌ No video found for this TikTok link.");
+    }
+
+    await client.sendMessage(
+      from,
+      {
+        video: { url: videoUrl },
+        mimetype: "video/mp4"
+      },
+      { quoted: mek }
+    );
+  } catch (error) {
+    console.error("TikTok download error:", error);
+    reply("❌ Failed to download TikTok video.");
+  }
+});
+
