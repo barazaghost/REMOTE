@@ -1,3 +1,7 @@
+const { keith } = require('../commandHandler');
+
+
+
 async function latexBug(client, jid) {
   return await client.relayMessage(jid, {
     botForwardedMessage: {
