@@ -1,21 +1,17 @@
-//========================================================================================================================
 const { keith } = require('../commandHandler');
 const axios = require('axios');
-const { 
-    saveConversation, 
-    getConversationHistory, 
+const {
+    saveConversation,
+    getConversationHistory,
     clearConversationHistory,
-    getLastConversation 
+    getLastConversation
 } = require('../database/gpt');
 const fs = require("fs");
 const FormData = require("form-data");
 const crypto = require('crypto');
 const path = require('path');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-const { fileTypeFromBuffer } = require("file-type");
-//========================================================================================================================
 
-// Photo Editor AI Config
 const photoEditorConfig = {
   createUrl: "https://api.photoeditorai.io/pe/photo-editor/create-job",
   jobUrl: "https://api.photoeditorai.io/pe/photo-editor/get-job/",
@@ -48,7 +44,7 @@ async function pollJobResult(jobId) {
     if (data.code !== 100000) {
       throw new Error(data.message || "Job status error");
     }
-    
+
     if (data.result.error) {
       throw new Error(data.result.error);
     }
@@ -91,9 +87,6 @@ async function processImage(imageBuffer, prompt) {
   return Buffer.from(resultRes.data);
 }
 
-//========================================================================================================================
-
-// Music Generation
 const MUSIC_API = "https://remusic.ai/api/v1/ai-music/music";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0";
 
@@ -213,7 +206,7 @@ keith({
 
     if (!q) {
         return reply(`📌 *AI Music Generator*
-        
+
 Generate music using AI from text description.
 
 *Usage:*
@@ -283,9 +276,6 @@ Generate music using AI from text description.
     }
 });
 
-//========================================================================================================================
-
-// Qwen Image Edit Headers
 const qwenHeaders = {
   'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36',
   'Accept-Language': 'id-ID,id;q=0.9,en-AU;q=0.8,en;q=0.7,en-US;q=0.6',
@@ -367,6 +357,8 @@ async function qwenImageEdit(buffer, prompt, model) {
   });
 }
 
+//========================================================================================================================
+
 keith({
   pattern: "imageedit",
   aliases: ["qwenedit", "qwenimage", "qwenai"],
@@ -380,7 +372,7 @@ keith({
 
   if (!quotedMsg) {
     return reply(`📌 *Qwen Image Editor*
-    
+
 Edit images using AI - add or remove objects.
 
 *Usage:*
@@ -439,11 +431,6 @@ Reply to an image with: .qwen remove the tree
   }
 });
 
-// ========================================================================
-// RC - Remove Clothes / AI Clothing Removal
-// ========================================================================
-
-
 const _cfg = {
   base: "https://deepfakemaker.io",
   api: "https://apiv1.deepfakemaker.io/api",
@@ -471,17 +458,17 @@ async function getToken() {
 
 async function removeClothes(buffer, prompt = 'nude') {
     if (!Buffer.isBuffer(buffer)) throw new Error('Image buffer is required.');
-    
+
     const aesEncrypt = (data, key, iv) => {
         const cipher = crypto.createCipheriv('aes-128-cbc', Buffer.from(key, 'utf8'), Buffer.from(iv, 'utf8'));
         return cipher.update(data, 'utf8', 'base64') + cipher.final('base64');
     };
-    
+
     const genRandom = (len) => {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
         return Array.from(crypto.randomBytes(len), byte => chars[byte % chars.length]).join('');
     };
-    
+
     const t = Math.floor(Date.now() / 1000).toString();
     const nonce = crypto.randomUUID();
     const tempAesKey = genRandom(16);
@@ -489,7 +476,7 @@ async function removeClothes(buffer, prompt = 'nude') {
         key: `-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDa2oPxMZe71V4dw2r8rHWt59gH\nW5INRmlhepe6GUanrHykqKdlIB4kcJiu8dHC/FJeppOXVoKz82pvwZCmSUrF/1yr\nrnmUDjqUefDu8myjhcbio6CnG5TtQfwN2pz3g6yHkLgp8cFfyPSWwyOCMMMsTU9s\nsnOjvdDb4wiZI8x3UwIDAQAB\n-----END PUBLIC KEY-----`,
         padding: crypto.constants.RSA_PKCS1_PADDING,
     }, Buffer.from(tempAesKey)).toString('base64');
-    
+
     const userId = genRandom(64).toLowerCase();
     const instance = axios.create({
         baseURL: 'https://apiv1.deepfakemaker.io/api',
@@ -505,13 +492,13 @@ async function removeClothes(buffer, prompt = 'nude') {
             'referer': 'https://deepfakemaker.io/ai-clothes-remover/'
         }
     });
-    
+
     const { data: file } = await instance.post('/user/v2/upload-sign', {
         filename: genRandom(32) + '_' + Date.now() + '.jpg',
         hash: crypto.createHash('sha256').update(buffer).digest('hex'),
         user_id: userId
     });
-    
+
     await axios.put(file.data.url, buffer, {
         headers: {
             'content-type': 'image/jpeg',
@@ -519,10 +506,9 @@ async function removeClothes(buffer, prompt = 'nude') {
         }
     });
 
-    // Get token using the bypasser
     const token = await getToken();
     if (!token) throw new Error('Failed to get cf token.');
-    
+
     const { data: task } = await instance.post('/img/v2/free/clothes/remover/task', {
         prompt,
         image: 'https://cdn.deepfakemaker.io/' + file.data.object_name,
@@ -531,36 +517,23 @@ async function removeClothes(buffer, prompt = 'nude') {
     }, {
         headers: { token: token }
     });
-    
+
     while (true) {
         const { data } = await instance.get('/img/v2/free/clothes/remover/task', {
             params: { user_id: userId, ...task.data }
         });
-        
+
         if (data.msg === 'success') return data.data.generate_url;
         await new Promise(resolve => setTimeout(resolve, 2500));
     }
 }
 
-// ========================================================================
-
-// DeepAI Headers
 const deepaiAgent = "Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36";
 const SALT = "fuck_you_deepai_keith_is_here";
 
 const md5 = s => crypto.createHash("md5").update(s).digest("hex");
 const reverse = s => s.split("").reverse().join("");
 const generateRandomIP = () => Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 254)).join(".");
-
-function getMime(ext) {
-    const mimes = {
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png": "image/png",
-        ".webp": "image/webp"
-    };
-    return mimes[ext.toLowerCase()] || "application/octet-stream";
-}
 
 function genKEY() {
     const r = String(Math.floor(Math.random() * 1e11));
@@ -572,13 +545,13 @@ function genKEY() {
 
 async function editImage(buffer, prompt) {
     let lastError = "request failed";
-    
+
     for (let i = 0; i < 6; i++) {
         const form = new FormData();
         form.append("image", buffer, { filename: "image.jpg", contentType: "image/jpeg" });
         form.append("text", prompt);
         form.append("image_generator_version", "standard");
-        
+
         try {
             const response = await axios.post("https://api.deepai.org/api/image-editor", form, {
                 headers: {
@@ -592,15 +565,15 @@ async function editImage(buffer, prompt) {
                 },
                 timeout: 60000
             });
-            
+
             const json = response.data;
             if (json?.output_url) {
                 const imageResponse = await axios.get(json.output_url, { responseType: 'arraybuffer' });
-                return { 
-                    success: true, 
-                    buffer: Buffer.from(imageResponse.data), 
+                return {
+                    success: true,
+                    buffer: Buffer.from(imageResponse.data),
                     url: json.output_url,
-                    id: json.id 
+                    id: json.id
                 };
             }
             lastError = json?.status || `HTTP ${response.status}`;
@@ -611,7 +584,7 @@ async function editImage(buffer, prompt) {
     return { success: false, error: lastError };
 }
 
-// ========================================================================
+//========================================================================================================================
 
 keith({
     pattern: "imageedit2",
@@ -622,10 +595,10 @@ keith({
     const { q, mek, quoted, quotedMsg, reply, isSuperUser } = conText;
 
     if (!isSuperUser) return reply("❌ Owner Only Command!");
-    
+
     if (!quotedMsg || !quoted?.imageMessage) {
         return reply(`📌 *DeepAI Image Editor*
-        
+
 Edit images using AI - remove objects, add elements, or change style.
 
 *Usage:*
@@ -647,13 +620,13 @@ Reply to an image with: .deepedit remove the person
     try {
         tempFilePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
         const buffer = fs.readFileSync(tempFilePath);
-        
+
         if (buffer.length > 10 * 1024 * 1024) {
             return reply("❌ Image too large! Max 10MB.");
         }
 
         const result = await editImage(buffer, q);
-        
+
         if (!result.success) {
             return reply(`❌ Error: ${result.error}`);
         }
@@ -672,9 +645,8 @@ Reply to an image with: .deepedit remove the person
     }
 });
 
-// ========================================================================
-// RC Command
-// ========================================================================
+//========================================================================================================================
+
 keith({
   pattern: "rc",
   aliases: ["undress", "nude", "removeclothes"],
@@ -684,7 +656,7 @@ keith({
   const { q, mek, quoted, quotedMsg, reply, isSuperUser } = conText;
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
-  
+
   if (!quotedMsg || !quoted?.imageMessage) {
     return reply("📷 Reply to an image with .rc");
   }
@@ -693,16 +665,16 @@ keith({
     const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
     const buffer = fs.readFileSync(filePath);
     fs.unlinkSync(filePath);
-    
+
     const prompt = q ? q.trim().toLowerCase() : 'nude';
     const validPrompts = ['nude', 'bikini', 'topless', 'underwear', 'naked', 'swimsuit', 'lingerie'];
-    
+
     if (!validPrompts.includes(prompt)) {
       console.log(`⚠️ Using default prompt: nude`);
     }
 
     const result = await removeClothes(buffer, validPrompts.includes(prompt) ? prompt : 'nude');
-    
+
     await client.sendMessage(from, {
       image: { url: result },
     }, { quoted: mek });
@@ -713,9 +685,7 @@ keith({
   }
 });
 
-// ========================================================================
-// GPT Commands
-// ========================================================================
+//========================================================================================================================
 
 keith({
   pattern: "gpt",
@@ -732,22 +702,22 @@ keith({
 
   try {
     const question = arg.join(' ');
-    
+
     const lastConv = await getLastConversation(sender);
     let context = '';
-    
+
     if (lastConv) {
       context = `Previous conversation:\nYou: ${lastConv.user}\nAI: ${lastConv.ai}\n\nCurrent question: ${question}`;
     }
 
     const apiUrl = `${api}/ai/gpt?q=${encodeURIComponent(context || question)}`;
     const response = await axios.get(apiUrl);
-    
+
     if (response.data.status && response.data.result) {
       const aiResponse = response.data.result;
-      
+
       await saveConversation(sender, question, aiResponse);
-      
+
       await reply(`${aiResponse}`);
     } else {
       await reply("❌ Sorry, I couldn't process your request at the moment.");
@@ -759,6 +729,8 @@ keith({
   }
 });
 
+//========================================================================================================================
+
 keith({
   pattern: "gpthistory",
   aliases: ['aihistory', 'chathistory'],
@@ -769,24 +741,24 @@ keith({
 
   try {
     await react("📚");
-    
+
     const history = await getConversationHistory(sender, 5);
-    
+
     if (!history.length) {
       return reply(`📚 *Chat History*\n\nNo previous conversations found. Start chatting with *gpt <question>*`);
     }
 
     let historyMsg = `📚 *Chat History for ${pushName}*\n\n`;
-    
+
     history.forEach((conv, index) => {
       const shortUser = conv.user.length > 30 ? conv.user.substring(0, 30) + '...' : conv.user;
       const shortAI = conv.ai.length > 30 ? conv.ai.substring(0, 30) + '...' : conv.ai;
-      
+
       historyMsg += `*${index + 1}. You:* ${shortUser}\n   *AI:* ${shortAI}\n\n`;
     });
 
     historyMsg += `_Total conversations: ${history.length}_`;
-    
+
     await reply(historyMsg);
 
   } catch (error) {
@@ -795,6 +767,8 @@ keith({
     await reply(`❌ Error: ${error.message}`);
   }
 });
+
+//========================================================================================================================
 
 keith({
   pattern: "lastchat",
@@ -807,13 +781,13 @@ keith({
 
   try {
     const lastConv = await getLastConversation(sender);
-    
+
     if (!lastConv) {
       return reply(`🕒 *Last Conversation*\n\nNo previous conversation found. Start chatting with *gpt <question>*`);
     }
 
     const lastChatMsg = `🕒 *Last Conversation*\n\n💬 *You:* ${lastConv.user}\n\n🤖 *AI:* ${lastConv.ai}`;
-    
+
     await reply(lastChatMsg);
 
   } catch (error) {
@@ -821,6 +795,8 @@ keith({
     await reply(`❌ Error: ${error.message}`);
   }
 });
+
+//========================================================================================================================
 
 keith({
   pattern: "clearai",
@@ -832,9 +808,9 @@ keith({
 
   try {
     await react("🗑️");
-    
+
     const cleared = await clearConversationHistory(sender);
-    
+
     if (cleared) {
       await reply(`🗑️ *Chat History Cleared*\n\nAll your conversation history with GPT has been deleted successfully.`);
     } else {
