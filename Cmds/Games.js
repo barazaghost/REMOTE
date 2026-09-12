@@ -49,58 +49,91 @@ async function sendGame(from, client, mek, url, label, idPrefix, trusted = ["git
   await client.relayMessage(from, content, {});
 }
 
-// Bubble Shooter
-keith({
-  pattern: "bubble",
-  aliases: ["bubbleshooter","bubblegame","shootbubble"],
-  category: "Game",
-  description: "Play Bubble Shooter",
-  filename: __filename
-}, async (from, client, { mek, reply }) => {
-  try { await sendGame(from, client, mek, 
-    "https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/Cmds/games/bubbleshooter.html", 
-    "🎮 Bubble Shooter", "bubblegame"); 
-  } catch (err) { reply(`❌ Error: ${err.message}`); }
-});
+// Game configs with aliases
+const games = {
+  bubble: {
+    url: "https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/Cmds/games/bubbleshooter.html",
+    label: "🎮 Bubble Shooter",
+    id: "bubblegame",
+    aliases: ["bubbleshooter","bubblegame","shootbubble"]
+  },
+  tictactoe: {
+    url: "https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/Cmds/games/tictactoe.html",
+    label: "🎮 Tic Tac Toe",
+    id: "tictactoe",
+    aliases: ["ttt","ttc","xoxo"]
+  },
+  hillclimber: {
+    url: "https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/Cmds/games/hillclimber.html",
+    label: "🏔️ Hill Climber",
+    id: "hillclimber",
+    aliases: ["hillclimb","hcr","climber"],
+    trusted: ["github.com","raw.githubusercontent.com","keithkeizzah.site"]
+  },
+  turborace: {
+    url: "https://github.com/kkeizzahB/RAW/raw/refs/heads/main/Cmds/games/turborace.html",
+    label: "🏎️ Turbo Race",
+    id: "turbo",
+    aliases: ["turbo","carrace","racingcar"],
+    trusted: ["github.com","raw.githubusercontent.com","keithkeizzah.site"]
+  },
+  blockbuster: {
+    url: "https://github.com/kkeizzahB/RAW/raw/refs/heads/main/Cmds/games/blockbuster.html",
+    label: "🎬 Blockbuster",
+    id: "blockbuster",
+    aliases: ["block","buster","moviegame"]
+  },
+  cardriver: {
+    url: "https://github.com/kkeizzahB/RAW/raw/refs/heads/main/Cmds/games/cardriver.html",
+    label: "🚗 Car Driver",
+    id: "cardriver",
+    aliases: ["driver","car","drivegame"]
+  },
+  chess: {
+    url: "https://github.com/kkeizzahB/RAW/raw/refs/heads/main/Cmds/games/chess.html",
+    label: "♟️ Chess",
+    id: "chess",
+    aliases: ["chessgame","boardchess"]
+  },
+  fruitmatch: {
+    url: "https://github.com/kkeizzahB/RAW/raw/refs/heads/main/Cmds/games/fruitmatch.html",
+    label: "🍓 Fruit Match",
+    id: "fruitmatch",
+    aliases: ["fruit","matchfruit","fruitgame"]
+  },
+  geometrydash: {
+    url: "https://github.com/kkeizzahB/RAW/raw/refs/heads/main/Cmds/games/geometrydash.html",
+    label: "📐 Geometry Dash",
+    id: "geometrydash",
+    aliases: ["geo","dash","gdash"]
+  },
+  plane: {
+    url: "https://github.com/kkeizzahB/RAW/raw/refs/heads/main/Cmds/games/plane.html",
+    label: "✈️ Plane Game",
+    id: "plane",
+    aliases: ["plane","fly","airgame"]
+  },
+  tetris: {
+    url: "https://github.com/kkeizzahB/RAW/raw/refs/heads/main/Cmds/games/tetris.html",
+    label: "🧩 Tetris",
+    id: "tetris",
+    aliases: ["tet","blocks","tetrisgame"]
+  }
+};
 
-// Tic Tac Toe
-keith({
-  pattern: "tictactoe",
-  aliases: ["ttt","ttc","xoxo"],
-  category: "Game",
-  description: "Play Tic Tac Toe",
-  filename: __filename
-}, async (from, client, { mek, reply }) => {
-  try { await sendGame(from, client, mek, 
-    "https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/Cmds/games/tictactoe.html", 
-    "🎮 Tic Tac Toe", "tictactoe"); 
-  } catch (err) { reply(`❌ Error: ${err.message}`); }
-});
-
-// Hill Climber
-keith({
-  pattern: "hillclimber",
-  aliases: ["hillclimb","hcr","climber"],
-  category: "Game",
-  description: "Play Hill Climber Racing",
-  filename: __filename
-}, async (from, client, { mek, reply }) => {
-  try { await sendGame(from, client, mek, 
-    "https://raw.githubusercontent.com/kkeizzahB/RAW/refs/heads/main/Cmds/games/hillclimber.html", 
-    "🏔️ Hill Climber", "hillclimber", ["github.com","raw.githubusercontent.com","keithkeizzah.site"]); 
-  } catch (err) { reply(`❌ Error: ${err.message}`); }
-});
-
-// Turbo Race
-keith({
-  pattern: "turborace",
-  aliases: ["turbo","carrace","racingcar"],
-  category: "Game",
-  description: "Play Turbo Race",
-  filename: __filename
-}, async (from, client, { mek, reply }) => {
-  try { await sendGame(from, client, mek, 
-    "https://github.com/kkeizzahB/RAW/raw/refs/heads/main/Cmds/games/turborace.html", 
-    "🏎️ Turbo Race", "turbo", ["github.com","raw.githubusercontent.com","keithkeizzah.site"]); 
-  } catch (err) { reply(`❌ Error: ${err.message}`); }
-});
+// Auto-register each game
+for (const [pattern, cfg] of Object.entries(games)) {
+  keith({
+    pattern,
+    aliases: cfg.aliases,
+    category: "Game",
+    description: `Play ${cfg.label.replace(/^[^ ]+ /,'')}`,
+    filename: __filename
+  }, async (from, client, { mek, reply }) => {
+    try {
+      await sendGame(from, client, mek, cfg.url, cfg.label, cfg.id, cfg.trusted);
+    } catch (err) {
+      reply(`❌ Error: ${err.message}`);
+    }
+  });
+}
