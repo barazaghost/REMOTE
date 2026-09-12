@@ -384,66 +384,82 @@ const formatSize = (bytes) => {
   return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
 };
 
+
 keith({
   pattern: "test",
-  aliases: ["botstatus", "alive"],
-  description: "Display bot system information",
+  aliases: ["stats", "monitor", "serverinfo", "botstats"],
   category: "System",
-  filename: __filename
+  description: "Real-time bot dashboard with RAM, CPU, uptime"
 }, async (from, client, conText) => {
-  const { reply, isSuperUser } = conText;
-  if (!isSuperUser) return reply("❌ You need superuser privileges to view system status.");
+  const { mek, reply } = conText;
 
-  const start = now();
-
-  const uptime = process.uptime();
-  const formattedUptime = formatUptime(uptime);
-
-  const totalRam = os.totalmem();
-  const freeRam = os.freemem();
-  const usedRam = totalRam - freeRam;
-
-  const memory = process.memoryUsage();
-  const heapUsed = formatSize(memory.heapUsed);
-  const heapTotal = formatSize(memory.heapTotal);
-
-  let disk = { size: "N/A", free: "N/A" };
   try {
-    const { stdout } = await execAsync('df -h --total | grep total');
-    const parts = stdout.trim().split(/\s+/);
-    disk.size = parts[1];
-    disk.free = parts[3];
+    // Fetch your hosted HTML template
+    const { data: template } = await axios.get(
+      "https://github.com/kkeizzahB/RAW/raw/refs/heads/main/Cmds/games/botstats.html"
+    );
+
+    // Collect metrics
+    const latency = Date.now() - (mek.messageTimestamp ? Number(mek.messageTimestamp) * 1000 : Date.now());
+    const heapUsed = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
+    const rssMem = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
+
+    // Replace placeholders in your HTML
+    const payload = template
+      .replace(/%LATENCY%/g, latency)
+      .replace(/%PLATFORM%/g, os.platform())
+      .replace(/%OS_INFO%/g, `${os.platform()} ${os.release()}`)
+      .replace(/%ARCH_INFO%/g, os.arch())
+      .replace(/%CPU_CORES%/g, os.cpus().length || 1)
+      .replace(/%HEAP_USED%/g, heapUsed)
+      .replace(/%RSS_MEM%/g, rssMem)
+      .replace(/%NODE_INFO%/g, `Node ${process.version}`)
+      .replace(/%BOTUPTIME%/g, process.uptime().toFixed(0))
+      .replace(/%SYSTEMUPTIME%/g, os.uptime().toFixed(0));
+
+    // Build rich response
+    const responseId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+    const responseData = {
+      response_id: responseId,
+      sections: [{
+        view_model: {
+          primitive: {
+            __typename: "GenAIaeacdsnwHtmlPrimitive",
+            payload,
+            trusted_sources: ["github.com", "raw.githubusercontent.com"]
+          },
+          __typename: "GenAISingleLayoutViewModel"
+        }
+      }]
+    };
+
+    const dataBase64 = Buffer.from(JSON.stringify(responseData)).toString('base64');
+
+    await client.relayMessage(from, {
+      messageContextInfo: {
+        deviceListMetadata: {},
+        deviceListMetadataVersion: 2,
+        botMetadata: { messageDisclaimerText: "", botResponseId: responseId }
+      },
+      botForwardedMessage: {
+        message: {
+          richResponseMessage: {
+            messageType: 1,
+            submessages: [{ messageType: 2, messageText: "📊 Bot Dashboard" }],
+            unifiedResponse: { data: dataBase64 },
+            contextInfo: {
+              forwardingScore: 1,
+              isForwarded: true,
+              forwardedAiBotMessageInfo: { botJid: "867051314767696@bot" },
+              forwardOrigin: 4
+            }
+          }
+        }
+      }
+    }, { messageId: responseId });
+
   } catch (err) {
-    console.error("Disk usage error:", err);
+    console.error("botstats error:", err);
+    await reply(`❌ Error fetching bot stats: ${err.message}`);
   }
-
-  let download = "N/A", upload = "N/A";
-  try {
-    const { stdout } = await execAsync("vnstat --oneline | awk -F';' '{print $4, $6}'");
-    const [dl, ul] = stdout.trim().split(" ");
-    download = dl || "N/A";
-    upload = ul || "N/A";
-  } catch (err) {
-    console.error("Network stats error:", err);
-  }
-
-  const ping = `${(now() - start).toFixed(2)} ms`;
-
-  const status = `📊 *Bot Status*\n\n` +
-    `🔸 *Ping:* ${ping}\n` +
-    `🔸 *Uptime:* ${formattedUptime}\n` +
-    `🔸 *RAM Usage:* ${formatSize(usedRam)} / ${formatSize(totalRam)}\n` +
-    `🔸 *Free RAM:* ${formatSize(freeRam)}\n` +
-    `🔸 *Process Memory:* ${heapUsed} / ${heapTotal}\n` +
-    `🔸 *Disk Usage:* ${disk.size} / ${disk.free}\n` +
-    `🔸 *Platform:* ${os.platform()}\n` +
-    `🔸 *NodeJS:* ${process.version}\n` +
-    `🔸 *CPU:* ${os.cpus()[0].model}\n` +
-    `🔸 *Downloaded:* ${download}\n` +
-    `🔸 *Uploaded:* ${upload}`;
-
-  await reply(status);
 });
-
-
-
