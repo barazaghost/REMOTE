@@ -3319,8 +3319,8 @@ if (connection === "open") {
     ║ ᴍᴏᴅᴇ ${currentMode}
     ║ ᴘʀᴇғɪx [ ${currentPrefix} ] 
     ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
-    ║ join
-    ║ t.me/keithmd
+    ║ host your bot here
+    ║ hosting.keithsite.lol 
     ╰═════════════⊷
 `;
 
