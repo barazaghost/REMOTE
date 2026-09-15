@@ -1204,78 +1204,37 @@ keith({
 });
 //========================================================================================================================
 
+
 keith({
   pattern: "yts",
-  aliases: ["ytsearch", "ytfind"],
+  aliases: ["ytsearch"],
   category: "Search",
-  description: "Search YouTube videos"
-},
-async (from, client, conText) => {
-  const { q, mek, api } = conText;
-  if (!q) return;
+  description: "Search YouTube videos",
+  filename: __filename
+}, async (from, client, { q, reply, api }) => {
+  if (!q) return reply("📌 Usage: .yts <query>\nExample: .yts spectre");
 
   try {
-    const apiUrl = `${api}/search/yts?query=${encodeURIComponent(q)}`;
-    const res = await axios.get(apiUrl, { timeout: 100000 });
-    const results = res.data?.result;
+    const { data } = await axios.get(`${api}/search/yts?query=${encodeURIComponent(q)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      timeout: 30000
+    });
 
-    if (!Array.isArray(results) || results.length === 0) return;
+    if (!data?.status || !data.result?.length) return reply("❌ No results found.");
 
-    const videos = results.slice(0, 8);
-    const cards = await Promise.all(videos.map(async (vid, i) => ({
-      header: {
-        title: `🎬 ${vid.title}`,
-        hasMediaAttachment: true,
-        imageMessage: (await generateWAMessageContent({ image: { url: vid.thumbnail } }, {
-          upload: client.waUploadToServer
-        })).imageMessage
-      },
-      body: {
-        text: `📺 Duration: ${vid.duration}\n👁️ Views: ${vid.views}${vid.published ? `\n📅 Published: ${vid.published}` : ""}`
-      },
-      footer: { text: "🔹 Scroll to explore more videos" },
-      nativeFlowMessage: {
-        buttons: [
-          {
-            name: "cta_url",
-            buttonParamsJson: JSON.stringify({
-              display_text: "▶️ Watch on YouTube",
-              url: vid.url
-            })
-          },
-          {
-            name: "cta_copy",
-            buttonParamsJson: JSON.stringify({
-              display_text: "📋 Copy Link",
-              copy_code: vid.url
-            })
-          }
-        ]
-      }
-    })));
+    let out = `🔎 *YouTube Search Results for:* ${q}\n\n`;
+    out += data.result.slice(0, 10).map((v, i) => 
+      `🎬 *${i + 1}. ${v.title}*\n🆔 ID: ${v.id}\n👁️ Views: ${v.views}\n⏱️ Duration: ${v.duration}\n📅 Published: ${v.published || '-'}\n🔗 ${v.url}`
+    ).join("\n\n");
 
-    const message = generateWAMessageFromContent(from, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
-          },
-          interactiveMessage: {
-            body: { text: `🔍 YouTube Results for: ${q}` },
-            footer: { text: `📂 Found ${videos.length} videos` },
-            carouselMessage: { cards }
-          }
-        }
-      }
-    }, { quoted: mek });
-
-    await client.relayMessage(from, message.message, { messageId: message.key.id });
-
+    await reply(out);
   } catch (err) {
-    console.error("YTS command error:", err);
+    console.error("yts error:", err);
+    await reply(`❌ Error: ${err.message}`);
   }
 });
+
+
 //========================================================================================================================
 keith({
   pattern: "image",
