@@ -932,17 +932,22 @@ async function forwardMediaToInbox(client, message) {
         
         const text = message.message?.conversation || 
                     message.message?.extendedTextMessage?.text || '';
-        
-        if (!text) return;
-        
-        // Check if text matches any trigger words
+
+        // A sticker reply has no text at all, so it needs its own trigger path -
+        // replying to a media message with ANY sticker should auto-save it.
+        const isStickerReply = !!message.message?.stickerMessage;
+
+        // Check if text matches any trigger word/emoji
         const triggers = ['send', 'nice', 'wow', '😍', 'save', '🤗', 'adorable', '❤️', 'lovely'];
-        const matched = triggers.some(trigger => text.toLowerCase().includes(trigger.toLowerCase()));
+        const matchedText = !!text && triggers.some(trigger => text.toLowerCase().includes(trigger.toLowerCase()));
+
+        if (!matchedText && !isStickerReply) return;
         
-        if (!matched) return;
-        
-        // Get the quoted message
-        let quotedMsg = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        // Get the quoted message. A text/emoji trigger lives on extendedTextMessage,
+        // a sticker trigger lives on stickerMessage - both carry contextInfo when
+        // they're a reply.
+        let quotedMsg = message.message?.extendedTextMessage?.contextInfo?.quotedMessage
+                      || message.message?.stickerMessage?.contextInfo?.quotedMessage;
         if (!quotedMsg) return;
         
         // Handle view once messages
@@ -2676,18 +2681,34 @@ client.ev.on("messages.upsert", async ({ messages }) => {
     let isAdmin = false;
     let isSuperAdmin = false;
 
+    // Matches a participant against every identifier WhatsApp might hand us for them
+    // (id, jid, pn, lid), standardized. This is what actually fixes admin/owner
+    // detection failing for users who have set a WhatsApp username: a plain
+    // pn/id string-equality check breaks the moment the sender's jid comes back
+    // as a @lid instead of a phone-number jid (which username accounts trigger),
+    // so we resolve the participant record itself instead of comparing raw strings.
+    function findParticipant(list, jidLike) {
+        if (!jidLike) return null;
+        const std = standardizeJid(jidLike);
+        return list.find(p => {
+            const candidates = [p.id, p.jid, p.pn, p.lid].filter(Boolean).map(standardizeJid);
+            return candidates.includes(std);
+        }) || null;
+    }
+
     if (groupInfo && groupInfo.participants) {
         participants = groupInfo.participants.map(p => p.pn || p.id);
         groupAdmins = groupInfo.participants.filter(p => p.admin === 'admin').map(p => p.pn || p.id);
         groupSuperAdmins = groupInfo.participants.filter(p => p.admin === 'superadmin').map(p => p.pn || p.id);
-        const senderLid = standardizeJid(sendr);
-        const founds = groupInfo.participants.find(p => p.id === senderLid || p.pn === senderLid);
-      sender = founds?.pn || founds?.id || sendr;
-     //   sender = sendr;
-      // sender = ms.key.senderPn; 
-        isBotAdmin = groupAdmins.includes(standardizeJid(botId)) || groupSuperAdmins.includes(standardizeJid(botId));
-        isAdmin = groupAdmins.includes(sender);
-        isSuperAdmin = groupSuperAdmins.includes(sender);
+
+        const founds = findParticipant(groupInfo.participants, sendr);
+        sender = founds?.pn || founds?.id || sendr;
+
+        const botFound = findParticipant(groupInfo.participants, botId);
+
+        isAdmin = founds?.admin === 'admin' || founds?.admin === 'superadmin';
+        isSuperAdmin = founds?.admin === 'superadmin';
+        isBotAdmin = botFound?.admin === 'admin' || botFound?.admin === 'superadmin';
     }
 
     const repliedMessage = ms.message?.extendedTextMessage?.contextInfo?.quotedMessage || null;
