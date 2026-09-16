@@ -699,8 +699,8 @@ keith({
 });
 // ==================== Pone.rs Command ====================
 keith({
-  pattern: "pone",
-  aliases: ["poners", "poneupload"],
+  pattern: "url",
+  aliases: ["pone", "upload"],
   description: "Upload quoted media to Pone.rs",
   category: "Uploader",
   filename: __filename
@@ -1050,8 +1050,8 @@ keith({
 
 // ==================== imgbb Command ====================
 keith({
-  pattern: "url",
-  aliases: ["upload", "urlconvert"],
+  pattern: "imgbb",
+  aliases: ["uploader", "urlconvert"],
   description: "Convert quoted media to Catbox URL",
   category: "Uploader",
   filename: __filename
