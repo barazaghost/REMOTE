@@ -65,7 +65,7 @@ keith({
 
   initializeCommands();
 
-  const categories = Object.keys(commandList);
+  const categories = Object.keys(commandList).sort((a, b) => a.localeCompare(b));
 
   let menuText = `╰►Hey, ${pushName || 'User'}
 ╭───〔 *${botname}* 〕──────┈
@@ -112,7 +112,7 @@ keith({
 
   initializeCommands();
 
-  const categories = Object.keys(commandList);
+  const categories = Object.keys(commandList).sort((a, b) => a.localeCompare(b));
 
   const menuText = `╰►Hey, ${pushName || 'User'}
 ╭───〔  *${botname}* 〕──────┈⊷𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭
