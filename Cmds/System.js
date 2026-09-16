@@ -12,6 +12,45 @@ const execAsync = util.promisify(require('child_process').exec);
 //========================================================================================================================
 
 
+const formatUptime = (seconds) => {
+  seconds = Number(seconds);
+  const d = Math.floor(seconds / (3600 * 24));
+  const h = Math.floor((seconds % (3600 * 24)) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+
+  const dDisplay = d > 0 ? `${d} ${d === 1 ? "day" : "days"}, ` : "";
+  const hDisplay = h > 0 ? `${h} ${h === 1 ? "hour" : "hours"}, ` : "";
+  const mDisplay = m > 0 ? `${m} ${m === 1 ? "minute" : "minutes"}, ` : "";
+  const sDisplay = s > 0 ? `${s} ${s === 1 ? "second" : "seconds"}` : "";
+
+  return `${dDisplay}${hDisplay}${mDisplay}${sDisplay}`.trim().replace(/,\s*$/, "");
+};
+
+// Uptime command
+keith({
+  pattern: "uptime",
+  aliases: ["up", "runtime"],
+  category: "System",
+  description: "Show bot runtime",
+  filename: __filename
+}, async (from, client, { botname, reply }) => {
+  try {
+    const uptimeText = `${botname} uptime is: ${formatUptime(process.uptime())}`;
+
+    await client.sendInappSignup(from, {
+      text: uptimeText,
+      title: botname,
+      subtitle: "Uptime Monitor",
+      footer: "Runtime Tracker"
+    });
+  } catch (err) {
+    console.error("Uptime error:", err);
+    await reply(`Error: ${err.message}`);
+  }
+});
+
+
 // Ping command
 keith({
   pattern: "ping",
