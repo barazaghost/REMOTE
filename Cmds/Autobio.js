@@ -239,17 +239,40 @@ async function uploadToUguu(filePath) {
   }
 }
 
+
 async function uploadToImgBB(filePath) {
-  const buffer = await fs.readFile(filePath);
+  if (!fs.existsSync(filePath)) {
+    throw new Error('File not found');
+  }
+
+  const ext = path.extname(filePath) || '.jpg';
   const form = new FormData();
-  form.append('image', buffer.toString('base64'));
-  
-  const { data } = await axios.post('https://api.imgbb.com/1/upload?key=16cf2d5c12696d6e0344ed55d54483c6', form, {
-    headers: form.getHeaders()
+  form.append('source', fs.createReadStream(filePath), {
+    filename: `image-${Date.now()}${ext}`
+  });
+  form.append('type', 'file');
+  form.append('action', 'upload');
+
+  const { data } = await axios({
+    method: 'POST',
+    url: 'https://imgbb.com/json',
+    headers: {
+      'User-Agent': 'Mozilla/5.0',
+      'Accept': 'application/json',
+      'Referer': 'https://imgbb.com/',
+      'Origin': 'https://imgbb.com',
+      ...form.getHeaders()
+    },
+    data: form
   });
 
-  return data.data.url;
+  if (!data?.image?.url) {
+    throw new Error('Upload failed');
+  }
+
+  return data.image.url;
 }
+
 
 async function uploadToUploadF(filePath) {
   if (!fs.existsSync(filePath)) throw new Error("File does not exist");
