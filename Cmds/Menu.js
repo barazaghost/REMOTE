@@ -12,6 +12,11 @@ function initializeCommands() {
       const category = cmd.category?.toUpperCase() || 'UNCATEGORIZED';
       if (!commandList[category]) commandList[category] = [];
       commandList[category].push(cmd.pattern);
+      });
+       // Sort commands inside each category
+    Object.keys(commandList).forEach(cat => {
+      commandList[cat].sort((a, b) => a.localeCompare(b));
+    
     });
   }
 }
