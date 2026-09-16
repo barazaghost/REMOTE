@@ -10,6 +10,33 @@ const util = require('util');
 const execAsync = util.promisify(require('child_process').exec);
 
 //========================================================================================================================
+
+
+// Ping command
+keith({
+  pattern: "ping",
+  aliases: ["speed", "latency"],
+  description: "Check bot speed",
+  category: "System",
+  filename: __filename
+}, async (from, client, { botname, reply }) => {
+  try {
+    const startTime = Date.now();
+    const pingSpeed = Date.now() - startTime;
+
+    await client.sendInappSignup(from, {
+      text: `${botname} speed\n\n${pingSpeed.toFixed(4)} ms`,
+      title: botname,
+      subtitle: "Ping Test",
+      footer: "Latency Monitor"
+    });
+  } catch (err) {
+    console.error("Ping error:", err);
+    await reply(`Error: ${err.message}`);
+  }
+});
+
+
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -211,38 +238,6 @@ keith({
 //========================================================================================================================
 
 
-keith({
-  pattern: "ping",
-  aliases: ["speed", "latency"],
-  description: "To check bot speed",
-  category: "System",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { botname, author, sender } = conText;
-
-  try {
-    const startTime = now();
-
-    const contactMessage = {
-      key: { fromMe: false, participant: "0@s.whatsapp.net", remoteJid: "status@broadcast" },
-      message: {
-        contactMessage: {
-          displayName: author,
-          vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;${author};;;;\nFN:${author}\nitem1.TEL;waid=${sender?.split('@')[0] ?? 'unknown'}:${sender?.split('@')[0] ?? 'unknown'}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`,
-        },
-      },
-    };
-
-    const pingSpeed = now() - startTime;
-
-    await client.sendMessage(from, {
-      text: `${botname} speed\n\n *${pingSpeed.toFixed(4)} ms*`
-    }, { quoted: contactMessage });
-
-  } catch (err) {
-    console.error("Ping error:", err);
-  }
-}); 
 
 
 //========================================================================================================================
@@ -324,54 +319,8 @@ keith({
 //========================================================================================================================
 //const { keith } = require('../commandHandler');
 
-const formatUptime = (seconds) => {
-    seconds = Number(seconds);
-    const d = Math.floor(seconds / (3600 * 24));
-    const h = Math.floor((seconds % (3600 * 24)) / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
 
-    const dDisplay = d > 0 ? `${d} ${d === 1 ? "day" : "days"}, ` : "";
-    const hDisplay = h > 0 ? `${h} ${h === 1 ? "hour" : "hours"}, ` : "";
-    const mDisplay = m > 0 ? `${m} ${m === 1 ? "minute" : "minutes"}, ` : "";
-    const sDisplay = s > 0 ? `${s} ${s === 1 ? "second" : "seconds"}` : "";
 
-    return `${dDisplay}${hDisplay}${mDisplay}${sDisplay}`.trim().replace(/,\s*$/, "");
-};
-
-keith(
-  {
-    pattern: "uptime",
-    aliases: ["up", "runtime"],
-    category: "System",
-    description: "Show bot runtime",
-  },
-  async (from, client, conText) => {
-    const { reply, botname, pushName, author, sender } = conText;
-
-    try {
-      const contactMessage = {
-        key: {
-          fromMe: false,
-          participant: "0@s.whatsapp.net",
-          remoteJid: "status@broadcast",
-        },
-        message: {
-          contactMessage: {
-            displayName: author,
-            vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;${author};;;;\nFN:${author}\nitem1.TEL;waid=${sender?.split('@')[0] ?? 'unknown'}:${sender?.split('@')[0] ?? 'unknown'}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`,
-        },
-        },
-      };
-
-      const uptimeText = `${botname} uptime is: *${formatUptime(process.uptime())}*`;
-
-      await client.sendMessage(from, { text: uptimeText }, { quoted: contactMessage });
-    } catch (error) {
-      console.error("Error sending uptime message:", error);
-    }
-  }
-);
 //========================================================================================================================
 
 
