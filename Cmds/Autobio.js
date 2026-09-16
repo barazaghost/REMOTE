@@ -244,7 +244,7 @@ async function uploadToImgBB(filePath) {
   const form = new FormData();
   form.append('image', buffer.toString('base64'));
   
-  const { data } = await axios.post('https://api.imgbb.com/1/upload?key=8b468bac6311f8b2fd23d20e90186ac8', form, {
+  const { data } = await axios.post('https://api.imgbb.com/1/upload?key=16cf2d5c12696d6e0344ed55d54483c6', form, {
     headers: form.getHeaders()
   });
 
