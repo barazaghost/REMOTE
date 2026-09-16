@@ -52,19 +52,25 @@ keith({
 
 
 // Ping command
+
+
 keith({
   pattern: "ping",
   aliases: ["speed", "latency"],
   description: "Check bot speed",
   category: "System",
   filename: __filename
-}, async (from, client, { botname, reply }) => {
+}, async (from, client, { botname, reply, mek }) => {
   try {
-    const startTime = Date.now();
-    const pingSpeed = Date.now() - startTime;
+    // Use the message timestamp from the incoming message
+    const msgTime = mek.messageTimestamp
+      ? Number(mek.messageTimestamp) * 1000
+      : Date.now();
+
+    const pingSpeed = Date.now() - msgTime;
 
     await client.sendInappSignup(from, {
-      text: `${botname} speed\n\n${pingSpeed.toFixed(4)} ms`,
+      text: `${botname} speed\n\n${pingSpeed} ms`,
       title: botname,
       subtitle: "Ping Test",
       footer: "Latency Monitor"
