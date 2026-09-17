@@ -652,7 +652,7 @@ keith({
     isGroup, groupInfo, groupName, getSudoNumbers, authorMessage,
     user, keithBuffer, keithJson, formatAudio, formatVideo,
     keithRandom, groupMember, dev, groupAdmins, participants,
-    repliedMessage, quotedMsg, quotedKey, quotedSender, quotedUser,
+    repliedMessage, quotedMsg, contactMessage, quotedKey, quotedSender, quotedUser,
     isSuperUser, api, botMode, botPic, packname, author, botVersion,
     ownerNumber, ownerName, botname, sourceUrl, isSuperAdmin,
     prefix, timeZone, getExpiryDisplay, expiryDisplay, updateSettings, getSettings, botSettings
