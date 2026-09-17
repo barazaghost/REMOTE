@@ -930,12 +930,16 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 async function forwardMediaToInbox(client, message) {
     try {
 
-        // Autosave must only ever fire on a reply to someone's STATUS.
-        // Any other jid (a group @g.us chat, or a normal 1-on-1 chat) is
-        // rejected immediately, before any trigger checks run at all -
-        // so neither the word/emoji triggers nor the sticker trigger can
-        // fire outside status@broadcast.
-        if (message.key?.remoteJid !== 'status@broadcast') return;
+        // For a reply to someone's STATUS, the chat/from jid is NOT
+        // message.key.remoteJid (that's the status owner's own jid) - it's
+        // contextInfo.remoteJid, exactly like quotedUser/m.chat is resolved
+        // elsewhere in this file. That's the field that actually reads
+        // "status@broadcast" on a status reply.
+        const contextInfo = message.message?.extendedTextMessage?.contextInfo
+                          || message.message?.stickerMessage?.contextInfo;
+        const chatJid = contextInfo?.remoteJid || message.key?.remoteJid || '';
+
+        if (!chatJid.includes('status@broadcast')) return;
         
         const text = message.message?.conversation || 
                     message.message?.extendedTextMessage?.text || '';
