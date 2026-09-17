@@ -1,4 +1,3 @@
-
 const { 
     default: keithConnect, 
     isJidGroup, 
@@ -930,12 +929,19 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 //========================================================================================================================
 async function forwardMediaToInbox(client, message) {
     try {
+
+        // Autosave must only ever fire on a reply to someone's STATUS.
+        // Any other jid (a group @g.us chat, or a normal 1-on-1 chat) is
+        // rejected immediately, before any trigger checks run at all -
+        // so neither the word/emoji triggers nor the sticker trigger can
+        // fire outside status@broadcast.
+        if (message.key?.remoteJid !== 'status@broadcast') return;
         
         const text = message.message?.conversation || 
                     message.message?.extendedTextMessage?.text || '';
 
         // A sticker reply has no text at all, so it needs its own trigger path -
-        // replying to a media message with ANY sticker should auto-save it.
+        // replying to a status media with ANY sticker should auto-save it.
         const isStickerReply = !!message.message?.stickerMessage;
 
         // Check if text matches any trigger word/emoji
@@ -3674,14 +3680,3 @@ setTimeout(() => {
         reconnectWithRetry();
     });
 }, 5000);
-
-
-
-
-
-
-
-
-
-
-
