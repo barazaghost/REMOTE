@@ -13,6 +13,45 @@ const axios = require('axios');
 //========================================================================================================================
 //========================================================================================================================
 
+
+keith({
+  pattern: "domainstalk",
+  aliases: ["stalkdomain","domain"],
+  category: "Stalker",   
+  description: "Fetch domain WHOIS/registrar info",
+  filename: __filename
+}, async (from, client, { q, reply, api }) => {
+  if (!q) return reply("Usage: .domainstalk <domain>\nExample: .domainstalk whatsapp.com");
+
+  try {
+    const { data } = await axios.get(`${api}/stalker/domain?q=${encodeURIComponent(q)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      timeout: 30000
+    });
+
+    if (!data?.status || !data.result) return reply("No domain info found.");
+
+    const r = data.result;
+    let out = `Domain Info: ${r.domain}\n\n`;
+    out += `Handle: ${r.handle}\n`;
+    out += `Registrar: ${r.registrar?.name} (ID: ${r.registrar?.handle})\n`;
+    out += `Website: ${r.registrar?.website}\n`;
+    out += `Registrant: ${r.registrant?.organization} (${r.registrant?.email})\n`;
+    out += `Phone: ${r.registrant?.phone}\n`;
+    out += `Address: ${r.registrant?.address}\n\n`;
+    out += `Nameservers:\n${r.nameservers?.join(", ")}\n\n`;
+    out += `Status:\n${r.status?.join(", ")}\n\n`;
+    out += `Registered: ${r.events?.registration}\n`;
+    out += `Expires: ${r.events?.expiration}\n`;
+    out += `Last Changed: ${r.events?.lastChanged}\n`;
+    out += `Last Update: ${r.events?.lastUpdate}`;
+
+    await reply(out);   
+  } catch (err) {
+    console.error("domainstalk error:", err);
+    await reply(`Error: ${err.message}`);
+  }
+});
 // ============================================================
 // GitHub Repository Stalk
 // ============================================================
