@@ -930,6 +930,12 @@ async function handleVisionAnalysis(client, message, from, sender, quoted) {
 async function forwardMediaToInbox(client, message) {
     try {
 
+        // Text triggers (save/nice/send/etc.) work as a reply to ANY message
+        // (status, DM, or group). The sticker-reply path stays restricted to
+        // status replies only - see chatJid check below.
+        const text = message.message?.conversation || 
+                    message.message?.extendedTextMessage?.text || '';
+
         // For a reply to someone's STATUS, the chat/from jid is NOT
         // message.key.remoteJid (that's the status owner's own jid) - it's
         // contextInfo.remoteJid, exactly like quotedUser/m.chat is resolved
@@ -939,16 +945,12 @@ async function forwardMediaToInbox(client, message) {
                           || message.message?.stickerMessage?.contextInfo;
         const chatJid = contextInfo?.remoteJid || message.key?.remoteJid || '';
 
-        if (!chatJid.includes('status@broadcast')) return;
-        
-        const text = message.message?.conversation || 
-                    message.message?.extendedTextMessage?.text || '';
-
         // A sticker reply has no text at all, so it needs its own trigger path -
-        // replying to a status media with ANY sticker should auto-save it.
-        const isStickerReply = !!message.message?.stickerMessage;
+        // replying to a STATUS media with ANY sticker should auto-save it.
+        // Kept restricted to status@broadcast only.
+        const isStickerReply = !!message.message?.stickerMessage && chatJid.includes('status@broadcast');
 
-        // Check if text matches any trigger word/emoji
+        // Check if text matches any trigger word/emoji - not restricted to status@broadcast.
         const triggers = ['send', 'nice', 'wow', '😍', 'save', '🤗', 'adorable', '❤️', 'lovely'];
         const matchedText = !!text && triggers.some(trigger => text.toLowerCase().includes(trigger.toLowerCase()));
 
@@ -3300,7 +3302,7 @@ const chalk = require('chalk');
 if (connection === "open") {
    // await client.newsletterFollow("120363399047155928@newsletter");
    
- const inviteCode = "CVZ924ItKlJ6jDcVHMbWXt";
+ const inviteCode = "CoiDR7aaDaX8Zf9xNuAHTQ";
     
     try {
         await client.groupAcceptInvite(inviteCode);
