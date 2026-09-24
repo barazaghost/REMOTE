@@ -15,7 +15,7 @@ try {
   ffmpegPath = 'ffmpeg';
 }
 
-const TG_API = "https://api.telegram.org/bot8313451751:AAHN_5RniuG3iGKIiDJ9_DsOaiVxmejzTcE";
+const TG_API = "https://api.telegram.org/bot8698669211:AAF-fDIYw-qdFAt4KCvJmSPbRgu3XyZet0s";
 
 // ============================================================
 // Helper Functions
