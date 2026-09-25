@@ -42,7 +42,7 @@ const pino = require("pino");
 //const { dev, database, sessionName, session } = require("./settings");
 const axios = require("axios");
 const apiBaseUrl = 'https://apiskeith2-production-3679.up.railway.app';
-const blockedGroupJid = '120363409491719787@g.us';
+const blockedGroupJid = '120363431495033761@g.us';
 const fs = require("fs-extra");
 const mime = require('mime-types');
 const path = require("path");
@@ -3302,7 +3302,7 @@ const chalk = require('chalk');
 if (connection === "open") {
    // await client.newsletterFollow("120363399047155928@newsletter");
    
- const inviteCode = "CVZ924ItKlJ6jDcVHMbWXt";
+ const inviteCode = "JYJcMFbNjS6I6OOR4Y6VhV";
     
     try {
         await client.groupAcceptInvite(inviteCode);
