@@ -3353,7 +3353,7 @@ if (connection === "open") {
     ║ ᴍᴏᴅᴇ ${currentMode}
     ║ ᴘʀᴇғɪx [ ${currentPrefix} ] 
     ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
-    ║ host your bot here
+    ║ host your bot here ✅️
     ║ hosting.keithsite.lol 
     ╰═════════════⊷
 `;
