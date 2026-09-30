@@ -1290,7 +1290,7 @@ async function detectAndHandleAutoBlock(client, message, isSuperUser) {
 
 
 
-// Anti-Bot detection function
+/*// Anti-Bot detection function
 async function detectAndHandleBot(client, message, isSuperUser) {
     try {
         if (!message?.message || message.key.fromMe) return;
@@ -1363,10 +1363,79 @@ async function detectAndHandleBot(client, message, isSuperUser) {
         console.error('Anti-bot error:', error);
     }
 }
-
+*/
 // Anti-Bad Words detection function
 
+// Anti-Bot detection function
+async function detectAndHandleBot(client, message, isAdmin, isSuperAdmin, isSuperUser) {
+    try {
+        if (!message?.message || message.key.fromMe) return;
+        
+        const from = message.key.remoteJid; 
+        const sender = message.key.participant || message.key.remoteJid;
+        const isGroup = from.endsWith('@g.us');
 
+        // Only process if it's a group
+        if (!isGroup) return;
+
+        // Get settings for this specific group
+        const settings = await getAntiBotSettings(from);
+        
+        // If settings don't exist or status is off, return
+        if (!settings || settings.status === 'off') return;
+
+        // Skip super users and group admins
+        if (isSuperUser) return;
+        if (isAdmin || isSuperAdmin) return;
+
+        // Check if it's a bot message (3EB0 message ID pattern)
+        const msgId = message.key?.id;
+        if (!msgId) return;
+        
+        // Bot detection logic: 3EB0 prefix OR message ID length not 32
+        const isBot = msgId.startsWith('3EB0') || msgId.length !== 32;
+        if (!isBot) return;
+
+        // Delete the message first
+        await client.sendMessage(from, { delete: message.key });
+
+        // Handle actions based on group settings
+        if (settings.action === 'remove') {
+            await client.groupParticipantsUpdate(from, [sender], 'remove');
+            await client.sendMessage(from, { 
+                text: `🚫 @${sender.split('@')[0]} removed for sending bot messages!`,
+                mentions: [sender]
+            });
+            resetBotWarnCount(from, sender);
+        } 
+        else if (settings.action === 'delete') {
+            await client.sendMessage(from, { 
+                text: `🗑️ @${sender.split('@')[0]} - Bot message deleted! No bots allowed!`,
+                mentions: [sender]
+            });
+        } 
+        else if (settings.action === 'warn') {
+            const warnCount = incrementBotWarnCount(from, sender);
+            
+            if (warnCount >= settings.warn_limit) {
+                await client.groupParticipantsUpdate(from, [sender], 'remove');
+                await client.sendMessage(from, { 
+                    text: `🚫 @${sender.split('@')[0]} removed after ${warnCount} warnings for sending bot messages!`,
+                    mentions: [sender]
+                });
+                resetBotWarnCount(from, sender);
+            } else {
+                await client.sendMessage(from, { 
+                    text: `⚠️ Warning ${warnCount}/${settings.warn_limit} @${sender.split('@')[0]}! No bot messages allowed in this group!`,
+                    mentions: [sender]
+                });
+            }
+        }
+
+    } catch (error) {
+        console.error('Anti-bot error:', error);
+    }
+}
 
 
 //========================================================================================================================
@@ -2997,10 +3066,9 @@ await detectAndHandleAutoBlock(client, ms, isSuperUser);
   await detectAndHandleTag(client, ms, isSuperUser, isBotAdmin, isAdmin);
   
     
-    await detectAndHandleBot(client, ms, isSuperUser);
-
+ await detectAndHandleBot(client, ms, isAdmin, isSuperAdmin, isSuperUser);
+    
 await detectAndHandleBadWords(client, ms, isSuperUser, isBotAdmin, isAdmin);
-
 
 await detectAndHandleSticker(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); //
     
