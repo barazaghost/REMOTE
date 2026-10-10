@@ -269,7 +269,7 @@ keith({
     console.error("gitclone error:", err);
     await reply("❌ Failed to clone repo. Error: " + err.message);
   }
-});*/
+});
 //========================================================================================================================
 //const { keith } = require("../commandHandler");
 
@@ -424,7 +424,7 @@ keith({
     console.error("anon command error:", err);
     reply("❌ Failed to send your message.");
   }
-});
+});*/
 //========================================================================================================================
 
 //const { keith } = require("../commandHandler");
