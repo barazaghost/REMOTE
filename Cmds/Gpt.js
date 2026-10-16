@@ -359,7 +359,7 @@ async function qwenImageEdit(buffer, prompt, model) {
 
 //========================================================================================================================
 
-keith({
+/*keith({
   pattern: "imageedit",
   aliases: ["qwenedit", "qwenimage", "qwenai"],
   description: "Edit image using Qwen AI (add/remove objects)",
@@ -556,7 +556,7 @@ async function editImage(buffer, prompt) {
             const response = await axios.post("https://api.deepai.org/api/image-editor", form, {
                 headers: {
                     ...form.getHeaders(),
-                    'accept': '*/*',
+                   // 'accept': '*
                     'origin': 'https://deepai.org',
                     'referer': 'https://deepai.org/',
                     'user-agent': deepaiAgent,
@@ -683,7 +683,7 @@ keith({
     console.error("RC Error:", error);
     reply(`❌ Error: ${error.message}`);
   }
-});
+});*/
 
 //========================================================================================================================
 
