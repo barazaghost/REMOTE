@@ -490,3 +490,64 @@ keith({
     `⏩ Skipped: ${skipped} item(s)`
   ));
 });
+
+
+
+keith({
+  pattern: 'read',
+  category: 'dev',
+  filename: __filename
+}, async (from, client, conText) => {
+  const { quotedMsg, reply } = conText;
+
+  if (!quotedMsg) {
+    return reply('📌 Reply to a .js or .json file to read it.');
+  }
+
+  let node = quotedMsg;
+  for (let i = 0; i < 10; i++) {
+    const next = node.ephemeralMessage?.message
+      || node.viewOnceMessage?.message
+      || node.viewOnceMessageV2?.message
+      || node.documentWithCaptionMessage?.message;
+    if (!next) break;
+    node = next;
+  }
+
+  const doc = node.documentMessage;
+  if (!doc) return reply('❌ Reply to a document (.js or .json).');
+
+  const name = doc.fileName || 'file';
+  if (!/\.(c?js|json)$/i.test(name) && !/javascript|ecmascript|json/i.test(doc.mimetype || '')) {
+    return reply('❌ Only .js and .json files are supported.');
+  }
+
+  try {
+    const stream = await downloadContentFromMessage(doc, 'document');
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    let text = Buffer.concat(chunks).toString('utf8');
+
+    if (!text.trim()) return reply('❌ The file is empty.');
+
+    text = text.replace(/^\uFEFF/, '').trim();
+    const fence = text.match(/^```[a-zA-Z]*\n?([\s\S]*?)\n?```$/);
+    if (fence) text = fence[1].trim();
+
+    if (text.length <= 3000) {
+      return reply('```' + text + '```');
+    }
+
+    const MAX = 3500;
+    const parts = [];
+    for (let i = 0; i < text.length; i += MAX) parts.push(text.slice(i, i + MAX));
+
+    for (const part of parts) {
+      await reply('```' + part + '```');
+    }
+
+  } catch (err) {
+    console.error('read error:', err);
+    await reply(`❌ Failed to read file: ${err.message}`);
+  }
+});
