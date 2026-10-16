@@ -2136,24 +2136,49 @@ keith({
 },
 async (from, client, conText) => {
   const { reply, q, isSuperUser } = conText;
+  const { noPrefixWords } = require('../settings');
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
 
-  const newPrefix = q?.trim();
+  const input = q?.trim();
 
-  if (!newPrefix) {
+  // No argument -> show the current prefix and how to change it
+  if (!input) {
     const settings = await getSettings();
-    return reply(`*🔧 Current Prefix:* \`${settings.prefix}\`\n\n*Usage:* \`${settings.prefix}prefix <new_prefix>\``);
+    const current = settings.prefix;
+    const shown = current === '' ? 'none (no prefix)' : `\`${current}\``;
+    return reply(
+      `*🔧 Current Prefix:* ${shown}\n\n` +
+      `*Usage:*\n` +
+      `• \`${current}prefix <new_prefix>\` - set a prefix (1-3 characters)\n` +
+      `• \`${current}prefix none\` - remove the prefix (commands work without one)`
+    );
   }
 
-  if (newPrefix.length > 3) {
-    return reply("❌ Prefix must be 1-3 characters long!");
+  // "none" / "null" / "off" ... -> no-prefix mode (stored as an empty string)
+  const wantsNoPrefix = noPrefixWords.includes(input.toLowerCase());
+
+  if (!wantsNoPrefix) {
+    if (input.length > 3) return reply("❌ Prefix must be 1-3 characters long!");
+    if (/\s/.test(input)) return reply("❌ Prefix can't contain spaces!");
   }
+
+  const newPrefix = wantsNoPrefix ? '' : input;
 
   try {
-    await updateSettings({ prefix: newPrefix });
+    const saved = await updateSettings({ prefix: newPrefix });
+    if (!saved) return reply("❌ Failed to update prefix!");
+
     // Update the botSettings in context
     conText.botSettings.prefix = newPrefix;
+
+    if (wantsNoPrefix) {
+      return reply(
+        `✅ *Prefix removed.* Commands now work without a prefix - just type the command, e.g. \`menu\`.\n\n` +
+        `• To bring a prefix back: \`prefix .\`\n` +
+        `• In public mode anyone can trigger commands by typing the word. Use \`mode private\` to keep them owner-only.`
+      );
+    }
     return reply(`✅ Prefix changed to: \`${newPrefix}\``);
   } catch (error) {
     return reply("❌ Failed to update prefix!");
