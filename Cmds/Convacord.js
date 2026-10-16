@@ -15,7 +15,7 @@ const findCommand = (name) =>
   commands.find(c => c?.pattern === name || (Array.isArray(c?.aliases) && c.aliases.includes(name)));
 
 // ============================================================
-// SETSTICKERCMD - bind a sticker to a command
+// SETSTICKERCMD - bind a sticker to a command.
 // ============================================================
 keith({
   pattern: "setstickercmd",
