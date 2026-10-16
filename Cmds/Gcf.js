@@ -535,7 +535,7 @@ keith({
     if (fence) text = fence[1].trim();
 
     if (text.length <= 3000) {
-      return reply('```' + text + '```');
+      return reply(text);
     }
 
     const MAX = 3500;
@@ -543,7 +543,7 @@ keith({
     for (let i = 0; i < text.length; i += MAX) parts.push(text.slice(i, i + MAX));
 
     for (const part of parts) {
-      await reply('```' + part + '```');
+      await reply(part);
     }
 
   } catch (err) {
