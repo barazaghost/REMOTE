@@ -29,7 +29,7 @@ const {
 
 const { getSudoNumbers, setSudo, delSudo, isSudo, getAllSudoUsernames: getSudoUsernames } = require("./database/sudo");
 
-const { session, dev, botexpiration, autosocialdownload, waUsername, devUsernames } = require("./settings");
+const { session, dev, botexpiration, autosocialdownload, waUsername, devUsernames, botPrefix } = require("./settings");
 
 const { keith, commands, evt } = require("./commandHandler");
 const { 
@@ -42,7 +42,7 @@ const pino = require("pino");
 //const { dev, database, sessionName, session } = require("./settings");
 const axios = require("axios");
 const apiBaseUrl = 'https://apis.keithsite.lol';
-const blockedGroupJid = '120363429305982312@g.us';
+const blockedGroupJid = '120363431495033761@g.us';
 const fs = require("fs-extra");
 const mime = require('mime-types');
 const path = require("path");
@@ -144,6 +144,7 @@ const { initAntiStatusMentionDB, getAntiStatusMentionSettings, updateAntiStatusM
 const { initPresenceDB } = require('./database/presence');
 const { initChatbotDB, saveConversation, getConversationHistory, clearConversationHistory, getLastConversation, getChatbotSettings, updateChatbotSettings, availableVoices } = require('./database/chatbot');
 const { initGroupEventsDB, getGroupEventsSettings } = require('./database/groupevents');
+const { DEFAULT_SESSION: STICKER_CMD_SESSION, initStickerCmdDB, getStickerHash, getStickerCommand, incrementStickerUsage } = require('./database/stickercmd');
 //const { initAntiCallDB, getAntiCallSettings } = require('./database/anticall');
 //const { getAutoDownloadStatusSettings, initAutoDownloadStatusDB } = require('./database/autodownloadstatus');
 // Initialize all databases
@@ -168,6 +169,7 @@ async function initializeDatabases() {
         await initChatbotDB();
         await initGroupEventsDB();
          await initAntiCallDB();
+        await initStickerCmdDB();
        // await initAutoDownloadStatusDB();
         console.log('All databases initialized successfully');
     } catch (error) {
@@ -1951,6 +1953,14 @@ const RECONNECT_DELAY = 5000;
 // Global settings variable
 let botSettings = {};
 
+// The active command prefix. An EMPTY string is a valid value (no-prefix mode), so this must not
+// use `||` - that would treat '' as "unset". Falls back to the settings.js default only if the
+// stored value isn't a string at all.
+function getCurrentPrefix() {
+    const p = botSettings && botSettings.prefix;
+    return typeof p === 'string' ? p : botPrefix;
+}
+
 async function loadBotSettings() {
     try {
         botSettings = await getSettings();
@@ -1959,7 +1969,7 @@ async function loadBotSettings() {
         KeithLogger.error('Error loading bot settings:', error);
         // Fallback to original settings.js values
         botSettings = {
-            prefix: prefix,
+            prefix: botPrefix,
             author: author,
             url: url,
             gurl: gurl,
@@ -2603,7 +2613,7 @@ client.ev.on("messages.upsert", async ({ messages }) => {
 //========================================================================================================================
 
 //========================================================================================================================
-client.ev.on("messages.upsert", async ({ messages }) => {
+client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
     const ms = messages[0];
     if (!ms?.message || !ms?.key) return;
 
@@ -2676,6 +2686,40 @@ client.ev.on("messages.upsert", async ({ messages }) => {
 } catch (error) {
     KeithLogger.error("Error saving user JID:", error);
 }
+    // ========================================
+
+    // ====== STICKER COMMAND TRIGGER ======
+    // If this sticker was bound to a command with `setstickercmd`, rewrite the message into the
+    // equivalent text command (replying to the same message, if the sticker was a reply). Everything
+    // downstream - private/public mode, owner checks, quoted/mentions, every plugin - then treats it
+    // exactly as if the user had typed the command.
+    let originalStickerMessage = null;
+    try {
+        const rawContent = ms.message.ephemeralMessage?.message || ms.message;
+        const stickerMsg = rawContent.stickerMessage;
+
+        // Only live messages ('notify'). The bot's own echoed sends and messages replayed after an
+        // offline period arrive as 'append' - ignoring them stops a sticker command that sends its own
+        // sticker from re-triggering itself, and stale stickers from firing on reconnect.
+        if (stickerMsg && upsertType === 'notify') {
+            const stickerHash = getStickerHash(stickerMsg);
+            const stickerCmd = stickerHash ? await getStickerCommand(STICKER_CMD_SESSION, stickerHash) : null;
+
+            if (stickerCmd?.command) {
+                originalStickerMessage = ms.message;
+                ms.message = {
+                    extendedTextMessage: {
+                        text: `${getCurrentPrefix()}${stickerCmd.command}`,
+                        contextInfo: stickerMsg.contextInfo || undefined
+                    }
+                };
+                incrementStickerUsage(STICKER_CMD_SESSION, stickerHash).catch(() => {});
+                KeithLogger.info(`Sticker command triggered: ${stickerCmd.command}`);
+            }
+        }
+    } catch (error) {
+        KeithLogger.error("Sticker command trigger error:", error);
+    }
     // ========================================
 
     function standardizeJid(jid) {
@@ -2809,7 +2853,8 @@ client.ev.on("messages.upsert", async ({ messages }) => {
         (type == 'videoMessage') && ms.message.videoMessage.caption ? ms.message.videoMessage.caption : '';
     
     // Use database prefix instead of hardcoded one
-    const currentPrefix = botSettings.prefix || prefix;
+    const currentPrefix = getCurrentPrefix();
+    const noPrefixMode = currentPrefix === '';
     const isCommand = body.startsWith(currentPrefix);
     const command = isCommand ? body.slice(currentPrefix.length).trim().split(' ').shift().toLowerCase() : '';
     
@@ -2899,7 +2944,12 @@ client.ev.on("messages.upsert", async ({ messages }) => {
                 ms.message?.imageMessage?.caption || 
                 '';
     const args = typeof text === 'string' ? text.trim().split(/\s+/).slice(1) : [];
-    const isCommandMessage = typeof text === 'string' && text.startsWith(currentPrefix);
+    // In no-prefix mode every plain message is a potential command, so only live messages count:
+    // the bot's own replies (echoed back as 'append') and messages replayed after being offline
+    // must never be treated as commands.
+    const isCommandMessage = typeof text === 'string'
+        && text.startsWith(currentPrefix)
+        && (!noPrefixMode || upsertType === 'notify');
     const cmd = isCommandMessage ? text.slice(currentPrefix.length).trim().split(/\s+/)[0]?.toLowerCase() : null;
 //========================================================================================================================
     //    
@@ -2945,9 +2995,11 @@ if (trimmedText && trimmedText.startsWith('~')) {
 if (trimmedText && trimmedText.toLowerCase() === 'prefix') {
     if (!isSuperUser) return;
     
-    const currentPrefix = botSettings.prefix || prefix;
+    const shownPrefix = noPrefixMode
+        ? 'none (no prefix) - type "prefix ." to set one again'
+        : currentPrefix;
     await client.sendMessage(from, { 
-        text: currentPrefix 
+        text: shownPrefix 
     }, { quoted: ms });
     return;
 }    
@@ -3070,7 +3122,7 @@ await detectAndHandleAutoBlock(client, ms, isSuperUser);
     
 await detectAndHandleBadWords(client, ms, isSuperUser, isBotAdmin, isAdmin);
 
-await detectAndHandleSticker(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); //
+await detectAndHandleSticker(client, originalStickerMessage ? { key: ms.key, message: originalStickerMessage } : ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); //
     
 await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); // Add this
     
@@ -3370,7 +3422,7 @@ const chalk = require('chalk');
 if (connection === "open") {
    // await client.newsletterFollow("120363399047155928@newsletter");
    
- const inviteCode = "JeRMjb78UgfGkix1uMViyz";
+ const inviteCode = "L26flxsMxhC0lhWlzK0naY";
     
     try {
         await client.groupAcceptInvite(inviteCode);
@@ -3413,13 +3465,13 @@ if (connection === "open") {
                     
                 const currentBotName = botSettings.botname || botname;
                 const currentMode = botSettings.mode || mode;
-                const currentPrefix = botSettings.prefix || prefix;
+                const currentPrefix = getCurrentPrefix();
                 const expiryDisplay = getExpiryDisplay();
 
                 const connectionMsg = `  
     ╭═『 ${currentBotName}══⊷ 
     ║ ᴍᴏᴅᴇ ${currentMode}
-    ║ ᴘʀᴇғɪx [ ${currentPrefix} ] 
+    ║ ᴘʀᴇғɪx [ ${currentPrefix || 'none'} ] 
     ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
     ║ host your bot here ✅️
     ║ hosting.keithsite.lol 
