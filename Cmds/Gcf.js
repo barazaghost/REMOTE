@@ -126,6 +126,7 @@ function describeError(err, filename) {
   return `${err?.name || 'Error'}: ${String(err?.message || err).split('\n')[0]}${line}`;
 }
 
+// ---- box used by .run ----
 const box = (title, msg) => `*${title}*\n\n${String(msg)}`;
 
 keith({
@@ -205,8 +206,8 @@ keith({
   }
 });
 
-//////////
-//////%%/
+// ==================== CRM SECTION ====================
+
 const STRUCT_KEYS = [
   'ephemeralMessage', 'viewOnceMessage', 'viewOnceMessageV2', 'viewOnceMessageV2Extension',
   'documentWithCaptionMessage', 'editedMessage', 'deviceSentMessage', 'futureProofMessage',
@@ -296,7 +297,8 @@ function buildPlugin(capture, pattern) {
   );
 }
 
-const box = (title, msg) => `*${title}*\n\n${String(msg)}`;
+// ---- renamed to cbox to avoid clash with .run's box ----
+const cbox = (title, msg) => `*${title}*\n\n${String(msg)}`;
 
 async function sendRichCode(client, jid, introText, code, language = 'javascript') {
   const responseId = Math.random().toString(36).substring(2);
@@ -339,7 +341,7 @@ keith({
   filename: __filename
 }, async (from, client, conText) => {
   const { mek, quoted, quotedKey, store, reply, isSuperUser } = conText;
-  const fmt = (msg) => box('CRM', msg);
+  const fmt = (msg) => cbox('CRM', msg);
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
 
@@ -371,7 +373,7 @@ keith({
   filename: __filename
 }, async (from, client, conText) => {
   const { mek, quoted, quotedKey, store, reply, isSuperUser } = conText;
-  const fmt = (msg) => box('CRM-SNIP', msg);
+  const fmt = (msg) => cbox('CRM-SNIP', msg);
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
 
@@ -407,7 +409,7 @@ keith({
   filename: __filename
 }, async (from, client, conText) => {
   const { mek, q, quoted, quotedKey, store, reply, isSuperUser, prefix } = conText;
-  const fmt = (msg) => box('CRM-CMD', msg);
+  const fmt = (msg) => cbox('CRM-CMD', msg);
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
 
@@ -452,7 +454,7 @@ keith({
   filename: __filename
 }, async (from, client, conText) => {
   const { q, reply, isSuperUser } = conText;
-  const fmt = (msg) => box('CLEARTMP', msg);
+  const fmt = (msg) => cbox('CLEARTMP', msg);
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
 
@@ -488,6 +490,3 @@ keith({
     `⏩ Skipped: ${skipped} item(s)`
   ));
 });
-
-
-
