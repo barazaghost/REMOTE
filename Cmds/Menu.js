@@ -178,9 +178,9 @@ keith({
           ],
           messageParamsJson: JSON.stringify({
             limited_time_offer: {
-              text: 'Host Keith MD',
+              text: 'Advert: keith bot hosting site at affordable price',
               url: 'https://hosting.keithsite.lol',
-              copy_code: 'Advert: keith bot hosting site at affordable price ',
+              copy_code: 'hosting.keithsite.lol',
               expiration_time: Date.now() + (24 * 60 * 60 * 1000) // Ends tomorrow
             },
             bottom_sheet: {
