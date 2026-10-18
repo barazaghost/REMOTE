@@ -55,26 +55,26 @@ function locationQuoted(pushName) {
 
 const additionalNodes = [
   {
-    tag: 'biz',
+    tag: "biz",
     attrs: {},
     content: [
       {
-        tag: 'interactive',
-        attrs: { type: 'native_flow', v: '1' },
-        content: [{ tag: 'native_flow', attrs: { v: '9', name: 'mixed' } }]
+        tag: "interactive",
+        attrs: { type: "native_flow", v: "1" },
+        content: [{ tag: "native_flow", attrs: { v: "9", name: "mixed" } }]
       }
     ]
   }
 ];
 
 //========================================================================================================================
-// MENU 1 (Native Interactive Flow)
+// MENU 1 (Clickable Image Native Flow)
 //========================================================================================================================
 keith({
   pattern: 'menu',
   aliases: ['help', 'commands', 'cmds'],
   category: 'general',
-  description: 'Native flow menu with category picker',
+  description: 'Native flow menu with clickable image',
   filename: __filename
 }, async (from, client, conText) => {
   const { sender, botname, botPic, expiryDisplay, pushName, reply } = conText;
@@ -89,11 +89,14 @@ keith({
   initializeCommands();
   const categories = Object.keys(commandList).sort((a, b) => a.localeCompare(b));
 
-  const categoryRows = categories.map((cat, i) => ({
-    header: `${i + 1}`.padStart(2, '0'),
-    title: cat,
-    description: `${commandList[cat].length} commands`,
-    id: `menu_cat_${cat}`
+  const nextPageSections = categories.map((cat) => ({
+    rows: [
+      {
+        title: cat,
+        description: `There are ${commandList[cat].length} commands`,
+        id: `menu_cat_${cat}`
+      }
+    ]
   }));
 
   const caption =
@@ -102,14 +105,14 @@ keith({
     `│✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}\n` +
     `│✵│▸ 𝐁𝐎𝐓 𝐄𝐗𝐏𝐈𝐑𝐀𝐓𝐈𝐎𝐍: ${expiryDisplay || 'N/A'}\n` +
     `╰──────────────────────⊷\n\n` +
-    `Tap *Browse Categories* to see commands.`;
+    ` Tap *Browse Categories* to see commands.`;
 
   try {
     const imgUrl = botPic || 'https://files.catbox.moe/placeholder.jpg';
     const rawBuf = (await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 60000 })).data;
 
     const resized = await sharp(Buffer.from(rawBuf))
-      .resize(736, 414, { fit: 'cover', position: 'center' })
+      .resize(800, 436, { fit: 'cover', position: 'center' })
       .jpeg({ quality: 90 })
       .toBuffer();
 
@@ -120,55 +123,78 @@ keith({
 
     const quoted = locationQuoted(pushName);
 
-    const imageMessage = {
-      ...media.imageMessage,
-      caption,
-      height: 414,
-      width: 736,
-      interactiveAnnotations: [],
-      scanLengths: [],
-      annotations: [],
-      contextInfo: {
-        mentionedJid: [sender],
-        groupMentions: [],
-        statusAttributions: [],
-        forwardingScore: 1,
-        isForwarded: true
-      }
-    };
-
     const payload = {
       interactiveMessage: {
         header: {
-          title: '',
-          subtitle: '',
-          imageMessage,
-          hasMediaAttachment: true
+          title: botname || 'Menu',
+          subtitle: "",
+          hasMediaAttachment: true,
+          productMessage: {
+            product: {
+              productImage: media.imageMessage,
+              title: botname || 'Menu',
+              description: "Click to open hosting site",
+              currencyCode: "",
+              retailerId: "",
+              url: "https://hosting.keithsite.lol",
+              productImageCount: 1
+            },
+            businessOwnerJid: "0@s.whatsapp.net"
+          }
         },
-        body: { text: caption },
-        footer: { text: botname || 'Bot' },
+        body: {
+          text: caption
+        },
+        footer: {
+          text: `> ᴡʜᴀᴛꜱᴀᴘᴘ ʙᴏᴛ ʙʏ ${botname || 'Keith'}`
+        },
         nativeFlowMessage: {
           buttons: [
             {
-              name: 'single_select',
+              name: "single_select",
+              buttonParamsJson: "{\"has_multiple_buttons\":true}"
+            },
+            {
+              name: "call_permission_request",
+              buttonParamsJson: "{\"has_multiple_buttons\":true}"
+            },
+            {
+              name: "cta_url",
               buttonParamsJson: JSON.stringify({
-                title: '| Browse Categories',
-                sections: [{ title: 'Command Categories', rows: categoryRows }]
+                display_text: "Hosting Site",
+                url: "https://hosting.keithsite.lol",
+                merchant_url: "https://hosting.keithsite.lol",
+                has_multiple_buttons: true
+              })
+            },
+            {
+              name: "single_select",
+              buttonParamsJson: JSON.stringify({
+                title: "Next Page",
+                sections: nextPageSections,
+                has_multiple_buttons: true
               })
             }
           ],
           messageParamsJson: JSON.stringify({
             limited_time_offer: {
-              text: 'Advert: host your bot in hosting.keithsite.lol',
+              text: 'Host Keith MD',
               url: 'https://hosting.keithsite.lol',
-              copy_code: 'hosting.keithsite.lol',
+              copy_code: 'Advert: keith bot hosting site at affordable price ',
               expiration_time: Date.now() + (24 * 60 * 60 * 1000) // Ends tomorrow
             },
             bottom_sheet: {
-              in_thread_buttons_limit: 1,
-              divider_indices: [0],
-              list_title: botname || 'Menu',
-              button_title: botname || 'Menu'
+              in_thread_buttons_limit: 2,
+              divider_indices: [1, 2, 3, 4, 5, 999],
+              list_title: "Select Menu",
+              button_title: "Tap Here!"
+            },
+            tap_target_configuration: {
+              title: botname || 'Menu',
+              description: "WhatsApp Bot",
+              canonical_url: "https://hosting.keithsite.lol",
+              domain: "https://hosting.keithsite.lol",
+              button_index: 0
             }
           })
         },
@@ -192,7 +218,7 @@ keith({
 
   } catch (err) {
     console.error('menu error:', err);
-    return reply(` ${err.message}`);
+    return reply(`❌ ${err.message}`);
   }
 
   const handler = async (update) => {
