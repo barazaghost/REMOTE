@@ -2,6 +2,325 @@
 const { keith } = require('../commandHandler');
 const { sendButtons } = require('gifted-btns');
 const axios = require('axios');
+const { randomUUID } = require('crypto');
+const { prepareWAMessageMedia } = require('@whiskeysockets/baileys');
+const sharp = require('sharp');
+
+const additionalNodes = [
+  {
+    tag: "biz",
+    attrs: {},
+    content: [
+      {
+        tag: "interactive",
+        attrs: { type: "native_flow", v: "1" },
+        content: [{ tag: "native_flow", attrs: { v: "9", name: "mixed" } }]
+      }
+    ]
+  }
+];
+
+//========================================================================================================================
+// REPO 1 (GitHub)
+//========================================================================================================================
+keith({
+  pattern: "repo",
+  aliases: ["script", "sc"],
+  description: "Send KEITH-MD GitHub repo information",
+  category: "General",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { sender, pushName, botname, author, botPic, reply } = conText;
+
+  try {
+    const response = await axios.get("https://api.github.com/repos/kkeizza/Keith");
+    const repoData = response.data;
+
+    const createdDate = new Date(repoData.created_at).toLocaleDateString("en-KE", {
+      day: "numeric", month: "short", year: "numeric"
+    });
+
+    const lastUpdateDate = new Date(repoData.updated_at).toLocaleDateString("en-KE", {
+      day: "numeric", month: "short", year: "numeric"
+    });
+
+    const caption =
+      `Hello @${sender.split('@')[0]}, 👋 This is *${botname}*\n` +
+      `The best bot in the universe developed by ${author}. Fork and give a star 🌟 to my repo\n\n` +
+      `╭───────────────────\n` +
+      `│✞ *Stars:* ${repoData.stargazers_count}\n` +
+      `│✞ *Forks:* ${repoData.forks_count}\n` +
+      `│✞ *Release Date:* ${createdDate}\n` +
+      `│✞ *Last Update:* ${lastUpdateDate}\n` +
+      `│✞ *Owner:* ${author}\n` +
+      `╰───────────────────`;
+
+    const imgUrl = botPic || 'https://files.catbox.moe/placeholder.jpg';
+    const rawBuf = (await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 60000 })).data;
+
+    const resized = await sharp(Buffer.from(rawBuf))
+      .resize(800, 436, { fit: 'cover', position: 'center' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    const media = await prepareWAMessageMedia(
+      { image: resized },
+      { upload: client.waUploadToServer }
+    );
+
+    const payload = {
+      interactiveMessage: {
+        header: {
+          title: botname || 'Repo',
+          subtitle: "",
+          hasMediaAttachment: true,
+          productMessage: {
+            product: {
+              productImage: media.imageMessage,
+              title: botname || 'Repository',
+              description: "Click to visit repository",
+              currencyCode: "",
+              retailerId: "",
+              url: repoData.html_url,
+              productImageCount: 1
+            },
+            businessOwnerJid: "0@s.whatsapp.net"
+          }
+        },
+        body: {
+          text: caption
+        },
+        footer: {
+          text: '♡'
+        },
+        nativeFlowMessage: {
+          buttons: [
+            {
+              name: "cta_url",
+              buttonParamsJson: JSON.stringify({
+                display_text: "Visit Repository",
+                url: repoData.html_url,
+                merchant_url: repoData.html_url
+              })
+            },
+            {
+              name: "cta_url",
+              buttonParamsJson: JSON.stringify({
+                display_text: "Fork Repository",
+                url: "https://github.com/kkeizza/Keith/fork",
+                merchant_url: "https://github.com/kkeizza/Keith/fork"
+              })
+            },
+            {
+              name: "cta_copy",
+              buttonParamsJson: JSON.stringify({
+                display_text: "Copy Session URL",
+                id: "copy_session",
+                copy_code: "https://keithsite.lol/keithpair"
+              })
+            },
+            {
+              name: "cta_url",
+              buttonParamsJson: JSON.stringify({
+                display_text: "Download Zip",
+                url: "https://github.com/kkeizza/Keith/archive/refs/heads/main.zip",
+                merchant_url: "https://github.com/kkeizza/Keith/archive/refs/heads/main.zip"
+              })
+            }
+          ],
+          messageParamsJson: JSON.stringify({
+            bottom_sheet: {
+              in_thread_buttons_limit: 1,
+              divider_indices: [0, 1, 2, 3],
+              list_title: "Repository Actions",
+              button_title: "Select Action"
+            },
+            tap_target_configuration: {
+              title: "Keith Repo",
+              description: "Visit the repository",
+              canonical_url: repoData.html_url,
+              domain: repoData.html_url,
+              button_index: 0
+            }
+          })
+        },
+        contextInfo: {
+          mentionedJid: [sender],
+          groupMentions: [],
+          statusAttributions: [],
+          forwardingScore: 1,
+          isForwarded: true,
+          quotedMessage: {
+            key: { participant: '0@s.whatsapp.net', remoteJid: 'status@broadcast' },
+            message: { locationMessage: { name: `Hi ${pushName || 'User'}`, jpegThumbnail: '' } }
+          },
+          participant: '0@s.whatsapp.net',
+          stanzaId: 'status@broadcast'
+        }
+      }
+    };
+
+    await client.relayMessage(from, payload, {
+      messageId: randomUUID(),
+      additionalNodes
+    });
+
+  } catch (err) {
+    console.error("❌ Repo fetch failed:", err);
+    await reply(`❌ Failed to fetch repository information: ${err.message}`);
+  }
+});
+
+//========================================================================================================================
+// REPO 2 (GitLab)
+//========================================================================================================================
+keith({
+  pattern: "repo2",
+  aliases: ["script2", "sc2"],
+  description: "Send KEITH-MD GitLab repo information",
+  category: "General",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { sender, pushName, botname, author, botPic, reply } = conText;
+
+  try {
+    const response = await axios.get("https://gitlab.com/api/v4/projects/Keithkeizzah%2FKEITH-MD");
+    const repoData = response.data;
+
+    const createdDate = new Date(repoData.created_at).toLocaleDateString("en-KE", {
+      day: "numeric", month: "short", year: "numeric"
+    });
+
+    const lastUpdateDate = new Date(repoData.last_activity_at).toLocaleDateString("en-KE", {
+      day: "numeric", month: "short", year: "numeric"
+    });
+
+    const caption =
+      `Hello @${sender.split('@')[0]}, 👋 This is *${botname}*\n` +
+      `The best bot in the universe developed by ${author}. Fork and give a star 🌟 to my repo\n\n` +
+      `╭───────────────────\n` +
+      `│✞ *Stars:* ${repoData.star_count}\n` +
+      `│✞ *Forks:* ${repoData.forks_count}\n` +
+      `│✞ *Release Date:* ${createdDate}\n` +
+      `│✞ *Last Update:* ${lastUpdateDate}\n` +
+      `│✞ *Owner:* ${repoData.namespace.name}\n` +
+      `╰───────────────────`;
+
+    const imgUrl = botPic || 'https://files.catbox.moe/placeholder.jpg';
+    const rawBuf = (await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 60000 })).data;
+
+    const resized = await sharp(Buffer.from(rawBuf))
+      .resize(800, 436, { fit: 'cover', position: 'center' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    const media = await prepareWAMessageMedia(
+      { image: resized },
+      { upload: client.waUploadToServer }
+    );
+
+    const payload = {
+      interactiveMessage: {
+        header: {
+          title: botname || 'GitLab Repo',
+          subtitle: "",
+          hasMediaAttachment: true,
+          productMessage: {
+            product: {
+              productImage: media.imageMessage,
+              title: botname || 'Repository',
+              description: "Click to visit GitLab repository",
+              currencyCode: "",
+              retailerId: "",
+              url: repoData.web_url,
+              productImageCount: 1
+            },
+            businessOwnerJid: "0@s.whatsapp.net"
+          }
+        },
+        body: {
+          text: caption
+        },
+        footer: {
+          text: '♡'
+        },
+        nativeFlowMessage: {
+          buttons: [
+            {
+              name: "cta_url",
+              buttonParamsJson: JSON.stringify({
+                display_text: "Visit Repository",
+                url: repoData.web_url,
+                merchant_url: repoData.web_url
+              })
+            },
+            {
+              name: "cta_url",
+              buttonParamsJson: JSON.stringify({
+                display_text: "Fork Repository",
+                url: `${repoData.web_url}/-/forks/new`,
+                merchant_url: `${repoData.web_url}/-/forks/new`
+              })
+            },
+            {
+              name: "cta_copy",
+              buttonParamsJson: JSON.stringify({
+                display_text: "Copy Session URL",
+                id: "copy_session",
+                copy_code: "https://keithsite.lol/keithpair"
+              })
+            },
+            {
+              name: "cta_url",
+              buttonParamsJson: JSON.stringify({
+                display_text: "Download Zip",
+                url: `${repoData.web_url}/-/archive/main/KEITH-MD-main.zip`,
+                merchant_url: `${repoData.web_url}/-/archive/main/KEITH-MD-main.zip`
+              })
+            }
+          ],
+          messageParamsJson: JSON.stringify({
+            bottom_sheet: {
+              in_thread_buttons_limit: 1,
+              divider_indices: [0, 1, 2, 3],
+              list_title: "Repository Actions",
+              button_title: "Select Action"
+            },
+            tap_target_configuration: {
+              title: "GitLab Repo",
+              description: "Visit the repository",
+              canonical_url: repoData.web_url,
+              domain: repoData.web_url,
+              button_index: 0
+            }
+          })
+        },
+        contextInfo: {
+          mentionedJid: [sender],
+          groupMentions: [],
+          statusAttributions: [],
+          forwardingScore: 1,
+          isForwarded: true,
+          quotedMessage: {
+            key: { participant: '0@s.whatsapp.net', remoteJid: 'status@broadcast' },
+            message: { locationMessage: { name: `Hi ${pushName || 'User'}`, jpegThumbnail: '' } }
+          },
+          participant: '0@s.whatsapp.net',
+          stanzaId: 'status@broadcast'
+        }
+      }
+    };
+
+    await client.relayMessage(from, payload, {
+      messageId: randomUUID(),
+      additionalNodes
+    });
+
+  } catch (err) {
+    console.error("❌ Repo fetch failed:", err);
+    await reply(`❌ Failed to fetch repository information: ${err.message}`);
+  }
+});
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -183,132 +502,4 @@ keith({
 });
 //========================================================================================================================
 //
-
-
-keith({
-  pattern: "repo2",
-  aliases: ["script2", "sc2"],
-  description: "Send KEITH-MD repo information",
-  category: "General",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { reply, pushName, botname, author } = conText;
-
-  try {
-    // GitLab API endpoint for your repo
-    const response = await axios.get("https://gitlab.com/api/v4/projects/Keithkeizzah%2FKEITH-MD");
-    const repoData = response.data;
-
-    const createdDate = new Date(repoData.created_at).toLocaleDateString("en-KE", {
-      day: "numeric", month: "short", year: "numeric"
-    });
-
-    const lastUpdateDate = new Date(repoData.last_activity_at).toLocaleDateString("en-KE", {
-      day: "numeric", month: "short", year: "numeric"
-    });
-
-    const messageText =
-      `Hello ${pushName},👋 This is *${botname}*\n` +
-      `The best bot in the universe developed by ${author}. Fork and give a star 🌟 to my repo\n\n` +
-      `╭───────────────────\n` +
-      `│✞ *Stars:* ${repoData.star_count}\n` +
-      `│✞ *Forks:* ${repoData.forks_count}\n` +
-      `│✞ *Release Date:* ${createdDate}\n` +
-      `│✞ *Last Update:* ${lastUpdateDate}\n` +
-      `│✞ *Owner:* ${repoData.namespace.name}\n` +
-      `╰───────────────────\n` +
-      `${repoData.web_url}`;
-
-    await reply(messageText);
-
-  } catch (err) {
-    console.error("❌ Repo fetch failed:", err);
-    await reply("❌ Failed to fetch repository information.");
-  }
-});
-
-//========================================================================================================================
-
-
-
-
-keith({
-  pattern: "repo",
-  aliases: ["script", "sc"],
-  description: "Send KEITH-MD repo information",
-  category: "General",
-  filename: __filename
-}, async (from, client, conText) => {
-  const { mek, pushName, botname, author, botPic } = conText;
-
-  try {
-    const response = await axios.get("https://api.github.com/repos/kkeizza/Keith");
-    const repoData = response.data;
-
-    const createdDate = new Date(repoData.created_at).toLocaleDateString("en-KE", {
-      day: "numeric", month: "short", year: "numeric"
-    });
-
-    const lastUpdateDate = new Date(repoData.updated_at).toLocaleDateString("en-KE", {
-      day: "numeric", month: "short", year: "numeric"
-    });
-
-    const messageText =
-      `Hello @${pushName},👋 This is *${botname}*\n` +
-      `The best bot in the universe developed by ${author}. Fork and give a star 🌟 to my repo\n\n` +
-      `╭───────────────────\n` +
-      `│✞ *Stars:* ${repoData.stargazers_count}\n` +
-      `│✞ *Forks:* ${repoData.forks_count}\n` +
-      `│✞ *Release Date:* ${createdDate}\n` +
-      `│✞ *Last Update:* ${lastUpdateDate}\n` +
-      `│✞ *Owner:* ${author}\n` +
-      `╰───────────────────`;
-
-    await sendButtons(client, from, {
-      title: '',
-      text: messageText,
-      footer: '♡',
-      image: { url: botPic },
-      buttons: [
-        {
-          name: "cta_url",
-          buttonParamsJson: JSON.stringify({
-            display_text: "Visit Repository",
-            url: repoData.html_url
-          })
-        },
-        {
-          name: "cta_url",
-          buttonParamsJson: JSON.stringify({
-            display_text: "Fork Repository",
-            url: "https://github.com/kkeizza/Keith/fork"
-          })
-        },
-        {
-          name: "cta_copy",
-          buttonParamsJson: JSON.stringify({
-            display_text: "Copy Session URL",
-            id: "copy_session",
-            copy_code: "https://keithsite.lol/keithpair"
-          })
-        },
-        {
-          name: "cta_url",
-          buttonParamsJson: JSON.stringify({
-            display_text: "Download Zip",
-            id: `repo_dl_${Date.now()}`,
-            url: "https://github.com/kkeizza/Keith/archive/refs/heads/main.zip"
-          })
-        }
-      ]
-    }, { quoted: mek, mentions: [mek.sender] });
-
-  } catch (err) {
-    console.error("❌ Repo fetch failed:", err);
-    await client.sendMessage(from, {
-      text: "❌ Failed to fetch repository information."
-    }, { quoted: mek });
-  }
-});
-
 
