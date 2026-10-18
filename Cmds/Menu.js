@@ -1,75 +1,254 @@
 const { keith } = require('../commandHandler');
-const activeMenus = new Map();
+const { randomUUID } = require('crypto');
+const { prepareWAMessageMedia } = require('@whiskeysockets/baileys');
+const axios = require('axios');
+const sharp = require('sharp');
 
+const activeMenus = new Map();
 const commandList = {};
 let totalCommands = 0;
 
+//========================================================================================================================
+// SHARED HELPERS
+//========================================================================================================================
+
 function initializeCommands() {
-  if (Object.keys(commandList).length === 0) {
-    const commands = require('../commandHandler').commands;
-    totalCommands = commands.filter(cmd => !cmd.dontAddCommandList).length;
-    commands.forEach((cmd) => {
-      const category = cmd.category?.toUpperCase() || 'UNCATEGORIZED';
-      if (!commandList[category]) commandList[category] = [];
-      commandList[category].push(cmd.pattern);
-      });
-       // Sort commands inside each category
-    Object.keys(commandList).forEach(cat => {
-      commandList[cat].sort((a, b) => a.localeCompare(b));
-    
-    });
-  }
+  if (Object.keys(commandList).length > 0) return;
+  
+  const commands = require('../commandHandler').commands;
+  totalCommands = commands.filter((cmd) => !cmd.dontAddCommandList).length;
+  
+  commands.forEach((cmd) => {
+    const category = cmd.category?.toUpperCase() || 'UNCATEGORIZED';
+    if (!commandList[category]) commandList[category] = [];
+    commandList[category].push(cmd.pattern);
+  });
+  
+  Object.keys(commandList).forEach((cat) => {
+    commandList[cat].sort((a, b) => a.localeCompare(b));
+  });
 }
 
-function getCategoryCommands(categories, selectedNumber) {
-  const selectedCategory = categories?.[selectedNumber - 1];
-  if (!selectedCategory) {
-    return {
-      text: null,
-      category: null
-    };
-  }
-
-  const commandsInCategory = commandList[selectedCategory] || [];
-
-  return {
-    text:
-      `╭────「 ${selectedCategory} 」──┈⊷𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭𑲭\n` +
-      `│◦➛╭───────────────\n` +
-      commandsInCategory.map((cmd, idx) => `│◦➛ ${idx + 1}. ${cmd}`).join("\n") +
-      `\n│◦➛╰─────────────\n` +
-      `╰──────────────┈⊷\n\n` +
-      `🔢 Total: ${commandsInCategory.length} commands`,
-    category: selectedCategory
-  };
+function getCategoryText(category) {
+  const cmds = commandList[category] || [];
+  return (
+    `╭────「 ${category} 」───┈⊷\n` +
+    `│◦➛╭───────────────\n` +
+    cmds.map((cmd, i) => `│◦➛ ${i + 1}. ${cmd}`).join('\n') +
+    `\n│◦➛╰─────────────\n` +
+    `╰──────────────┈⊷\n\n` +
+    `🔢 Total: ${cmds.length} commands`
+  );
 }
 
 function locationQuoted(pushName) {
   return {
-    key: {
-      participant: '0@s.whatsapp.net',
-      remoteJid: 'status@broadcast',
-    },
+    key: { participant: '0@s.whatsapp.net', remoteJid: 'status@broadcast' },
     message: {
       locationMessage: {
         name: `Hi ${pushName || 'User'}`,
-        jpegThumbnail: '',
-      },
-    },
+        jpegThumbnail: ''
+      }
+    }
   };
 }
 
+const additionalNodes = [
+  {
+    tag: 'biz',
+    attrs: {},
+    content: [
+      {
+        tag: 'interactive',
+        attrs: { type: 'native_flow', v: '1' },
+        content: [{ tag: 'native_flow', attrs: { v: '9', name: 'mixed' } }]
+      }
+    ]
+  }
+];
+
 //========================================================================================================================
-// MENU (full list)
+// MENU 1 (Native Interactive Flow)
+//========================================================================================================================
 keith({
-  pattern: "menu",
+  pattern: 'menu',
+  aliases: ['help', 'commands', 'cmds'],
+  category: 'general',
+  description: 'Native flow menu with category picker',
+  filename: __filename
+}, async (from, client, conText) => {
+  const { sender, botname, botPic, expiryDisplay, pushName, reply } = conText;
+  const userId = sender;
+
+  if (activeMenus.has(userId)) {
+    const { handler } = activeMenus.get(userId);
+    client.ev.off('messages.upsert', handler);
+    activeMenus.delete(userId);
+  }
+
+  initializeCommands();
+  const categories = Object.keys(commandList).sort((a, b) => a.localeCompare(b));
+
+  const categoryRows = categories.map((cat, i) => ({
+    header: `${i + 1}`.padStart(2, '0'),
+    title: cat,
+    description: `${commandList[cat].length} commands`,
+    id: `menu_cat_${cat}`
+  }));
+
+  const caption =
+    `👋 Hey, @${sender.split('@')[0]}\n\n` +
+    `╭───〔 *${botname}* 〕──────┈\n` +
+    `│✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}\n` +
+    `│✵│▸ 𝐁𝐎𝐓 𝐄𝐗𝐏𝐈𝐑𝐀𝐓𝐈𝐎𝐍: ${expiryDisplay || 'N/A'}\n` +
+    `╰──────────────────────⊷\n\n` +
+    `Tap *Browse Categories* to see commands.`;
+
+  try {
+    const imgUrl = botPic || 'https://files.catbox.moe/placeholder.jpg';
+    const rawBuf = (await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 60000 })).data;
+
+    const resized = await sharp(Buffer.from(rawBuf))
+      .resize(736, 414, { fit: 'cover', position: 'center' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    const media = await prepareWAMessageMedia(
+      { image: resized },
+      { upload: client.waUploadToServer }
+    );
+
+    const quoted = locationQuoted(pushName);
+
+    const imageMessage = {
+      ...media.imageMessage,
+      caption,
+      height: 414,
+      width: 736,
+      interactiveAnnotations: [],
+      scanLengths: [],
+      annotations: [],
+      contextInfo: {
+        mentionedJid: [sender],
+        groupMentions: [],
+        statusAttributions: [],
+        forwardingScore: 1,
+        isForwarded: true
+      }
+    };
+
+    const payload = {
+      interactiveMessage: {
+        header: {
+          title: '',
+          subtitle: '',
+          imageMessage,
+          hasMediaAttachment: true
+        },
+        body: { text: caption },
+        footer: { text: botname || 'Bot' },
+        nativeFlowMessage: {
+          buttons: [
+            {
+              name: 'single_select',
+              buttonParamsJson: JSON.stringify({
+                title: '| Browse Categories',
+                sections: [{ title: 'Command Categories', rows: categoryRows }]
+              })
+            }
+          ],
+          messageParamsJson: JSON.stringify({
+            limited_time_offer: {
+              text: 'Advert: host your bot in hosting.keithsite.lol',
+              url: 'https://hosting.keithsite.lol',
+              copy_code: 'hosting.keithsite.lol',
+              expiration_time: Date.now() + (24 * 60 * 60 * 1000) // Ends tomorrow
+            },
+            bottom_sheet: {
+              in_thread_buttons_limit: 1,
+              divider_indices: [0],
+              list_title: botname || 'Menu',
+              button_title: botname || 'Menu'
+            }
+          })
+        },
+        contextInfo: {
+          mentionedJid: [sender],
+          groupMentions: [],
+          statusAttributions: [],
+          forwardingScore: 1,
+          isForwarded: true,
+          quotedMessage: quoted.message,
+          participant: quoted.key.participant,
+          stanzaId: 'status@broadcast'
+        }
+      }
+    };
+
+    await client.relayMessage(from, payload, {
+      messageId: randomUUID(),
+      additionalNodes
+    });
+
+  } catch (err) {
+    console.error('menu error:', err);
+    return reply(` ${err.message}`);
+  }
+
+  const handler = async (update) => {
+    const msg = update.messages?.[0];
+    if (!msg?.message) return;
+    if (msg.key.remoteJid !== from) return;
+
+    const resp = msg.message.interactiveResponseMessage?.nativeFlowResponseMessage;
+    if (!resp) return;
+
+    let params = {};
+    try {
+      params = JSON.parse(resp.paramsJson || '{}');
+    } catch { return; }
+
+    const selectedId = params.id || params.selectedId;
+    if (!selectedId) return;
+
+    if (selectedId.startsWith('menu_cat_')) {
+      const category = selectedId.replace('menu_cat_', '');
+      await client.sendMessage(from, {
+        image: { url: botPic },
+        caption: getCategoryText(category),
+        mentions: [sender],
+        contextInfo: {
+          quotedMessage: locationQuoted().message,
+          participant: locationQuoted().key.participant,
+          stanzaId: 'status@broadcast'
+        }
+      }, { quoted: msg });
+    }
+  };
+
+  client.ev.on('messages.upsert', handler);
+  activeMenus.set(userId, { handler });
+
+  setTimeout(() => {
+    if (activeMenus.has(userId)) {
+      client.ev.off('messages.upsert', activeMenus.get(userId).handler);
+      activeMenus.delete(userId);
+    }
+  }, 600000);
+});
+
+//========================================================================================================================
+// MENU 2 (Full Text List)
+//========================================================================================================================
+keith({
+  pattern: "menu2",
+  aliases: ["menufull"],
   category: "general",
   description: "Show all commands grouped by category"
 }, async (from, client, conText) => {
-  const { mek, sender, botname, expiryDisplay, botPic, pushName } = conText;
+  const { sender, botname, expiryDisplay, botPic, pushName } = conText;
 
   initializeCommands();
-
   const categories = Object.keys(commandList).sort((a, b) => a.localeCompare(b));
 
   let menuText = `╰►Hey, ${pushName || 'User'}
@@ -100,13 +279,14 @@ keith({
 });
 
 //========================================================================================================================
-// MENU (interactive)
+// MENU 3 (Interactive Number Reply)
+//========================================================================================================================
 keith({
-  pattern: "menu2",
+  pattern: "menu3",
   category: "general",
-  description: "Interactive category-based menu"
+  description: "Interactive category-based menu (reply with number)"
 }, async (from, client, conText) => {
-  const { mek, sender, botname, botPic, expiryDisplay, pushName } = conText;
+  const { sender, botname, botPic, expiryDisplay, pushName } = conText;
   const userId = sender;
 
   if (activeMenus.has(userId)) {
@@ -116,7 +296,6 @@ keith({
   }
 
   initializeCommands();
-
   const categories = Object.keys(commandList).sort((a, b) => a.localeCompare(b));
 
   const menuText = `╰►Hey, ${pushName || 'User'}
@@ -181,7 +360,8 @@ ${categories.map((cat, i) => `> │◦➛ ${i + 1}. ${cat}`).join("\n")}
       return;
     }
 
-    const { text: commandsText } = getCategoryCommands(categories, selectedNumber);
+    const categoryName = categories[selectedNumber - 1];
+    const commandsText = getCategoryText(categoryName);
     if (!commandsText) return;
 
     const quotedMsg = locationQuoted(pushName);
