@@ -264,25 +264,27 @@ keith({
 });
 
 //========================================================================================================================
-// MENU 2 (Full Text List)
+// MENU 2 (Full Text List with Link Preview)
 //========================================================================================================================
 keith({
   pattern: "menu2",
   aliases: ["menufull"],
   category: "general",
-  description: "Show all commands grouped by category"
+  description: "Show all commands grouped by category (link preview style)"
 }, async (from, client, conText) => {
-  const { sender, botname, expiryDisplay, botPic, pushName } = conText;
+  const { sender, botname, expiryDisplay, botPic, pushName, reply } = conText;
 
   initializeCommands();
   const categories = Object.keys(commandList).sort((a, b) => a.localeCompare(b));
 
-  let menuText = `╰►Hey, ${pushName || 'User'}
-╭───〔 *${botname}* 〕──────┈
-├──────────────
-│✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}
-│✵│▸ 𝐁𝐎𝐓 𝐄𝐗𝐏𝐈𝐑𝐀𝐓𝐈𝐎𝐍 𝐃𝐀𝐓𝐄: ${expiryDisplay}
-╰──────────────────────⊷\n\n`;
+  // Start with the URL so WhatsApp triggers the preview
+  let menuText = `https://hosting.keithsite.lol\n\n` +
+    `╰►Hey, ${pushName || 'User'}\n` +
+    `╭───〔 *${botname}* 〕──────┈\n` +
+    `├──────────────\n` +
+    `│✵│▸ 𝐓𝐎𝐓𝐀𝐋 𝐏𝐋𝐔𝐆𝐈𝐍𝐒: ${totalCommands}\n` +
+    `│✵│▸ 𝐁𝐎𝐓 𝐄𝐗𝐏𝐈𝐑𝐀𝐓𝐈𝐎𝐍 𝐃𝐀𝐓𝐄: ${expiryDisplay}\n` +
+    `╰──────────────────────⊷\n\n`;
 
   categories.forEach(cat => {
     menuText += `╭─────「 ${cat} 」───┈⊷\n`;
@@ -290,18 +292,52 @@ keith({
     menuText += `\n╰──────────────┈⊷\n\n`;
   });
 
-  const quoted = locationQuoted(pushName);
+  try {
+    const imgUrl = botPic || 'https://files.catbox.moe/placeholder.jpg';
+    const rawBuf = (await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 60000 })).data;
 
-  await client.sendMessage(from, {
-    image: { url: botPic },
-    caption: menuText.trim(),
-    mentions: [sender],
-    contextInfo: {
-      quotedMessage: quoted.message,
-      participant: quoted.key.participant,
-      stanzaId: 'status@broadcast'
-    }
-  });
+    const resized = await sharp(Buffer.from(rawBuf))
+      .resize(736, 1308, { fit: 'cover', position: 'center' }) // Match the original aspect ratio
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    const media = await prepareWAMessageMedia(
+      { image: resized },
+      { upload: client.waUploadToServer }
+    );
+
+    const payload = {
+      extendedTextMessage: {
+        endCardTiles: [],
+        text: menuText.trim(),
+        matchedText: "https://hosting.keithsite.lol",
+        description: `Powered by ${botname || 'Keith'}`,
+        title: botname || 'Menu',
+        previewType: 0,
+        jpegThumbnail: media.imageMessage.jpegThumbnail,
+        thumbnailDirectPath: media.imageMessage.directPath,
+        thumbnailSha256: media.imageMessage.fileSha256,
+        thumbnailEncSha256: media.imageMessage.fileEncSha256,
+        mediaKey: media.imageMessage.mediaKey,
+        mediaKeyTimestamp: media.imageMessage.mediaKeyTimestamp,
+        thumbnailHeight: 1308,
+        thumbnailWidth: 736,
+        inviteLinkGroupTypeV2: 0,
+        contextInfo: {
+          mentionedJid: [sender],
+          groupMentions: [],
+          statusAttributions: [],
+          forwardingScore: 1,
+          isForwarded: true
+        }
+      }
+    };
+
+    await client.relayMessage(from, payload, {});
+  } catch (err) {
+    console.error('menu2 error:', err);
+    await reply(`❌ ${err.message}`);
+  }
 });
 
 //========================================================================================================================
