@@ -15,6 +15,106 @@ const util = require('util');
 const { sendInteractiveMessage } = require('gifted-btns');
 //========================================================================================================================
 
+const DURATIONS = {
+  1: { seconds: 86400, label: '1 day' },
+  2: { seconds: 604800, label: '7 days' },
+  3: { seconds: 2592000, label: '30 days' }
+};
+
+const numberOf = (jid) => String(jid || '').split('@')[0].split(':')[0];
+
+function getRepliedKey({ mek, client, from, store }) {
+  const ctx = mek?.message?.extendedTextMessage?.contextInfo;
+  const stanzaId = ctx?.stanzaId;
+  if (!stanzaId || !ctx?.quotedMessage) return null;
+
+  let key = null;
+  try { key = store?.loadMessage?.(from, stanzaId)?.key || null; } catch {}
+
+  if (!key) {
+    const botNumbers = [client.user?.id, client.user?.lid].filter(Boolean).map(numberOf);
+    const fromMe = botNumbers.includes(numberOf(ctx.participant));
+    key = { remoteJid: from, fromMe, id: stanzaId };
+    if (!fromMe && ctx.participant) key.participant = ctx.participant;
+  }
+  return key;
+}
+
+function pinGuards(conText) {
+  const { isGroup, isAdmin, isBotAdmin, isSuperUser } = conText;
+  
+  if (isGroup) {
+    if (!isAdmin && !isSuperUser) return "❌ Only group admins can do that!";
+    if (!isBotAdmin) return "This bot is not an admin";
+  }
+  
+  return null;
+}
+
+keith({
+  pattern: "pin",
+  aliases: ["pinmsg", "pinmessage"],
+  category: "Owner",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, q, reply, store, prefix } = conText;
+
+  const problem = pinGuards(conText);
+  if (problem) return reply(problem);
+
+  const key = getRepliedKey({ mek, client, from, store });
+  if (!key) return reply("❌ Reply to a message to pin it!");
+
+  const choice = (q || '').trim().split(/\s+/)[0];
+  if (!choice) {
+    return reply(
+      `⏱️ Specify the duration!\n\n*Options:*\n` +
+      `• ${prefix}pin 1 = 1 day\n` +
+      `• ${prefix}pin 2 = 7 days\n` +
+      `• ${prefix}pin 3 = 30 days`
+    );
+  }
+
+  const selected = DURATIONS[choice];
+  if (!selected) return reply("❌ Invalid option! Use 1, 2, or 3 only.");
+
+  try {
+    await client.sendMessage(from, { pin: key, type: 1, time: selected.seconds });
+    return reply(`📌 Message pinned for ${selected.label}!`);
+  } catch (e) {
+    console.error('[Pin] Error:', e);
+    return reply(`❌ ${e.message}\n\nFailed to pin the message.`);
+  }
+});
+
+keith({
+  pattern: "unpin",
+  aliases: ["unpinmsg", "unpinmessage"],
+  category: "Owner",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { mek, reply, store } = conText;
+
+  const problem = pinGuards(conText);
+  if (problem) return reply(problem);
+
+  const key = getRepliedKey({ mek, client, from, store });
+  if (!key) return reply("❌ Reply to the pinned message to unpin it!");
+
+  try {
+    await client.sendMessage(from, { pin: key, type: 2 });
+    return reply("📍 Message unpinned!");
+  } catch (e) {
+    console.error('[Unpin] Error:', e);
+    return reply(`❌ ${e.message}\n\nFailed to unpin the message.`);
+  }
+});//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+//========================================================================================================================
+
 // Debug helper - shows exactly what identity info Baileys gave us for the sender / quoted
 // user, so username-based sudo checks can be verified against real data instead of guesswork.
 keith({
