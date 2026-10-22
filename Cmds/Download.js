@@ -538,7 +538,7 @@ async (from, client, conText) => {
 
 keith({
   pattern: "pinterest",
-  aliases: ["pindl", "pin"],
+  aliases: ["pindl"],
   category: "downloader",
   description: "Download media from Pinterest"
 },
