@@ -8,6 +8,70 @@ const { keith } = require('../commandHandler');
 //========================================================================================================================
 //========================================================================================================================
 
+keith({
+  pattern: "soundcloud",
+  aliases: ["sc", "scdl", "scplay"],
+  category: "Downloader",
+  description: "Download audio from SoundCloud"
+}, async (from, client, conText) => {
+  const { q, api, reply, contactMessage } = conText;
+
+  if (!q) return reply("❌ Please provide a song name or SoundCloud link.");
+
+  try {
+    let downloadUrl, videoTitle, artistName;
+
+    if (q.includes("soundcloud.com")) {
+      // Direct link download
+      const dlResponse = await axios.get(`${api}/download/soundcloud?url=${encodeURIComponent(q)}`);
+      const result = dlResponse.data;
+
+      if (!result || !result.download) {
+        return reply("❌ SoundCloud track not found or no download link available.");
+      }
+
+      downloadUrl = result.download; // ✅ Correct key is 'download', not 'stream'
+      videoTitle = result.title;
+      artistName = result.artist;
+    } else {
+      // Search flow
+      const searchResponse = await axios.get(`${api}/search/soundcloud?q=${encodeURIComponent(q)}`);
+      const result = searchResponse.data?.result;
+
+      if (!result || !result.result || result.result.length === 0) {
+        return reply("❌ No results found.");
+      }
+
+      const topSong = result.result[0];
+      videoTitle = topSong.title;
+      artistName = topSong.artist;
+
+      const dlResponse = await axios.get(`${api}/download/soundcloud?url=${encodeURIComponent(topSong.url)}`);
+      const dlResult = dlResponse.data;
+
+      if (!dlResult || !dlResult.download) {
+        return reply("❌ Failed to get download link.");
+      }
+
+      downloadUrl = dlResult.download; // ✅ Correct key is 'download'
+    }
+
+    if (!downloadUrl) return reply("❌ Failed to extract download link.");
+
+    const fileName = `${videoTitle} - ${artistName}.mp3`.replace(/[^\w\s.-]/gi, '');
+
+    await client.sendMessage(from, {
+      audio: { url: downloadUrl },
+      mimetype: "audio/mpeg",
+      fileName: fileName,
+      ptt: false
+    }, { quoted: contactMessage });
+
+  } catch (error) {
+    console.error("Error during download process:", error);
+    await reply(`❌ Error: ${error.message}`);
+  }
+});
 //========================================================================================================================
 
 //========================================================================================================================
