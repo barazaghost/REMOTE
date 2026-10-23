@@ -146,7 +146,12 @@ keith({
           text: caption
         },
         footer: {
-          text: `> ᴡʜᴀᴛꜱᴀᴘᴘ ʙᴏᴛ ʙʏ ${botname || 'Keith'}`
+          // Fixed the missing backtick here
+          text: `You can as well use:
+> ${conText.prefix || '.'}menu2 (Full Text List)
+> ${conText.prefix || '.'}menu3 (Interactive Reply Menu)
+
+> ᴡʜᴀᴛꜱᴀᴘᴘ ʙᴏᴛ ʙʏ ${botname || 'Keith'}`
         },
         nativeFlowMessage: {
           buttons: [
