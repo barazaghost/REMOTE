@@ -3472,7 +3472,6 @@ if (connection === "open") {
     ╭═『 ${currentBotName}══⊷ 
     ║ ᴍᴏᴅᴇ ${currentMode}
     ║ ᴘʀᴇғɪx [ ${currentPrefix || 'none'} ] 
-    ║ ᴇxᴘɪʀʏ: ${expiryDisplay}
     ║ host your bot here ✅️
     ║ hosting.keithsite.lol 
     ╰═════════════⊷
