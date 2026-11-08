@@ -2039,6 +2039,22 @@ async function startKeith() {
         };
 
         client = keithConnect(keithSock);
+
+        // Store LID <-> phone-number JID mappings whenever WhatsApp provides one.
+        client.ev.on('lid-mapping.update', async ({ lid, pn }) => {
+            try {
+                if (!lid || !pn) return;
+
+                await client.signalRepository?.lidMapping?.storeLIDPNMappings([
+                    { lid, pn }
+                ]);
+
+                KeithLogger.info(`Stored LID mapping: ${lid} -> ${pn}`);
+            } catch (error) {
+                KeithLogger.error('Failed to store LID mapping:', error);
+            }
+        });
+
         KeithLogger.setClientInstance(client);
         
         store.bind(client.ev);
