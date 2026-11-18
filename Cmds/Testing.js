@@ -56,3 +56,36 @@ keith({
     await reply(`❌ Failed to send view-once text: ${err.message}`);
   }
 });
+
+
+keith({
+  pattern: 'rvt',
+  aliases: ['reveal', 'vv', 'readviewonce', 'rvo'],
+  category: 'tools',
+  description: 'Reveal the text inside a quoted view-once message',
+  filename: __filename
+}, async (from, client, conText) => {
+  const { reply, quotedMsg } = conText;
+
+  if (!quotedMsg) {
+    return reply('📌 Reply to a view-once text message to reveal it.');
+  }
+
+  let extractedText = null;
+
+  if (quotedMsg.viewOnceMessageV2?.message?.extendedTextMessage?.text) {
+    extractedText = quotedMsg.viewOnceMessageV2.message.extendedTextMessage.text;
+  } 
+  else if (quotedMsg.viewOnceMessage?.message?.extendedTextMessage?.text) {
+    extractedText = quotedMsg.viewOnceMessage.message.extendedTextMessage.text;
+  }
+  else if (quotedMsg.extendedTextMessage?.text) {
+    extractedText = quotedMsg.extendedTextMessage.text;
+  }
+
+  if (!extractedText) {
+    return reply('❌ Could not find any view-once text in the quoted message.');
+  }
+
+  return reply(extractedText);
+});
