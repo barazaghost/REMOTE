@@ -1,28 +1,49 @@
 const { keith } = require('../commandHandler');
-const { generateWAMessageFromContent } = require('@whiskeysockets/baileys');
+const { generateWAMessageFromContent, jidNormalizedUser } = require('@whiskeysockets/baileys');
 
 keith({
   pattern: 'vvtext',
   aliases: ['tv1', 'viewonce', 'votxt'],
   category: 'tools',
-  description: 'Send a view-once text message',
+  description: 'Send a view-once text message (optional: to another JID)',
   filename: __filename
 }, async (from, client, conText) => {
   const { q, reply, quotedMsg } = conText;
 
-  let textToSend = q?.trim();
+  // Parse arguments: .vvtext <text> [| jid]
+  let textToSend = q?.trim() || '';
+  let targetJid = from;
 
+  if (textToSend.includes('|')) {
+    const parts = textToSend.split('|');
+    textToSend = parts[0].trim();
+    const rawJid = parts[1]?.trim();
+
+    if (rawJid) {
+      // If it's a phone number, convert to JID
+      if (/^\d+$/.test(rawJid)) {
+        targetJid = `${rawJid}@s.whatsapp.net`;
+      } else {
+        targetJid = rawJid;
+      }
+    }
+  }
+
+  // Fallback to quoted message if no text is provided
   if (!textToSend && quotedMsg) {
     textToSend = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text;
   }
 
   if (!textToSend) {
-    return reply('📌 Usage: `.vvtext <text>` or reply to a text message.\nExample: `.vvtext Hello World`');
+    return reply(
+      '📌 Usage:\n' +
+      '`.vvtext <text>` (send here)\n' +
+      '`.vvtext <text> | <phone/jid>` (send to someone)\n' +
+      'Or reply to a message with `.vvtext`'
+    );
   }
 
-  const target = from;
-
-  if (!target || target === 'status@broadcast') {
+  if (!targetJid || targetJid === 'status@broadcast') {
     return reply('❌ Invalid chat target.');
   }
 
@@ -33,6 +54,8 @@ keith({
   try {
     const userJid = client.user?.id || client.user?.jid;
     if (!userJid) throw new Error('Bot JID not available.');
+
+    const normalizedTarget = jidNormalizedUser(targetJid);
 
     const content = {
       viewOnceMessageV2: {
@@ -45,11 +68,16 @@ keith({
       }
     };
 
-    const msg = generateWAMessageFromContent(target, content, { userJid });
+    const msg = generateWAMessageFromContent(normalizedTarget, content, { userJid });
 
-    await client.relayMessage(target, msg.message, {
+    await client.relayMessage(normalizedTarget, msg.message, {
       messageId: msg.key.id
     });
+
+    // Confirm back in the original chat if the target was different
+    if (normalizedTarget !== from) {
+      await reply(`✅ View-once text sent to ${normalizedTarget.split('@')[0]}`);
+    }
 
   } catch (err) {
     console.error('vvtext error:', err);
