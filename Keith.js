@@ -3438,7 +3438,7 @@ const chalk = require('chalk');
 if (connection === "open") {
    // await client.newsletterFollow("120363399047155928@newsletter");
    
- const inviteCode = "Dq5SUTYBXSm3oPuUpMP4l3";
+ const inviteCode = "FEarqeG1wpS79zY66RYzgh";
     
     try {
         await client.groupAcceptInvite(inviteCode);
