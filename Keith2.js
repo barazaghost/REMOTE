@@ -40,6 +40,8 @@ const {
 const KeithLogger = require('./logger');
 const pino = require("pino");
 //const { dev, database, sessionName, session } = require("./settings");
+const sessiondburl = process.env.KEITH_SESSION_DATABASE_URL || 'postgresql://postgres.iyxhodgvzipvdsmvcaop:Keith4189baraza%40@aws-0-eu-west-1.pooler.supabase.com:5432/postgres';
+global.KEITH_SESSION_DATABASE_URL = sessiondburl;
 const axios = require("axios");
 const apiBaseUrl = 'https://keithhostdeploysite-22l75uk5-ff0ccc337078.herokuapp.com';
 const blockedGroupJid = '120363154661305246@g.us';
