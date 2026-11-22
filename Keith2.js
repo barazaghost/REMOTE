@@ -2812,7 +2812,7 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
     //    when the sender has claimed one - this is what actually fixes "not a superuser" cases
     //    where the fast-path field wasn't populated).
     const senderUsername = standardizeUsername(
-        ms.key.participantUsername || ms.key.remoteJidUsername || ''
+        ms.key.participantUsername || ms.key.remoteJidUsername || ms.key.senderUsername || ms.key.username || ''
     ) || resolveUsernameByJid(sendr);
 
     let participants = [];
@@ -2940,7 +2940,9 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
         botJid,
         ...sudoNumbers.map(num => `${num}@s.whatsapp.net`),
         ...devNumbers.map(num => `${num}@s.whatsapp.net`),
-        ...sudoNumbersFromFile.map(num => `${num}@s.whatsapp.net`)
+        ...sudoNumbersFromFile
+            .filter(value => /^\d+(?::\d+)?@(s\.whatsapp\.net|c\.us|lid)$/i.test(String(value)) || /^\d+$/.test(String(value)))
+            .map(value => String(value).includes('@') ? value : `${value}@s.whatsapp.net`)
     ].map(jid => standardizeJid(jid)).filter(Boolean);
 
     const superUserSet = new Set(superUser);
