@@ -4,6 +4,7 @@ const axios = require('axios');
 const fs = require('fs');
 const { sendButtons } = require('gifted-btns');
 const { getGroupEventsSettings, updateGroupEventsSettings } = require('../database/groupevents');
+const { getActiveUsers, getInactiveUsers, clearActiveUser } = require('../database/activeusers');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -1059,74 +1060,95 @@ keith({
 //========================================================================================================================
 
 keith({
-    pattern: "listonline",
-    aliases: ["listactive", "activeusers", "online", "topactive"],
+    pattern: "listactiveusers",
+    aliases: ["listonline", "listactive", "activeusers", "online", "topactive"],
     category: "Group",
-    description: "Show most active users in the group by message count"
+    description: "Show the most active users by persistent message count"
 }, async (from, client, conText) => {
-    const { reply, isGroup, isAdmin, isBotAdmin, groupInfo, activeUsers, sender, isSuperUser, mek } = conText;
-
-    if (!isGroup) {
-        return reply("❌ This command only works in groups!");
-    }
-
-    if (!isSuperUser) {
-        return reply("👑 Only group admins can use this command!");
-    }
+    const { reply, isGroup, groupInfo, q, mek } = conText;
+    if (!isGroup) return reply("❌ This command only works in groups!");
 
     try {
-        
-        const users = activeUsers ? activeUsers(from, 30) : [];
-        
-        if (!users || users.length === 0) {
-            return reply(`📊 *No active users found yet!*
+        const users = await getActiveUsers(from, parseInt(q, 10) || 30);
+        if (!users.length) return reply("📊 No active users have been recorded yet.");
 
-Members need to send messages first for tracking to build up.
-
-💡 *Tip:* Active users are tracked based on message count.`);
-        }
-
-        const groupName = groupInfo?.subject || 'This Group';
-        const totalParticipants = groupInfo?.participants?.length || 0;
-        
-        let message = `📊 *ACTIVE USERS — ${groupName}*\n`;
-        message += `👥 *Total Members:* ${totalParticipants}\n`;
-        message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-
-        let medalEmojis = ['🥇', '🥈', '🥉'];
-        let mentions = [];
-
-        for (let i = 0; i < users.length; i++) {
-            const { jid, count } = users[i];
-            const medal = i < 3 ? medalEmojis[i] : '🔹';
-            
-            
-            const participant = groupInfo?.participants?.find(p => p.id === jid);
-            let displayName;
-            
-            if (participant?.pn) {
-                displayName = participant.pn;
-            } else if (participant?.name) {
-                displayName = participant.name;
-            } else {
-                displayName = jid.split('@')[0];
-            }
-            
-            message += `${medal} ${i + 1}. @${displayName} — *${count} messages*\n`;
-            mentions.push(jid);
-        }
-
-        message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
-        message += `📈 *Total Active users:* ${users.length}`;
-
-        await client.sendMessage(from, {
-            text: message,
-            mentions: mentions
-        }, { quoted: mek });
-
+        const sameJid = (a, b) => a === b || a?.split(':')[0] === b?.split(':')[0];
+        const mentions = users.map(user => user.userJid);
+        let message = `📊 *ACTIVE USERS — ${groupInfo?.subject || 'This Group'}*\n━━━━━━━━━━━━━━━━━━━━\n`;
+        users.forEach((user, index) => {
+            const participant = groupInfo?.participants?.find(p => sameJid(p.id, user.userJid));
+            const name = user.userName || participant?.pn || participant?.name || user.userJid.split('@')[0];
+            message += `${index < 3 ? ['🥇', '🥈', '🥉'][index] : '🔹'} ${index + 1}. @${name} — *${user.messageCount} messages*\n`;
+        });
+        message += `━━━━━━━━━━━━━━━━━━━━\n📈 *Total listed:* ${users.length}`;
+        await client.sendMessage(from, { text: message, mentions }, { quoted: mek });
     } catch (err) {
-        console.error("listonline error:", err);
+        console.error("listactiveusers error:", err);
         await reply(`❌ Error: ${err.message}`);
+    }
+});
+
+keith({
+    pattern: "listinactive",
+    aliases: ["inactiveusers"],
+    category: "Group",
+    description: "List users inactive for the specified number of minutes"
+}, async (from, client, conText) => {
+    const { reply, isGroup, q, mek } = conText;
+    if (!isGroup) return reply("❌ This command only works in groups!");
+    const minutes = Math.max(1, parseInt(q, 10) || 30);
+    try {
+        const users = await getInactiveUsers(from, minutes);
+        if (!users.length) return reply(`✅ No tracked users have been inactive for ${minutes} minutes.`);
+        const mentions = users.map(user => user.userJid);
+        let message = `📋 *INACTIVE USERS (${minutes}+ MINUTES)*\n━━━━━━━━━━━━━━━━━━━━\n`;
+        users.forEach((user, index) => {
+            const name = user.userName || user.userJid.split('@')[0];
+            message += `${index + 1}. @${name} — ${user.messageCount} messages, last seen ${new Date(user.lastSeen).toLocaleString()}\n`;
+        });
+        await client.sendMessage(from, { text: message, mentions }, { quoted: mek });
+    } catch (err) {
+        console.error("listinactive error:", err);
+        await reply(`❌ Error: ${err.message}`);
+    }
+});
+
+keith({
+    pattern: "kickinactive",
+    aliases: ["removeinactive"],
+    category: "Group",
+    description: "Remove non-admin users inactive for the specified number of minutes"
+}, async (from, client, conText) => {
+    const { reply, isGroup, isAdmin, isBotAdmin, q, groupInfo } = conText;
+    if (!isGroup) return reply("❌ This command only works in groups!");
+    if (!isAdmin) return reply("❌ Only group admins can use this command!");
+    if (!isBotAdmin) return reply("❌ I need to be a group admin first.");
+
+    const minutes = Math.max(1, parseInt(q, 10) || 30);
+    const sameJid = (a, b) => a === b || a?.split(':')[0] === b?.split(':')[0];
+    const botJid = client.user?.id;
+    try {
+        const inactive = await getInactiveUsers(from, minutes);
+        const removable = inactive.filter(user => {
+            const participant = groupInfo?.participants?.find(p => sameJid(p.id, user.userJid));
+            return participant && !participant.admin && !sameJid(user.userJid, botJid);
+        });
+        if (!removable.length) return reply(`✅ No removable users have been inactive for ${minutes} minutes.`);
+
+        let removed = 0;
+        for (const user of removable) {
+            try {
+                await client.groupParticipantsUpdate(from, [user.userJid], 'remove');
+                await clearActiveUser(from, user.userJid);
+                removed++;
+            } catch (err) {
+                console.error(`kickinactive failed for ${user.userJid}:`, err.message);
+            }
+        }
+        return reply(`✅ Removed ${removed} inactive user(s) inactive for ${minutes}+ minutes.`);
+    } catch (err) {
+        console.error("kickinactive error:", err);
+        return reply(`❌ Error: ${err.message}`);
     }
 });
 
