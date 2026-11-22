@@ -1533,9 +1533,15 @@ keith({
       }
       let finalResult = result;
       if (result.includes('@lid')) {
-        finalResult = await client.getJidFromLid(result);
+        try {
+          finalResult = await client.getJidFromLid(result);
+        } catch {
+          finalResult = null;
+        }
       }
-      targetNumber = finalResult.split("@")[0];
+      if (finalResult && !finalResult.endsWith('@lid')) {
+        targetNumber = finalResult.split("@")[0];
+      }
     }
   }
 
