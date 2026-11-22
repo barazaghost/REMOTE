@@ -2129,6 +2129,43 @@ async (from, client, conText) => {
 //========================================================================================================================
 
 keith({
+  pattern: "autogreytick",
+  aliases: ["greytick", "greycheck"],
+  category: "Settings",
+  description: "Enable or disable automatic grey ticks"
+}, async (from, client, conText) => {
+  const { reply, q, isSuperUser, botSettings } = conText;
+
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  const input = q?.trim().toLowerCase();
+  if (!input || !["on", "off", "true", "false"].includes(input)) {
+    const current = botSettings.autogreytick === true ||
+      String(botSettings.autogreytick).toLowerCase() === "true";
+
+    return reply(
+      `*Automatic Grey Tick*\n\n` +
+      `Current status: *${current ? "ON" : "OFF"}*\n\n` +
+      `Usage:\n` +
+      `• .autogreytick on\n` +
+      `• .autogreytick off`
+    );
+  }
+
+  const enabled = input === "on" || input === "true";
+  const saved = await updateSettings({ autogreytick: enabled });
+
+  if (!saved) return reply("❌ Failed to save autogreytick setting.");
+
+  botSettings.autogreytick = enabled;
+  return reply(
+    `✅ Automatic grey tick is now *${enabled ? "ON" : "OFF"}*.\n\n` +
+    `Restart the bot for the WhatsApp connection setting to take effect.`
+  );
+});
+//========================================================================================================================
+
+keith({
   pattern: "prefix",
   aliases: ["setprefix"],
   category: "Settings",
