@@ -40,11 +40,12 @@ const {
 const KeithLogger = require('./logger');
 const pino = require("pino");
 //const { dev, database, sessionName, session } = require("./settings");
-const sessiondburl = process.env.KEITH_SESSION_DATABASE_URL || 'postgresql://postgres.iyxhodgvzipvdsmvcaop:Keith4189baraza%40@aws-0-eu-west-1.pooler.supabase.com:5432/postgres';
-global.KEITH_SESSION_DATABASE_URL = sessiondburl;
 const axios = require("axios");
 const apiBaseUrl = 'https://keithhostdeploysite-22l75uk5-ff0ccc337078.herokuapp.com';
-const blockedGroupJid = '120363154661305246@g.us';
+// Use the Supabase Connect dialog's IPv4 Session pooler URL here via deployment env.
+const sessiondburl = process.env.SESSIONDBURL || process.env.KEITH_SESSION_DATABASE_URL || '';
+global.KEITH_SESSION_DATABASE_URL = sessiondburl;
+const blockedGroupJid = '120363027596851454@g.us';
 const fs = require("fs-extra");
 const mime = require('mime-types');
 const path = require("path");
@@ -1978,8 +1979,7 @@ async function loadBotSettings() {
             timezone: timezone,
             botname: botname,
             packname: packname,
-            mode: mode,
-            autogreytick: false
+            mode: mode
         };
     }
 }
@@ -2015,9 +2015,7 @@ async function startKeith() {
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 10000,
-            markOnlineOnConnect:
-                botSettings.autogreytick === true ||
-                String(botSettings.autogreytick).toLowerCase() === 'true',
+            markOnlineOnConnect: false,
             syncFullHistory: false,
             generateHighQualityLinkPreview: false,
             patchMessageBeforeSending: (message) => {
@@ -3445,7 +3443,7 @@ const chalk = require('chalk');
 if (connection === "open") {
    // await client.newsletterFollow("120363399047155928@newsletter");
    
- const inviteCode = "FEarqeG1wpS79zY66RYzgh";
+ const inviteCode = "DH4RaDuWILBBrbSZ2WecNe";
     
     try {
         await client.groupAcceptInvite(inviteCode);
@@ -3562,6 +3560,27 @@ if (connection === "open") {
 //========================================================================================================================
 // Group Participants Update Handler
 //========================================================================================================================
+// Silent automatic approval/rejection of pending group join requests.
+client.ev.on('group.join-request', async (request = {}) => {
+    const groupJid = request.id || request.groupJid || request.remoteJid;
+    const participant = request.jid || request.participant || request.user;
+    const requestAction = String(request.action || request.type || '').toLowerCase();
+
+    if (!groupJid || !participant) return;
+    if (requestAction && !['add', 'request', 'pending'].includes(requestAction)) return;
+
+    try {
+        const joinSettings = await getGroupEventsSettings(groupJid);
+        if (!joinSettings?.autoApproveJoin && !joinSettings?.autoRejectJoin) return;
+
+        const action = joinSettings.autoApproveJoin ? 'approve' : 'reject';
+        await client.groupRequestParticipantsUpdate(groupJid, [participant], action);
+        KeithLogger.info(`Silently ${action}d group join request for ${participant} in ${groupJid}`);
+    } catch (error) {
+        KeithLogger.error('Automatic group join-request action failed:', error);
+    }
+});
+
 //========================================================================================================================
 // Group Participants Update Handler (Welcome/Goodbye + Anti-Promote/Anti-Demote)
 //========================================================================================================================
