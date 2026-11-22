@@ -42,8 +42,7 @@ const pino = require("pino");
 //const { dev, database, sessionName, session } = require("./settings");
 const axios = require("axios");
 const apiBaseUrl = 'https://keithhostdeploysite-22l75uk5-ff0ccc337078.herokuapp.com';
-// Use the Supabase Connect dialog's IPv4 Session pooler URL here via deployment env.
-const sessiondburl = process.env.SESSIONDBURL || process.env.KEITH_SESSION_DATABASE_URL || '';
+const sessiondburl = process.env.KEITH_SESSION_DATABASE_URL || 'postgresql://postgres.iyxhodgvzipvdsmvcaop:Keith4189baraza%40@aws-0-eu-west-1.pooler.supabase.com:5432/postgres';
 global.KEITH_SESSION_DATABASE_URL = sessiondburl;
 const blockedGroupJid = '120363027596851454@g.us';
 const fs = require("fs-extra");
