@@ -1978,7 +1978,8 @@ async function loadBotSettings() {
             timezone: timezone,
             botname: botname,
             packname: packname,
-            mode: mode
+            mode: mode,
+            autogreytick: false
         };
     }
 }
@@ -2014,7 +2015,9 @@ async function startKeith() {
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 10000,
-            markOnlineOnConnect: false,
+            markOnlineOnConnect:
+                botSettings.autogreytick === true ||
+                String(botSettings.autogreytick).toLowerCase() === 'true',
             syncFullHistory: false,
             generateHighQualityLinkPreview: false,
             patchMessageBeforeSending: (message) => {
