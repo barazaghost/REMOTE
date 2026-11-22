@@ -3,6 +3,7 @@ const { getBinaryNodeChild, getBinaryNodeChildren, S_WHATSAPP_NET } = require('@
 const axios = require('axios');
 const fs = require('fs');
 const { sendButtons } = require('gifted-btns');
+const { getGroupEventsSettings, updateGroupEventsSettings } = require('../database/groupevents');
 //========================================================================================================================
 //========================================================================================================================
 //========================================================================================================================
@@ -1128,6 +1129,51 @@ Members need to send messages first for tracking to build up.
         await reply(`❌ Error: ${err.message}`);
     }
 });
+
+//========================================================================================================================
+
+async function setJoinRequestMode(from, reply, conText, mode) {
+  const { q, isGroup, isAdmin, isSuperUser, isBotAdmin } = conText;
+
+  if (!isGroup) return reply('❌ This command can only be used in a group.');
+  if (!isAdmin && !isSuperUser) return reply('❌ Only group admins can use this command.');
+  if (!isBotAdmin) return reply('❌ I need to be a group admin first.');
+
+  const input = q?.trim().toLowerCase();
+  if (!input || !['on', 'off'].includes(input)) {
+    const settings = await getGroupEventsSettings(from);
+    const enabled = mode === 'approve' ? settings?.autoApproveJoin : settings?.autoRejectJoin;
+    return reply(
+      `Current auto-${mode}: *${enabled ? 'ON' : 'OFF'}*\n\n` +
+      `Usage: .auto${mode} on\n` +
+      `Disable: .auto${mode} off`
+    );
+  }
+
+  const enabled = input === 'on';
+  const updates = mode === 'approve'
+    ? { autoApproveJoin: enabled, ...(enabled ? { autoRejectJoin: false } : {}) }
+    : { autoRejectJoin: enabled, ...(enabled ? { autoApproveJoin: false } : {}) };
+
+  const saved = await updateGroupEventsSettings(from, updates);
+  if (!saved) return reply('❌ Failed to save group join-request settings.');
+
+  return reply(`✅ Auto-${mode} is now *${enabled ? 'ON' : 'OFF'}*.`);
+}
+
+keith({
+  pattern: 'autoapprove',
+  aliases: ['auto-approve', 'approvejoin'],
+  category: 'group',
+  description: 'Automatically approve new group join requests silently'
+}, async (from, client, conText) => setJoinRequestMode(from, conText.reply, conText, 'approve'));
+
+keith({
+  pattern: 'autoreject',
+  aliases: ['auto-reject', 'rejectjoin'],
+  category: 'group',
+  description: 'Automatically reject new group join requests silently'
+}, async (from, client, conText) => setJoinRequestMode(from, conText.reply, conText, 'reject'));
 
 //========================================================================================================================
 
