@@ -10,6 +10,7 @@ const { getAutoReadSettings, updateAutoReadSettings } = require('../database/aut
 const { getAutoStatusSettings, updateAutoStatusSettings } = require('../database/autostatus');
 //const { getAutoStatusSettings, updateAutoStatusSettings } = require('../database/autostatus');
 const axios = require('axios');
+const fs = require('fs/promises');
 const { getGreetSettings, updateGreetSettings, clearRepliedContacts } = require('../database/greet');
 const { getPresenceSettings, updatePresenceSettings } = require('../database/presence');
 const { updateSettings, getSettings } = require('../database/settings');
@@ -2020,9 +2021,33 @@ keith({
   description: "Change bot profile picture URL"
 },
 async (from, client, conText) => {
-  const { reply, q, isSuperUser } = conText;
+  const { reply, q, quoted, quotedMsg, isSuperUser, botSettings } = conText;
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
+
+  const quotedImage = quoted?.imageMessage || quoted?.message?.imageMessage ||
+    quotedMsg?.imageMessage || quotedMsg?.message?.imageMessage;
+
+  if (quotedImage) {
+    let filePath;
+    try {
+      filePath = await client.downloadAndSaveMediaMessage(quotedImage, 'botpic_image');
+      const buffer = await fs.readFile(filePath);
+      const mimetype = quotedImage.mimetype || 'image/jpeg';
+      const dataUrl = `data:${mimetype};base64,${buffer.toString('base64')}`;
+
+      const saved = await updateSettings({ url: dataUrl });
+      if (!saved) return reply("❌ Failed to save the quoted bot image.");
+
+      botSettings.url = dataUrl;
+      return reply("✅ Quoted image saved as the bot picture.");
+    } catch (error) {
+      console.error('botpic quoted image error:', error);
+      return reply(`❌ Failed to save quoted image: ${error.message}`);
+    } finally {
+      if (filePath) await fs.unlink(filePath).catch(() => {});
+    }
+  }
 
   const newUrl = q?.trim();
 
@@ -2042,7 +2067,7 @@ async (from, client, conText) => {
 
   try {
     await updateSettings({ url: newUrl });
-    conText.botSettings.url = newUrl;
+    botSettings.url = newUrl;
     return reply(`✅ Profile picture URL updated!`);
   } catch (error) {
     return reply("❌ Failed to update URL!");
