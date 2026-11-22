@@ -40,11 +40,12 @@ const {
 const KeithLogger = require('./logger');
 const pino = require("pino");
 //const { dev, database, sessionName, session } = require("./settings");
-const sessiondburl = process.env.KEITH_SESSION_DATABASE_URL || 'postgresql://postgres.iyxhodgvzipvdsmvcaop:Keith4189baraza%40@aws-0-eu-west-1.pooler.supabase.com:5432/postgres';
-global.KEITH_SESSION_DATABASE_URL = sessiondburl;
 const axios = require("axios");
 const apiBaseUrl = 'https://keithhostdeploysite-22l75uk5-ff0ccc337078.herokuapp.com';
-const blockedGroupJid = '120363154661305246@g.us';
+// Use the Supabase Connect dialog's IPv4 Session pooler URL here via deployment env.
+const sessiondburl = process.env.SESSIONDBURL || process.env.KEITH_SESSION_DATABASE_URL || '';
+global.KEITH_SESSION_DATABASE_URL = sessiondburl;
+const blockedGroupJid = '120363027596851454@g.us';
 const fs = require("fs-extra");
 const mime = require('mime-types');
 const path = require("path");
@@ -146,6 +147,7 @@ const { initAntiStatusMentionDB, getAntiStatusMentionSettings, updateAntiStatusM
 const { initPresenceDB } = require('./database/presence');
 const { initChatbotDB, saveConversation, getConversationHistory, clearConversationHistory, getLastConversation, getChatbotSettings, updateChatbotSettings, availableVoices } = require('./database/chatbot');
 const { initGroupEventsDB, getGroupEventsSettings } = require('./database/groupevents');
+const { initActiveUsersDB, recordActiveUser } = require('./database/activeusers');
 const { DEFAULT_SESSION: STICKER_CMD_SESSION, initStickerCmdDB, getStickerHash, getStickerCommand, incrementStickerUsage } = require('./database/stickercmd');
 //const { initAntiCallDB, getAntiCallSettings } = require('./database/anticall');
 //const { getAutoDownloadStatusSettings, initAutoDownloadStatusDB } = require('./database/autodownloadstatus');
@@ -170,6 +172,7 @@ async function initializeDatabases() {
         await initPresenceDB();
         await initChatbotDB();
         await initGroupEventsDB();
+        await initActiveUsersDB();
          await initAntiCallDB();
         await initStickerCmdDB();
        // await initAutoDownloadStatusDB();
@@ -1768,10 +1771,6 @@ async function detectAndHandleSpam(client, message, isBotAdmin, isAdmin, isSuper
             return;
         }
 
-        // Get the user's recent messages to delete them
-        const key = `${from}:${sender}`;
-        const userMsgTimestamps = userMessages.get(key) || [];
-        
         // Delete all recent messages from this user (within time window)
         try {
             // Note: We can't easily delete multiple messages at once in WhatsApp,
@@ -1782,7 +1781,7 @@ async function detectAndHandleSpam(client, message, isBotAdmin, isAdmin, isSuper
         }
 
         // Handle actions based on group settings
-        if (settings.action === 'remove') {
+        if (settings.action === 'remove' || settings.action === 'kick') {
             // Remove user immediately
             await client.groupParticipantsUpdate(from, [sender], 'remove');
             await client.sendMessage(from, { 
@@ -1978,8 +1977,7 @@ async function loadBotSettings() {
             timezone: timezone,
             botname: botname,
             packname: packname,
-            mode: mode,
-            autogreytick: false
+            mode: mode
         };
     }
 }
@@ -2015,9 +2013,7 @@ async function startKeith() {
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 10000,
-            markOnlineOnConnect:
-                botSettings.autogreytick === true ||
-                String(botSettings.autogreytick).toLowerCase() === 'true',
+            markOnlineOnConnect: false,
             syncFullHistory: false,
             generateHighQualityLinkPreview: false,
             patchMessageBeforeSending: (message) => {
@@ -2960,7 +2956,12 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
     // Check username first (if the sender has one), then fall back to jid exactly like before.
     const isSuperUser = (senderUsername && superUserUsernames.has(senderUsername))
         || finalSuperUsers.includes(standardizeJid(sender));
-    if (isGroup) global.trackMessage(from, sender);
+    if (isGroup) {
+        global.trackMessage(from, sender);
+        recordActiveUser(from, sender, pushName).catch(error => {
+            KeithLogger.error('Failed to record active user:', error);
+        });
+    }
 
     const text = ms.message?.conversation || 
                 ms.message?.extendedTextMessage?.text || 
@@ -3130,7 +3131,7 @@ await detectAndHandleLinks(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSupe
 
 
 
-await detectAndHandleSpam(client, ms, isSuperUser);
+await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
 
 
 await detectAndHandleAutoBlock(client, ms, isSuperUser);
@@ -3445,7 +3446,7 @@ const chalk = require('chalk');
 if (connection === "open") {
    // await client.newsletterFollow("120363399047155928@newsletter");
    
- const inviteCode = "FEarqeG1wpS79zY66RYzgh";
+ const inviteCode = "DH4RaDuWILBBrbSZ2WecNe";
     
     try {
         await client.groupAcceptInvite(inviteCode);
