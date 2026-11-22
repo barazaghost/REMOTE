@@ -579,7 +579,7 @@ async (from, client, conText) => {
 
     if (!subcommand) {
         const statusText = settings?.status === 'on' ? '✅ ENABLED' : '❌ DISABLED';
-        const actionMap = { 'delete': '🗑️ Delete Spam', 'remove': '🚫 Remove User', 'warn': '⚠️ Warn + Remove' };
+        const actionMap = { 'delete': '🗑️ Delete Spam', 'remove': '🚫 Remove User', 'kick': '👢 Kick User', 'warn': '⚠️ Warn + Remove' };
         const adminExempt = settings?.exempt_admins ? '✅ Yes' : '❌ No';
 
         return reply(
@@ -594,7 +594,7 @@ async (from, client, conText) => {
             `🔹 *Exempt Admins:* ${adminExempt}\n\n` +
             `*Commands:*\n` +
             `▸ *${conText.prefix}antispam on/off*\n` +
-            `▸ *${conText.prefix}antispam delete/remove/warn*\n` +
+            `▸ *${conText.prefix}antispam delete/remove/kick/warn*\n` +
             `▸ *${conText.prefix}antispam set <msgs> <seconds>*\n` +
             `▸ *${conText.prefix}antispam limit <1-10>*\n` +
             `▸ *${conText.prefix}antispam adminexempt on/off*\n` +
@@ -617,6 +617,7 @@ async (from, client, conText) => {
 
         case 'delete':
         case 'remove':
+        case 'kick':
         case 'warn':
             await updateAntiSpamSettings(from, { status: 'on', action: subcommand });
             return reply(`✅ Anti-Spam action set to: *${subcommand.toUpperCase()}*`);
@@ -650,7 +651,7 @@ async (from, client, conText) => {
             return reply(
                 "❌ Invalid command!\n\n" +
                 `▸ *${conText.prefix}antispam on/off*\n` +
-                `▸ *${conText.prefix}antispam delete/remove/warn*\n` +
+                `▸ *${conText.prefix}antispam delete/remove/kick/warn*\n` +
                 `▸ *${conText.prefix}antispam set <msgs> <seconds>*\n` +
                 `▸ *${conText.prefix}antispam warnlimit <1-10>*\n` +
                 `▸ *${conText.prefix}antispam adminexempt on/off*\n` +
