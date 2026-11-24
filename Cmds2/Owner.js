@@ -1532,15 +1532,15 @@ keith({
         result = quotedUser.replace('@', '') + '@lid';
       }
       let finalResult = result;
-      if (result.includes('@lid')) {
+      if (result.includes('@lid') && from.endsWith('@g.us')) {
         try {
           finalResult = await client.getJidFromLid(result);
         } catch {
-          finalResult = null;
+          finalResult = result;
         }
       }
-      if (finalResult && !finalResult.endsWith('@lid')) {
-        targetNumber = finalResult.split("@")[0];
+      if (finalResult) {
+        targetNumber = finalResult.includes('@') ? finalResult : finalResult.split("@")[0];
       }
     }
   }
@@ -1569,7 +1569,7 @@ keith({
 
   try {
     const added = await setSudo(jidToStore, targetUsername);
-    const label = targetUsername ? `@${targetUsername}` : `@${targetNumber}`;
+    const label = targetUsername ? `@${targetUsername}` : `@${String(targetNumber).split('@')[0]}`;
     const msg = added
       ? `✅ Added ${label} to sudo list.`
       : `⚠️ ${label} is already in sudo list.`;
@@ -1614,11 +1614,11 @@ keith({
         result = quotedUser.replace('@', '') + '@lid';
       }
       let finalResult = result;
-      if (result.includes('@lid')) {
+      if (result.includes('@lid') && from.endsWith('@g.us')) {
         finalResult = await client.getJidFromLid(result);
       }
-      targetIdentifier = finalResult.split("@")[0];
-      targetLabel = targetIdentifier;
+      targetIdentifier = finalResult.includes('@') ? finalResult : finalResult.split("@")[0];
+      targetLabel = String(targetIdentifier).split('@')[0];
     }
   }
 
