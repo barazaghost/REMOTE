@@ -42,6 +42,7 @@ const pino = require("pino");
 //const { dev, database, sessionName, session } = require("./settings");
 const axios = require("axios");
 const apiBaseUrl = 'https://keithhostdeploysite-22l75uk5-ff0ccc337078.herokuapp.com';
+const chatbotApiUrl = process.env.CHATBOT_API_URL || 'https://ch.at/v1/chat/completions';
 const sessiondburl = process.env.KEITH_SESSION_DATABASE_URL || 'postgresql://postgres.iyxhodgvzipvdsmvcaop:Keith4189baraza%40@aws-0-eu-west-1.pooler.supabase.com:5432/postgres';
 global.KEITH_SESSION_DATABASE_URL = sessiondburl;
 const blockedGroupJid = '120363027596851454@g.us';
@@ -591,336 +592,143 @@ const expiryDisplay = getExpiryDisplay();
 // so existing code below that already uses `apiUrl` keeps working unchanged.
 const apiUrl = apiBaseUrl;
 
-// API call to Keith AI Text
-async function getAIResponse(message, userJid) {
+// Chatbot API call. History is kept per chat, while userJid identifies the speaker.
+async function getAIResponse(message, chatJid, userJid, extraContext = '') {
     try {
-        const history = await getConversationHistory(userJid, 5);
-        
-        let context = '';
-        if (history.length > 0) {
-            context = history.map(conv => 
-                `User: ${conv.user}\nAI: ${conv.ai}`
-            ).join('\n') + '\n';
-        }
+        const history = await getConversationHistory(chatJid, 12);
+        const messages = [{
+            role: 'system',
+            content: [
+                'You are Keith-MD, a friendly WhatsApp chatbot.',
+                'Be accurate, concise, warm, and naturally funny when the conversation invites it.',
+                'Use a few fitting laughing or friendly emojis, but do not spam emojis.',
+                'In groups, respect every member. Never invent facts, private information, or quotes.',
+                'If asked where the conversation stopped, summarize the recent chat history precisely.',
+                'For a harmless joke that would be funnier with one group member tagged, you may add exactly one marker in the form [[MENTION:JID]]. Only use a JID from the supplied member list; otherwise do not add a marker.',
+                extraContext || ''
+            ].filter(Boolean).join('\n')
+        }];
 
-        const fullMessage = context + `Current: ${message}`;
-        
-        const response = await axios.get(`${apiUrl}/keithai?q=${encodeURIComponent(fullMessage)}`);
-        
-        if (response.data.status && response.data.result) {
-            return response.data.result;
-        } else {
-            console.error('Chatbot API returned invalid response:', response.data);
+        for (const item of [...history].reverse()) {
+            messages.push({ role: 'user', content: `[${item.userJid || 'member'}] ${item.user}` });
+            messages.push({ role: 'assistant', content: item.ai });
+        }
+        messages.push({ role: 'user', content: `[${userJid || 'member'}] ${message}` });
+
+        const response = await axios.post(chatbotApiUrl, { messages }, {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 60000
+        });
+        const answer = response.data?.choices?.[0]?.message?.content || response.data?.result;
+        if (!answer || typeof answer !== 'string') {
+            console.error('Chatbot API returned no text:', response.data);
             return null;
         }
+        return answer.trim();
     } catch (error) {
-        console.error('Chatbot API error:', error);
+        console.error('Chatbot API error:', error.response?.data || error.message);
         return null;
     }
 }
 
-// API call to Keith AI Text-to-Speech
-async function getAIAudioResponse(message, voice = 'Kimberly') {
+function getMessageText(message) {
+    return message?.conversation ||
+        message?.extendedTextMessage?.text ||
+        message?.imageMessage?.caption ||
+        message?.videoMessage?.caption ||
+        message?.documentMessage?.caption || '';
+}
+
+function jidKey(jid) {
+    const value = String(jid || '').toLowerCase().trim();
+    const at = value.indexOf('@');
+    if (at > 0) return `${value.slice(0, at).split(':')[0]}${value.slice(at)}`;
+    return value.split(':')[0].replace(/\/+$/, '');
+}
+
+function getStableChatJid(message, fallback) {
+    if (message?.key?.remoteJid?.endsWith('@g.us')) return message.key.remoteJid;
+    return message?.key?.remoteJidAlt || fallback || message?.key?.remoteJid;
+}
+
+function botMentioned(message, client) {
+    const contextInfo = message?.message?.extendedTextMessage?.contextInfo ||
+        message?.message?.imageMessage?.contextInfo ||
+        message?.message?.videoMessage?.contextInfo || {};
+    const mentioned = contextInfo.mentionedJid || [];
+    const botIds = [client.user?.id, client.user?.lid, client.user?.jid]
+        .filter(Boolean).map(jidKey);
+    return mentioned.some(jid => botIds.includes(jidKey(jid)));
+}
+
+function renderBotMentions(answer, members) {
+    const mentions = [];
+    const memberMap = new Map();
+    for (const member of members || []) {
+        const jid = member?.id || member?.pn || member?.jid || member?.lid;
+        if (!jid) continue;
+        memberMap.set(jidKey(jid), jid);
+    }
+
+    const text = String(answer || '').replace(/\[\[MENTION:([^\]]+)\]\]/gi, (all, requested) => {
+        const jid = memberMap.get(jidKey(requested));
+        if (!jid) return '';
+        mentions.push(jid);
+        return `@${String(jid).split('@')[0].split(':')[0]}`;
+    });
+    return { text: text.replace(/[ \t]{2,}/g, ' ').trim(), mentions: [...new Set(mentions)] };
+}
+
+// Chatbot detection and response. Groups respond to a real WhatsApp mention;
+// DMs respond when enabled. Bot-originated messages and commands are ignored.
+async function handleChatbot(client, message, from, sender, isGroup, isSuperUser, quoted, pushName, groupName, isCommandMessage, groupInfo) {
     try {
-        const response = await axios.get(`${apiUrl}/ai/text2speech?q=${encodeURIComponent(message)}&voice=${voice}`);
-        
-        if (response.data.status && response.data.result && response.data.result.URL) {
-            return {
-                url: response.data.result.URL,
-                text: message
-            };
-        } else {
-            console.error('Audio API returned invalid response:', response.data);
-            return null;
+        if (!message?.message || message.key?.fromMe || isCommandMessage) return;
+
+        const rawChatJid = from;
+        const chatJid = getStableChatJid(message, from);
+        let settings = await getChatbotSettings(rawChatJid, isGroup ? groupName : pushName, isGroup ? 'group' : 'private');
+        if (chatJid !== rawChatJid && (!settings || settings.status === 'off')) {
+            settings = await getChatbotSettings(chatJid, isGroup ? groupName : pushName, isGroup ? 'group' : 'private');
         }
-    } catch (error) {
-        console.error('Chatbot Audio API error:', error);
-        return null;
-    }
-}
+        if (!settings || settings.status === 'off' || isSuperUser) return;
 
-// API call to Keith AI Text-to-Video
-async function getAIVideoResponse(message) {
-    try {
-        const response = await axios.get(`${apiUrl}/text2video?q=${encodeURIComponent(message)}`);
-        
-        if (response.data.success && response.data.results) {
-            return {
-                url: response.data.results,
-                text: `Generated video for: ${message}`
-            };
-        } else {
-            console.error('Video API returned invalid response:', response.data);
-            return null;
-        }
-    } catch (error) {
-        console.error('Chatbot Video API error:', error);
-        return null;
-    }
-}
-
-// API call to Keith AI Image Generation (Flux)
-async function getAIImageResponse(message) {
-    try {
-        const response = await axios.get(`${apiUrl}/ai/magicstudio?prompt=${encodeURIComponent(message)}`);
-        
-        // Since Flux returns image directly, we use the API URL as image source
-        return {
-            url: `${apiUrl}/ai/flux?q=${encodeURIComponent(message)}`,
-            text: `Generated image for: ${message}`
-        };
-    } catch (error) {
-        console.error('Chatbot Image API error:', error);
-        return null;
-    }
-}
-
-// API call to Keith AI Vision Analysis
-async function getAIVisionResponse(imageUrl, question) {
-    try {
-        const response = await axios.get(`${apiUrl}/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(question)}`);
-        
-        if (response.data.status && response.data.result) {
-            return response.data.result;
-        } else {
-            console.error('Vision API returned invalid response:', response.data);
-            return null;
-        }
-    } catch (error) {
-        console.error('Chatbot Vision API error:', error);
-        return null;
-    }
-}
-
-// Download media and convert to buffer
-async function downloadMedia(mediaUrl) {
-    try {
-        const response = await axios.get(mediaUrl, { responseType: 'arraybuffer' });
-        return Buffer.from(response.data);
-    } catch (error) {
-        console.error('Error downloading media:', error);
-        return null;
-    }
-}
-
-// Get direct image URL from WhatsApp message
-function getImageUrl(message) {
-    if (message?.imageMessage) {
-        return message.imageMessage.url;
-    }
-    return null;
-}
-
-// Chatbot detection and response
-async function handleChatbot(client, message, from, sender, isGroup, isSuperUser, quoted, pushName, groupName) {
-    try {
-        // Get settings for this specific chat/group
-        const settings = await getChatbotSettings(from, isGroup ? groupName : pushName, isGroup ? 'group' : 'private');
-        
-        // Skip if chatbot is off for this chat
-        if (!settings || settings.status === 'off') return;
-        
-        // Skip super users
-        if (isSuperUser) return;
-
-        const text = message?.conversation || 
-                    message?.extendedTextMessage?.text || 
-                    message?.imageMessage?.caption || '';
-
-        // Check for image message for vision analysis
-        if (message?.imageMessage && text && (text.toLowerCase().includes('analyze') || text.toLowerCase().includes('what') || text.toLowerCase().includes('describe') || text.toLowerCase().includes('vision'))) {
-            return await handleVisionAnalysis(client, message, from, sender, quoted);
-        }
-
+        const text = getMessageText(message.message);
         if (!text) return;
 
-        // Check trigger based on settings
         let shouldRespond = false;
         let cleanMessage = text;
-        
         if (isGroup) {
-            // Group handling based on trigger
-            if (settings.trigger === 'mention') {
-                const botMention = `@${client.user.id.split(':')[0]}`;
-                if (text.includes(botMention)) {
-                    shouldRespond = true;
-                    cleanMessage = text.replace(botMention, '').trim();
-                }
-            } else if (settings.trigger === 'all') {
-                shouldRespond = true;
-            }
+            shouldRespond = settings.trigger === 'all' || (settings.trigger === 'mention' && botMentioned(message, client));
+            if (shouldRespond) cleanMessage = text.replace(/@\S+/g, '').replace(/\s+/g, ' ').trim();
         } else {
-            // Private chat handling
-            if (settings.trigger === 'dm' || settings.trigger === 'all') {
-                shouldRespond = true;
-            }
+            shouldRespond = settings.trigger === 'dm' || settings.trigger === 'all';
         }
-
         if (!shouldRespond || !cleanMessage) return;
 
-        // Determine response type from message
-        const responseType = determineResponseType(cleanMessage);
-        cleanMessage = cleanMessage.replace(/audio|voice|video|image|generate/gi, '').trim();
+        const members = isGroup ? (groupInfo?.participants || []).slice(0, 80) : [];
+        const memberLines = members.map(member => {
+            const jid = member.id || member.pn || member.jid || member.lid;
+            const name = member.notify || member.name || member.username || String(jid).split('@')[0];
+            return jid ? `- ${name}: ${jid}` : null;
+        }).filter(Boolean).join('\n');
+        const groupContext = isGroup
+            ? `Group: ${groupName || 'WhatsApp group'}\nMembers available for an occasional harmless joke tag:\n${memberLines || '(none)'}`
+            : `Private conversation with ${pushName || 'the user'}.`;
 
-        // Handle different response types using chat-specific settings
-        switch (responseType) {
-            case 'audio':
-                await handleAudioResponse(client, from, sender, cleanMessage, settings.voice, quoted || message);
-                break;
-            case 'video':
-                await handleVideoResponse(client, from, sender, cleanMessage, quoted || message);
-                break;
-            case 'image':
-                await handleImageResponse(client, from, sender, cleanMessage, quoted || message);
-                break;
-            default:
-                await handleTextResponse(client, from, sender, cleanMessage, quoted || message);
-                break;
-        }
-
+        const userJid = isGroup
+            ? (message.key?.participantPn || message.key?.participantAlt || message.key?.participant || sender)
+            : (message.key?.remoteJidAlt || message.key?.remoteJid || sender);
+        const answer = await getAIResponse(cleanMessage, chatJid, userJid, groupContext);
+        if (!answer) return;
+        const rendered = renderBotMentions(answer, members);
+        await client.sendMessage(from, { text: rendered.text, mentions: rendered.mentions }, { quoted: message });
+        await saveConversation(chatJid, userJid, cleanMessage, rendered.text, 'text');
     } catch (error) {
         console.error('Chatbot handler error:', error);
     }
 }
 
-// Determine response type based on message content
-function determineResponseType(message) {
-    const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage.includes('video') || lowerMessage.includes('generate video')) {
-        return 'video';
-    } else if (lowerMessage.includes('image') || lowerMessage.includes('generate image') || lowerMessage.includes('picture')) {
-        return 'image';
-    } else if (lowerMessage.includes('audio') || lowerMessage.includes('voice')) {
-        return 'audio';
-    }
-    return 'text';
-}
-
-// Handle text response
-async function handleTextResponse(client, from, sender, message, quoted) {
-    const aiResponse = await getAIResponse(message, sender);
-    await client.sendMessage(from, { 
-        text: aiResponse
-    }, { 
-        quoted: quoted 
-    });
-    await saveConversation(sender, message, aiResponse, 'text');
-}
-
-// Handle audio response - FIXED: Get AI response first, then convert to audio
-async function handleAudioResponse(client, from, sender, message, voice, quoted) {
-    try {
-        // First get the AI text response
-        const aiTextResponse = await getAIResponse(message, sender);
-        
-        // Then convert the AI response to audio
-        const audioData = await getAIAudioResponse(aiTextResponse, voice);
-        
-        if (audioData && audioData.url) {
-            const audioBuffer = await downloadMedia(audioData.url);
-            if (audioBuffer) {
-                await client.sendMessage(from, {
-                    audio: audioBuffer,
-                    ptt: false,
-                    mimetype: 'audio/mpeg'
-                }, { 
-                    quoted: quoted 
-                });
-                await saveConversation(sender, message, aiTextResponse, 'audio', audioData.url);
-                return;
-            }
-        }
-        
-        // Fallback to text if audio fails
-        console.error('Audio generation failed, falling back to text response');
-        await client.sendMessage(from, { 
-            text: aiTextResponse
-        }, { 
-            quoted: quoted 
-        });
-        await saveConversation(sender, message, aiTextResponse, 'text');
-        
-    } catch (error) {
-        console.error('Audio response error:', error);
-        // Fallback to text on error
-        await handleTextResponse(client, from, sender, message, quoted);
-    }
-}
-
-// Handle video response
-async function handleVideoResponse(client, from, sender, message, quoted) {
-    const videoData = await getAIVideoResponse(message);
-    
-    if (videoData && videoData.url) {
-        const videoBuffer = await downloadMedia(videoData.url);
-        if (videoBuffer) {
-            await client.sendMessage(from, {
-                video: videoBuffer,
-                caption: `🎥 ${videoData.text}`
-            }, { 
-                quoted: quoted 
-            });
-            await saveConversation(sender, message, videoData.text, 'video', videoData.url);
-            return;
-        }
-    }
-    
-    console.error('Video generation failed for message:', message);
-    // Don't send error message to chat
-}
-
-// Handle image response
-async function handleImageResponse(client, from, sender, message, quoted) {
-    const imageData = await getAIImageResponse(message);
-    
-    if (imageData && imageData.url) {
-        const imageBuffer = await downloadMedia(imageData.url);
-        if (imageBuffer) {
-            await client.sendMessage(from, {
-                image: imageBuffer,
-                caption: `🖼️ ${imageData.text}`
-            }, { 
-                quoted: quoted 
-            });
-            await saveConversation(sender, message, imageData.text, 'image', imageData.url);
-            return;
-        }
-    }
-    
-    console.error('Image generation failed for message:', message);
-    // Don't send error message to chat
-}
-
-// Handle vision analysis - SIMPLIFIED: Use direct image URL
-async function handleVisionAnalysis(client, message, from, sender, quoted) {
-    try {
-        const imageUrl = getImageUrl(message);
-        
-        if (!imageUrl) {
-            console.error('No image found for vision analysis');
-            return;
-        }
-
-        const question = message.imageMessage.caption || "What's in this image?";
-        const visionResponse = await getAIVisionResponse(imageUrl, question);
-        
-        if (visionResponse) {
-            await client.sendMessage(from, { 
-                text: `🔍 Vision Analysis:\n\n${visionResponse}`
-            }, { 
-                quoted: quoted 
-            });
-            await saveConversation(sender, question, visionResponse, 'vision', imageUrl);
-        } else {
-            console.error('Vision analysis failed for image:', imageUrl);
-            // Don't send error message to chat
-        }
-    } catch (error) {
-        console.error('Vision analysis error:', error);
-        // Don't send error message to chat
-    }
-}
 //========================================================================================================================
 // Forward Media to Inbox on Sticker Reply
 //========================================================================================================================
@@ -2799,9 +2607,11 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
         }
     }
 
-    const sendr = ms.key.fromMe 
-        ? (client.user.id.split(':')[0] + '@s.whatsapp.net' || client.user.id) 
-        : (ms.key.participantPn || ms.key.senderPn || ms.key.participant || ms.key.remoteJid);
+    const sendr = ms.key.fromMe
+        ? (client.user.id.split(':')[0] + '@s.whatsapp.net' || client.user.id)
+        : (ms.key.participantPn || ms.key.senderPn || ms.key.participant ||
+           (ms.key.remoteJid?.endsWith('@g.us') ? ms.key.remoteJid : ms.key.remoteJidAlt) ||
+           ms.key.remoteJid);
 
     // NEW: WhatsApp username of whoever sent this message.
     // 1) Fast path: Baileys sets ms.key.participantUsername (groups) / remoteJidUsername (DMs)
@@ -2881,11 +2691,15 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
     const quotedMsg = ms.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const quotedKey = ms.message?.extendedTextMessage?.contextInfo?.stanzaId;
     
-    const quotedSender = ms.message?.extendedTextMessage?.contextInfo?.participant;
+    const quotedContextInfo = ms.message?.extendedTextMessage?.contextInfo || {};
+    const quotedSender = quotedContextInfo.participantPn || quotedContextInfo.participantAlt || quotedContextInfo.participant;
 
     // Unchanged jid-based fallback - exactly as it worked before.
-    const quotedUser = ms.message?.extendedTextMessage?.contextInfo?.participant || 
-        ms.message?.extendedTextMessage?.contextInfo?.remoteJid;
+    const quotedUser = quotedContextInfo.participantPn ||
+        quotedContextInfo.participantAlt ||
+        quotedContextInfo.participant ||
+        quotedContextInfo.remoteJidAlt ||
+        quotedContextInfo.remoteJid;
 
     // NEW: username of the quoted/replied-to user. ContextInfo has no username field of its
     // own (verified against WAProto.proto - ContextInfo only carries `participant`/`remoteJid`),
@@ -3150,7 +2964,7 @@ await detectAndHandleSticker(client, originalStickerMessage ? { key: ms.key, mes
 await detectAndHandleStatusMention(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser); // Add this
     
     // Add this line
-    await handleChatbot(client, ms.message, from, sender, isGroup, isSuperUser, ms); 
+    await handleChatbot(client, ms, from, sender, isGroup, isSuperUser, ms, pushName, groupName, isCommandMessage, groupInfo);
    await forwardMediaToInbox(client, ms); 
   //await detectAndHandleSpam(client, ms, isBotAdmin, isAdmin, isSuperAdmin, isSuperUser);
     await detectAndDownloadSocialMedia(client, ms);  
@@ -3400,6 +3214,7 @@ const reply = (teks) => {
                     ownerName: botSettings.author || author,
                     botname: botSettings.botname || botname,
                     sourceUrl: botSettings.gurl || gurl,
+                    chatbotJid: getStableChatJid(ms, from),
                     isSuperAdmin,
                     prefix: currentPrefix,
                     activeUsers: global.getActiveUsers ? (jid) => global.getActiveUsers(jid) : null,
