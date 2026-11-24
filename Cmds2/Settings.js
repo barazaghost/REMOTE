@@ -75,8 +75,7 @@ const {
     updateChatbotSettings, 
     clearConversationHistory, 
     getConversationHistory, 
-    getAllActiveChatbots,
-    availableVoices 
+    getAllActiveChatbots
 } = require('../database/chatbot');
 
 const { 
@@ -480,8 +479,7 @@ keith({
         settingsList += `├─ Status: ${chatbotStatusMap[chatbot?.status] || '❌ OFF'}\n`;
         settingsList += `├─ Mode: ${chatbotModeMap[chatbot?.mode] || 'N/A'}\n`;
         settingsList += `├─ Trigger: ${chatbot?.trigger === 'dm' ? '📨 DM' : chatbot?.trigger === 'mention' ? '🔔 Mention' : '📢 All'}\n`;
-        settingsList += `├─ Response: ${chatbot?.default_response === 'audio' ? '🎵 Audio' : '📝 Text'}\n`;
-        settingsList += `└─ Voice: ${chatbot?.voice || 'Kimberly'}\n\n`;
+        settingsList += `└─ Response: 📝 Text\n\n`;
 
         // 5. GROUP EVENTS
         settingsList += `*🎉 GROUP EVENTS*\n`;
@@ -1245,7 +1243,7 @@ keith({
     description: "Manage chatbot per chat/group"
 },
 async (from, client, conText) => {
-    const { reply, q, isSuperUser, isGroup, groupName, pushName } = conText;
+    const { reply, q, isSuperUser, isGroup, groupName, pushName, chatbotJid } = conText;
 
     if (!isSuperUser) return reply("❌ You need superuser privileges to use this command!");
 
@@ -1256,7 +1254,8 @@ async (from, client, conText) => {
     const subcommand = args[0]?.toLowerCase();
     const value = args.slice(1).join(" ");
 
-    const settings = await getChatbotSettings(from, chatName, chatType);
+    const chatJid = chatbotJid || from;
+    const settings = await getChatbotSettings(chatJid, chatName, chatType);
 
     if (subcommand === 'list') {
         const activeChats = await getAllActiveChatbots();
@@ -1275,22 +1274,16 @@ async (from, client, conText) => {
     if (subcommand === 'status' || !subcommand) {
         const statusIcon = settings?.status === 'on' ? '✅' : '❌';
         const triggerMap = { 'dm': '📨 DM Only', 'mention': '🔔 @mention', 'all': '📢 All Messages' };
-        const responseMap = { 'text': '📝 Text', 'audio': '🎵 Audio' };
-
         return reply(
             `*🤖 Chatbot Settings*\n\n` +
             `📌 *Name:* ${chatName}\n` +
-            `📍 *JID:* \`${from}\`\n\n` +
+            `📍 *JID:* \`${chatJid}\`\n\n` +
             `🔹 *Status:* ${statusIcon} ${settings?.status?.toUpperCase() || 'OFF'}\n` +
             `🔹 *Trigger:* ${triggerMap[settings?.trigger || (isGroup ? 'mention' : 'dm')]}\n` +
-            `🔹 *Response:* ${responseMap[settings?.default_response || 'text']}\n` +
-            `🔹 *Voice:* ${settings?.voice || 'Kimberly'}\n\n` +
+            `🔹 *Response:* 📝 Text\n\n` +
             `*Commands:*\n` +
             `▸ *${conText.prefix}chatbot on/off*\n` +
             `▸ *${conText.prefix}chatbot trigger ${isGroup ? 'mention/all' : 'dm/all'}*\n` +
-            `▸ *${conText.prefix}chatbot response text/audio*\n` +
-            `▸ *${conText.prefix}chatbot voice <name>*\n` +
-            `▸ *${conText.prefix}chatbot voices*\n` +
             `▸ *${conText.prefix}chatbot clear*\n` +
             `▸ *${conText.prefix}chatbot history*\n` +
             `▸ *${conText.prefix}chatbot status*`
@@ -1300,34 +1293,21 @@ async (from, client, conText) => {
     switch (subcommand) {
         case 'on':
         case 'off':
-            await updateChatbotSettings(from, { status: subcommand, chat_name: chatName, chat_type: chatType });
+            await updateChatbotSettings(chatJid, { status: subcommand, chat_name: chatName, chat_type: chatType });
             return reply(`✅ Chatbot *${subcommand.toUpperCase()}* for this ${chatType}!`);
 
         case 'trigger':
             const validTriggers = isGroup ? ['mention', 'all'] : ['dm', 'all'];
             if (!validTriggers.includes(value)) return reply(`❌ Invalid trigger! Use: ${validTriggers.join(' or ')}`);
-            await updateChatbotSettings(from, { trigger: value });
+            await updateChatbotSettings(chatJid, { trigger: value });
             return reply(`✅ Trigger set to: *${value.toUpperCase()}*`);
 
-        case 'response':
-            if (!['text', 'audio'].includes(value)) return reply("❌ Invalid response! Use: text or audio");
-            await updateChatbotSettings(from, { default_response: value });
-            return reply(`✅ Default response: *${value.toUpperCase()}*`);
-
-        case 'voice':
-            if (!availableVoices.includes(value)) return reply(`❌ Invalid voice! Available: ${availableVoices.join(', ')}`);
-            await updateChatbotSettings(from, { voice: value });
-            return reply(`✅ Voice set to: *${value}*`);
-
-        case 'voices':
-            return reply(`*🎙️ Available Voices:*\n\n${availableVoices.join(', ')}`);
-
         case 'clear':
-            const cleared = await clearConversationHistory(from);
+            const cleared = await clearConversationHistory(chatJid);
             return reply(cleared ? "✅ Conversation history cleared!" : "❌ No history to clear!");
 
         case 'history':
-            const history = await getConversationHistory(from, 10);
+            const history = await getConversationHistory(chatJid, 10);
             if (history.length === 0) return reply("📝 No conversations yet.");
             let historyText = `*📚 Recent Conversations (${history.length})*\n\n`;
             history.forEach((conv, index) => {
@@ -1341,9 +1321,6 @@ async (from, client, conText) => {
                 "❌ Invalid command!\n\n" +
                 `▸ *${conText.prefix}chatbot on/off*\n` +
                 `▸ *${conText.prefix}chatbot trigger ${isGroup ? 'mention/all' : 'dm/all'}*\n` +
-                `▸ *${conText.prefix}chatbot response text/audio*\n` +
-                `▸ *${conText.prefix}chatbot voice <name>*\n` +
-                `▸ *${conText.prefix}chatbot voices*\n` +
                 `▸ *${conText.prefix}chatbot clear*\n` +
                 `▸ *${conText.prefix}chatbot history*\n` +
                 `▸ *${conText.prefix}chatbot status*`
