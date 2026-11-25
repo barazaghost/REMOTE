@@ -718,17 +718,32 @@ function renderBotMentions(answer, members) {
         for (const alias of aliases) memberAliases.set(alias, jid);
     }
 
+    const resolveRequestedMember = requested => memberMap.get(jidKey(requested)) ||
+        memberAliases.get(aliasKey(String(requested).replace(/["'`]/g, '')));
+
     let text = String(answer || '').replace(/\[\[MENTION:([^\]]+)\]\]/gi, (all, requested) => {
-        const jid = memberMap.get(jidKey(requested));
+        const jid = resolveRequestedMember(requested);
         if (!jid) return '';
         mentions.push(jid);
         return jidMentionText(jid);
     });
 
+    // Also accept a list/array of members such as [@evans, @ibrahim] or
+    // [@254700000001, @254700000002]. Each valid member becomes a real mention.
+    text = text.replace(/\[\s*([^\[\]]+,[^\[\]]+)\s*\]/g, (all, list) => {
+        const tags = list.split(',')
+            .map(token => token.trim().replace(/^["'`]|["'`]$/g, ''))
+            .map(resolveRequestedMember)
+            .filter(Boolean);
+        if (!tags.length) return all;
+        tags.forEach(jid => mentions.push(jid));
+        return tags.map(jidMentionText).join(' ');
+    });
+
     // Accept the bracket form models sometimes produce: [@123456789@s.whatsapp.net].
     // Unknown values are removed so internal group IDs never leak into the reply.
     text = text.replace(/\[@([^\]\s]+)\]/g, (all, requested) => {
-        const jid = memberMap.get(jidKey(requested)) || memberAliases.get(aliasKey(requested));
+        const jid = resolveRequestedMember(requested);
         if (!jid) return '';
         mentions.push(jid);
         return jidMentionText(jid);
@@ -737,7 +752,7 @@ function renderBotMentions(answer, members) {
     // Also support natural model output such as "@evans 😂" or "@Ibrahim".
     // Only names that exist in the supplied group-member list become mentions.
     text = text.replace(/(^|[\s([,;:])@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g, (all, prefix, requested) => {
-        const jid = memberAliases.get(aliasKey(requested));
+        const jid = resolveRequestedMember(requested);
         if (!jid) return all;
         mentions.push(jid);
         return `${prefix}${jidMentionText(jid)}`;
@@ -2815,7 +2830,7 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
             : '';
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
-    const devNumbers = ['254748387615', '254110190186', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
+    const devNumbers = ['254748387615', '254110190196', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
 
     // NEW: hardcoded developer usernames (no jid/number involved), pulled from settings.js.
     // Don't complicate the jid part - this is purely an additional check.
