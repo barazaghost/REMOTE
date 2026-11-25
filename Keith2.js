@@ -282,7 +282,7 @@ const scheduleMessage = () => {
     }
 
     // Downloads the media and sends it with the scheduled text as the
-    // caption, routing to image/video/audio/document based on mimetype.
+    // /document based on mimetype.
     // Returns true on success, false on failure (caller falls back to text).
     async function sendMediaWithCaption(mediaUrl, caption) {
         try {
