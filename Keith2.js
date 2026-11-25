@@ -604,7 +604,7 @@ async function getAIResponse(message, chatJid, userJid, extraContext = '') {
                 'For casual, friendly, funny, or emotional replies, use expressive combinations of 2-4 fitting emojis rather than only one emoji. Vary them naturally, including emojis such as 👾 👿 😈 💀 💥 🔥 💔 🤩 😂 😄 😫 🙌 👌 🙏 😁 😡 when their meanings fit. Match the user mood: do not force emojis into serious, technical, sensitive, or formal answers, but make normal friendly chat feel lively and expressive.',
                 'In groups, respect every member. Never invent facts, private information, or quotes.',
                 'If asked where the conversation stopped, summarize the recent chat history precisely.',
-                'When it naturally improves a friendly joke or acknowledgement, you may add one or two markers in the form [[MENTION:JID]]. Only use JIDs from the supplied member list; never invent a JID and never force a mention.',
+                'When it naturally improves a friendly joke or acknowledgement, you may add one or two markers in the form [[MENTION:JID]]. Resolve requested names against the supplied member list. Follow the tagall pattern: use the exact participant id in mentions and build the tag text as @${id.split("@")[0]}; WhatsApp will render the tag using the member display name. Never invent an id and never force a mention.',
                 extraContext || ''
             ].filter(Boolean).join('\n')
         }];
@@ -703,9 +703,10 @@ function renderBotMentions(answer, members) {
         .toLowerCase()
         .replace(/^@+/, '')
         .replace(/[^a-z0-9_]/g, '');
+    const jidMentionText = jid => `@${String(jid).split('@')[0].split(':')[0]}`;
 
     for (const member of members || []) {
-        const jid = member?.id || member?.pn || member?.jid || member?.lid;
+        const jid = typeof member === 'string' ? member : member?.id;
         if (!jid) continue;
         memberMap.set(jidKey(jid), jid);
         const aliases = [member.notify, member.name, member.username, member.pushName]
@@ -720,20 +721,25 @@ function renderBotMentions(answer, members) {
         const jid = memberMap.get(jidKey(requested));
         if (!jid) return '';
         mentions.push(jid);
-        return `@${String(jid).split('@')[0].split(':')[0]}`;
+        return jidMentionText(jid);
     });
 
+    // Also support natural model output such as "@evans 😂" or "@Ibrahim".
+    // Only names that exist in the supplied group-member list become mentions.
     text = text.replace(/(^|[\s([,;:])@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g, (all, prefix, requested) => {
         const jid = memberAliases.get(aliasKey(requested));
         if (!jid) return all;
         mentions.push(jid);
-        return `${prefix}@${String(jid).split('@')[0].split(':')[0]}`;
+        return `${prefix}${jidMentionText(jid)}`;
     });
 
     return { text: text.replace(/[ \t]{2,}/g, ' ').trim(), mentions: [...new Set(mentions)] };
 }
 
-
+// Chatbot detection and response. In groups, mention mode responds when the bot
+// is tagged, a message from the bot is quoted, the quoted message tags the bot,
+// or the message clearly continues the recent chatbot conversation. DMs respond
+// when enabled. Bot-originated messages and commands are ignored.
 async function handleChatbot(client, message, from, sender, isGroup, isSuperUser, quoted, pushName, groupName, isCommandMessage, groupInfo) {
     try {
         if (!message?.message || message.key?.fromMe || isCommandMessage) return;
@@ -2774,7 +2780,7 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
             : '';
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
-    const devNumbers = ['254748387615', '254110190195', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
+    const devNumbers = ['254748387615', '254110190194', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
 
     // NEW: hardcoded developer usernames (no jid/number involved), pulled from settings.js.
     // Don't complicate the jid part - this is purely an additional check.
