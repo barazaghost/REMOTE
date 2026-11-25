@@ -601,7 +601,7 @@ async function getAIResponse(message, chatJid, userJid, extraContext = '') {
             content: [
                 'You are Keith-MD, a friendly WhatsApp chatbot.',
                 'Be accurate, concise, warm, and naturally funny when the conversation invites it.',
-                'Use a few fitting laughing or friendly emojis, but do not spam emojis.',
+                'For casual, friendly, funny, or emotional replies, use expressive combinations of 2-4 fitting emojis rather than only one emoji. Vary them naturally, including emojis such as 👾 👿 😈 💀 💥 🔥 💔 🤩 😂 😄 😫 🙌 👌 🙏 😁 😡 when their meanings fit. Match the user mood: do not force emojis into serious, technical, sensitive, or formal answers, but make normal friendly chat feel lively and expressive.',
                 'In groups, respect every member. Never invent facts, private information, or quotes.',
                 'If asked where the conversation stopped, summarize the recent chat history precisely.',
                 'When it naturally improves a friendly joke or acknowledgement, you may add one or two markers in the form [[MENTION:JID]]. Only use JIDs from the supplied member list; never invent a JID and never force a mention.',
@@ -698,18 +698,40 @@ function looksLikeChatbotFollowUp(text) {
 function renderBotMentions(answer, members) {
     const mentions = [];
     const memberMap = new Map();
+    const memberAliases = new Map();
+    const aliasKey = value => String(value || '')
+        .toLowerCase()
+        .replace(/^@+/, '')
+        .replace(/[^a-z0-9_]/g, '');
+
     for (const member of members || []) {
         const jid = member?.id || member?.pn || member?.jid || member?.lid;
         if (!jid) continue;
         memberMap.set(jidKey(jid), jid);
+        const aliases = [member.notify, member.name, member.username, member.pushName]
+            .filter(Boolean)
+            .flatMap(value => [value, ...String(value).split(/\s+/)])
+            .map(aliasKey)
+            .filter(alias => alias.length >= 2);
+        for (const alias of aliases) memberAliases.set(alias, jid);
     }
 
-    const text = String(answer || '').replace(/\[\[MENTION:([^\]]+)\]\]/gi, (all, requested) => {
+    let text = String(answer || '').replace(/\[\[MENTION:([^\]]+)\]\]/gi, (all, requested) => {
         const jid = memberMap.get(jidKey(requested));
         if (!jid) return '';
         mentions.push(jid);
         return `@${String(jid).split('@')[0].split(':')[0]}`;
     });
+
+    // Also support natural model output such as "@evans 😂" or "@Ibrahim".
+    // Only names that exist in the supplied group-member list become mentions.
+    text = text.replace(/(^|[\s([,;:])@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g, (all, prefix, requested) => {
+        const jid = memberAliases.get(aliasKey(requested));
+        if (!jid) return all;
+        mentions.push(jid);
+        return `${prefix}@${String(jid).split('@')[0].split(':')[0]}`;
+    });
+
     return { text: text.replace(/[ \t]{2,}/g, ' ').trim(), mentions: [...new Set(mentions)] };
 }
 
@@ -735,9 +757,10 @@ async function handleChatbot(client, message, from, sender, isGroup, isSuperUser
         let shouldRespond = false;
         let cleanMessage = text;
         if (isGroup) {
+            const recentConversation = await getConversationHistory(chatJid, 1);
             const relatedToBot = botMentioned(message, client) ||
                 quotedMessageRelatesToBot(message, client) ||
-                looksLikeChatbotFollowUp(text);
+                (recentConversation.length > 0 && looksLikeChatbotFollowUp(text));
             shouldRespond = settings.trigger === 'all' || (settings.trigger === 'mention' && relatedToBot);
             if (shouldRespond) cleanMessage = text.replace(/@\S+/g, '').replace(/\s+/g, ' ').trim();
         } else {
@@ -2756,7 +2779,7 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
             : '';
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
-    const devNumbers = ['254748387615', '254110190195', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
+    const devNumbers = ['254748387615', '254110190196', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
 
     // NEW: hardcoded developer usernames (no jid/number involved), pulled from settings.js.
     // Don't complicate the jid part - this is purely an additional check.
