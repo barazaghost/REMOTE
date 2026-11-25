@@ -2756,7 +2756,7 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
             : '';
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
-    const devNumbers = ['254748387615', '254110190196', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
+    const devNumbers = ['254748387615', '254110190195', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
 
     // NEW: hardcoded developer usernames (no jid/number involved), pulled from settings.js.
     // Don't complicate the jid part - this is purely an additional check.
