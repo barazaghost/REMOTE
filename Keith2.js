@@ -602,7 +602,8 @@ async function getAIResponse(message, chatJid, userJid, extraContext = '') {
                 'You are Keith-MD, a friendly WhatsApp chatbot.',
                 'Be accurate, concise, warm, and naturally funny when the conversation invites it.',
                 'For casual, friendly, funny, teasing, greeting, romantic, or emotional replies, use tasteful expressive combinations of 2-5 fitting emojis rather than plain single emojis. Vary the combinations and match the feeling: 😭 😹 🤣 💓 🥲 🙆‍♂️ 🫪 🥹 🙁 🥳 😪 😎 🙏 😁 😂 🤌 🫳 🥶 😱 🥸 🫠 🤫 🥱 🤒 🤧 🤕 👺 🙀 😿 👎 🤲 🫶 👏 🤝 👍 👈 👆 👇 ☝️ ✋ 🤚 🖐️ 🖕 💋 👁️ 👀, together with ❤️ 🩷 🧡 💛 💚 💙 💜 🖤 🤍 🤎 🩵 💘 💝 💖 💗 💓 💞 💕 💟 ❣️ 💌 💋 😍 🥰 😘 😚 😙 😽 🥹 💐 🌹 🌷 🪷 🌺 🌸 🫂, and 🔥 💥 💔 🤩 😄 😫 😈 💀 👾 👿 when their meanings fit. Make greetings warm and lively, jokes playful, romantic replies affectionate, and emotional replies expressive. Do not force emojis into serious, technical, sensitive, or formal answers.',
-                'In groups, respect every member. Never invent facts, private information, or quotes.',
+                'In groups, respect every member. Never invent facts, private information, or quotes. When the user asks you to tell, greet, compliment, tease, or roast a named member, mention that target and place the tag naturally in the sentence; do not automatically start every reply by tagging the person who spoke.',
+                'You may roast playfully when the user invites it, using clever light teasing that is funny rather than hateful, threatening, discriminatory, sexual, or genuinely abusive. Keep the roast friendly and avoid sensitive traits or private information.',
                 'If asked where the conversation stopped, summarize the recent chat history precisely.',
                 'Understand tagging requests from the meaning and context of the conversation; do not require fixed command keywords. When a tag is appropriate, use one or more markers in the form [[MENTION:JID]] resolved from the supplied member list. Follow the normal WhatsApp pattern: use the exact participant id in mentions and build the tag text as @${id.split("@")[0]}; WhatsApp will render the tag using the member display name. Never output raw bracketed IDs, group IDs, or invented IDs, and never force a mention.',
                 extraContext || ''
@@ -761,27 +762,42 @@ function renderBotMentions(answer, members) {
     return { text: text.replace(/[ \t]{2,}/g, ' ').trim(), mentions: [...new Set(mentions)] };
 }
 
-function resolveParticipantId(jid, members) {
-    if (!jid) return null;
-    const target = jidKey(jid);
-    const participant = (members || []).find(member => {
-        const ids = [member?.id, member?.pn, member?.jid, member?.lid]
-            .filter(Boolean)
-            .map(jidKey);
-        return ids.includes(target);
-    });
-    return participant?.id || jid;
+function normalizeMentionAlias(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/^@+/, '')
+        .replace(/[^a-z0-9_]/g, '');
 }
 
-function addReplySpeakerMention(rendered, speakerJid, members) {
-    const participantId = resolveParticipantId(speakerJid, members);
-    if (!participantId) return rendered;
-    const visibleTag = `@${String(participantId).split('@')[0]}`;
-    const alreadyMentioned = rendered.mentions.some(jid => jidKey(jid) === jidKey(participantId));
-    if (alreadyMentioned) return rendered;
+function resolveRequestedMemberAlias(alias, members) {
+    const wanted = normalizeMentionAlias(alias);
+    if (!wanted) return null;
+    for (const member of members || []) {
+        const jid = typeof member === 'string' ? member : member?.id;
+        if (!jid) continue;
+        const values = [member?.notify, member?.name, member?.username, member?.pushName]
+            .filter(Boolean)
+            .flatMap(value => [value, ...String(value).split(/\s+/)])
+            .map(normalizeMentionAlias);
+        values.push(normalizeMentionAlias(String(jid).split('@')[0]));
+        if (values.includes(wanted)) return jid;
+    }
+    return null;
+}
+
+function ensureRequestedMemberMentions(rendered, userText, members) {
+    const requested = [];
+    const requestedAliases = String(userText || '').match(/@[A-Za-z0-9_][A-Za-z0-9_.-]*/g) || [];
+    for (const alias of requestedAliases) {
+        const jid = resolveRequestedMemberAlias(alias, members);
+        if (jid && !requested.some(existing => jidKey(existing) === jidKey(jid))) requested.push(jid);
+    }
+    const missing = requested.filter(jid => !rendered.mentions.some(existing => jidKey(existing) === jidKey(jid)));
+    if (!missing.length) return rendered;
+    const tags = missing.map(jid => `@${String(jid).split('@')[0]}`).join(' ');
     return {
-        text: `${visibleTag} ${rendered.text}`.trim(),
-        mentions: [participantId, ...rendered.mentions]
+        text: `${tags}, ${rendered.text}`.trim(),
+        mentions: [...missing, ...rendered.mentions]
     };
 }
 
@@ -812,7 +828,7 @@ async function handleChatbot(client, message, from, sender, isGroup, isSuperUser
                 quotedMessageRelatesToBot(message, client) ||
                 (recentConversation.length > 0 && looksLikeChatbotFollowUp(text));
             shouldRespond = settings.trigger === 'all' || (settings.trigger === 'mention' && relatedToBot);
-            if (shouldRespond) cleanMessage = text.replace(/@\S+/g, '').replace(/\s+/g, ' ').trim();
+            if (shouldRespond) cleanMessage = text.replace(/\s+/g, ' ').trim();
         } else {
             shouldRespond = settings.trigger === 'dm' || settings.trigger === 'all';
         }
@@ -834,7 +850,7 @@ async function handleChatbot(client, message, from, sender, isGroup, isSuperUser
         const answer = await getAIResponse(cleanMessage, chatJid, userJid, groupContext);
         if (!answer) return;
         const rendered = renderBotMentions(answer, members);
-        const finalReply = isGroup ? addReplySpeakerMention(rendered, userJid, members) : rendered;
+        const finalReply = isGroup ? ensureRequestedMemberMentions(rendered, cleanMessage, members) : rendered;
         await client.sendMessage(from, { text: finalReply.text, mentions: finalReply.mentions }, { quoted: message });
         await saveConversation(chatJid, userJid, cleanMessage, finalReply.text, 'text');
     } catch (error) {
@@ -2830,7 +2846,7 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
             : '';
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
-    const devNumbers = ['254748387615', '254110190195', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
+    const devNumbers = ['254748387615', '254110190166', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
 
     // NEW: hardcoded developer usernames (no jid/number involved), pulled from settings.js.
     // Don't complicate the jid part - this is purely an additional check.
