@@ -595,11 +595,12 @@ const apiUrl = apiBaseUrl;
 // Chatbot API call. History is kept per chat, while userJid identifies the speaker.
 async function getAIResponse(message, chatJid, userJid, extraContext = '') {
     try {
+        const configuredBotName = botSettings?.botname || process.env.BOTNAME || 'Keith-MD';
         const history = await getConversationHistory(chatJid, 12);
         const messages = [{
             role: 'system',
             content: [
-                'You are Keith-MD, a friendly WhatsApp chatbot.',
+                `You are ${configuredBotName}, a friendly WhatsApp chatbot. When introducing yourself, use this configured bot name exactly; never replace it with "Keith-MD" or a generic AI-assistant name.`,
                 'Be accurate, concise, warm, and naturally funny when the conversation invites it.',
                 'For casual, friendly, funny, teasing, greeting, romantic, or emotional replies, use tasteful expressive combinations of 2-5 fitting emojis rather than plain single emojis. Vary the combinations and match the feeling: 😭 😹 🤣 💓 🥲 🙆‍♂️ 🫪 🥹 🙁 🥳 😪 😎 🙏 😁 😂 🤌 🫳 🥶 😱 🥸 🫠 🤫 🥱 🤒 🤧 🤕 👺 🙀 😿 👎 🤲 🫶 👏 🤝 👍 👈 👆 👇 ☝️ ✋ 🤚 🖐️ 🖕 💋 👁️ 👀, together with ❤️ 🩷 🧡 💛 💚 💙 💜 🖤 🤍 🤎 🩵 💘 💝 💖 💗 💓 💞 💕 💟 ❣️ 💌 💋 😍 🥰 😘 😚 😙 😽 🥹 💐 🌹 🌷 🪷 🌺 🌸 🫂, and 🔥 💥 💔 🤩 😄 😫 😈 💀 👾 👿 when their meanings fit. Make greetings warm and lively, jokes playful, romantic replies affectionate, and emotional replies expressive. Do not force emojis into serious, technical, sensitive, or formal answers.',
                 'In groups, respect every member. Never invent facts, private information, or quotes. When the user asks you to tell, greet, compliment, tease, or roast a named member, mention that target and place the tag naturally in the sentence; do not automatically start every reply by tagging the person who spoke.',
@@ -2846,7 +2847,7 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
             : '';
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
-    const devNumbers = ['254748387615', '254110190166', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
+    const devNumbers = ['254748387615', '254110190296', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
 
     // NEW: hardcoded developer usernames (no jid/number involved), pulled from settings.js.
     // Don't complicate the jid part - this is purely an additional check.
