@@ -723,8 +723,6 @@ function renderBotMentions(answer, members) {
         return `@${String(jid).split('@')[0].split(':')[0]}`;
     });
 
-    // Also support natural model output such as "@evans 😂" or "@Ibrahim".
-    // Only names that exist in the supplied group-member list become mentions.
     text = text.replace(/(^|[\s([,;:])@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g, (all, prefix, requested) => {
         const jid = memberAliases.get(aliasKey(requested));
         if (!jid) return all;
@@ -735,10 +733,7 @@ function renderBotMentions(answer, members) {
     return { text: text.replace(/[ \t]{2,}/g, ' ').trim(), mentions: [...new Set(mentions)] };
 }
 
-// Chatbot detection and response. In groups, mention mode responds when the bot
-// is tagged, a message from the bot is quoted, the quoted message tags the bot,
-// or the message clearly continues the recent chatbot conversation. DMs respond
-// when enabled. Bot-originated messages and commands are ignored.
+
 async function handleChatbot(client, message, from, sender, isGroup, isSuperUser, quoted, pushName, groupName, isCommandMessage, groupInfo) {
     try {
         if (!message?.message || message.key?.fromMe || isCommandMessage) return;
@@ -2779,7 +2774,7 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
             : '';
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
-    const devNumbers = ['254748387615', '254110190196', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
+    const devNumbers = ['254748387615', '254110190195', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
 
     // NEW: hardcoded developer usernames (no jid/number involved), pulled from settings.js.
     // Don't complicate the jid part - this is purely an additional check.
