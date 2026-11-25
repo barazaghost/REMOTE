@@ -604,7 +604,7 @@ async function getAIResponse(message, chatJid, userJid, extraContext = '') {
                 'Use a few fitting laughing or friendly emojis, but do not spam emojis.',
                 'In groups, respect every member. Never invent facts, private information, or quotes.',
                 'If asked where the conversation stopped, summarize the recent chat history precisely.',
-                'For a harmless joke that would be funnier with one group member tagged, you may add exactly one marker in the form [[MENTION:JID]]. Only use a JID from the supplied member list; otherwise do not add a marker.',
+                'When it naturally improves a friendly joke or acknowledgement, you may add one or two markers in the form [[MENTION:JID]]. Only use JIDs from the supplied member list; never invent a JID and never force a mention.',
                 extraContext || ''
             ].filter(Boolean).join('\n')
         }];
@@ -652,13 +652,47 @@ function getStableChatJid(message, fallback) {
 }
 
 function botMentioned(message, client) {
-    const contextInfo = message?.message?.extendedTextMessage?.contextInfo ||
-        message?.message?.imageMessage?.contextInfo ||
-        message?.message?.videoMessage?.contextInfo || {};
+    const contextInfo = getMessageContextInfo(message);
     const mentioned = contextInfo.mentionedJid || [];
     const botIds = [client.user?.id, client.user?.lid, client.user?.jid]
         .filter(Boolean).map(jidKey);
     return mentioned.some(jid => botIds.includes(jidKey(jid)));
+}
+
+function getMessageContextInfo(message) {
+    return message?.message?.extendedTextMessage?.contextInfo ||
+        message?.message?.imageMessage?.contextInfo ||
+        message?.message?.videoMessage?.contextInfo ||
+        message?.message?.documentMessage?.contextInfo || {};
+}
+
+function chatbotBotIds(client) {
+    return [client.user?.id, client.user?.lid, client.user?.jid]
+        .filter(Boolean).map(jidKey);
+}
+
+function quotedMessageRelatesToBot(message, client) {
+    const contextInfo = getMessageContextInfo(message);
+    const botIds = chatbotBotIds(client);
+    const quotedParticipants = [
+        contextInfo.participant,
+        contextInfo.participantAlt,
+        contextInfo.participantPn,
+        contextInfo.remoteJid,
+        contextInfo.remoteJidAlt
+    ].filter(Boolean);
+    if (quotedParticipants.some(jid => botIds.includes(jidKey(jid)))) return true;
+
+    const quotedMentions = contextInfo.quotedMessage?.extendedTextMessage?.contextInfo?.mentionedJid ||
+        contextInfo.quotedMessage?.imageMessage?.contextInfo?.mentionedJid || [];
+    return quotedMentions.some(jid => botIds.includes(jidKey(jid)));
+}
+
+function looksLikeChatbotFollowUp(text) {
+    const value = String(text || '').trim().toLowerCase();
+    if (!value) return false;
+    return /^(thanks|thank you|thx|yes|yeah|yep|no|okay|ok|sure|exactly|right|true|continue|go on|explain|tell me more|what about|how about|and also|then|so|why|how|what|can you|could you|please explain)\b/.test(value) ||
+        /\b(keith|bot|assistant|chatbot)\b/.test(value);
 }
 
 function renderBotMentions(answer, members) {
@@ -679,8 +713,10 @@ function renderBotMentions(answer, members) {
     return { text: text.replace(/[ \t]{2,}/g, ' ').trim(), mentions: [...new Set(mentions)] };
 }
 
-// Chatbot detection and response. Groups respond to a real WhatsApp mention;
-// DMs respond when enabled. Bot-originated messages and commands are ignored.
+// Chatbot detection and response. In groups, mention mode responds when the bot
+// is tagged, a message from the bot is quoted, the quoted message tags the bot,
+// or the message clearly continues the recent chatbot conversation. DMs respond
+// when enabled. Bot-originated messages and commands are ignored.
 async function handleChatbot(client, message, from, sender, isGroup, isSuperUser, quoted, pushName, groupName, isCommandMessage, groupInfo) {
     try {
         if (!message?.message || message.key?.fromMe || isCommandMessage) return;
@@ -699,7 +735,10 @@ async function handleChatbot(client, message, from, sender, isGroup, isSuperUser
         let shouldRespond = false;
         let cleanMessage = text;
         if (isGroup) {
-            shouldRespond = settings.trigger === 'all' || (settings.trigger === 'mention' && botMentioned(message, client));
+            const relatedToBot = botMentioned(message, client) ||
+                quotedMessageRelatesToBot(message, client) ||
+                looksLikeChatbotFollowUp(text);
+            shouldRespond = settings.trigger === 'all' || (settings.trigger === 'mention' && relatedToBot);
             if (shouldRespond) cleanMessage = text.replace(/@\S+/g, '').replace(/\s+/g, ' ').trim();
         } else {
             shouldRespond = settings.trigger === 'dm' || settings.trigger === 'all';
@@ -3379,22 +3418,32 @@ if (connection === "open") {
 //========================================================================================================================
 // Silent automatic approval/rejection of pending group join requests.
 client.ev.on('group.join-request', async (request = {}) => {
-    const groupJid = request.id || request.groupJid || request.remoteJid;
-    const participant = request.jid || request.participant || request.user;
-    const requestAction = String(request.action || request.type || '').toLowerCase();
+    const groupJid = request.id || request.groupJid || request.remoteJid || request.chat;
+    const participantData = request.participant || request.user || request.requester || request.jid;
+    const participant = typeof participantData === 'string'
+        ? participantData
+        : participantData?.jid || participantData?.id || participantData?.pn || participantData?.phoneNumber ||
+          request.participantPn || request.phoneNumber || request.phone || request.pn;
+    const requestAction = String(
+        request.action || request.type || request.request_method || request.requestMethod || ''
+    ).toLowerCase();
 
-    if (!groupJid || !participant) return;
-    if (requestAction && !['add', 'request', 'pending'].includes(requestAction)) return;
+    if (!groupJid || typeof participant !== 'string') return;
+    if (requestAction && !['add', 'request', 'pending', 'created'].includes(requestAction)) return;
 
     try {
         const joinSettings = await getGroupEventsSettings(groupJid);
         if (!joinSettings?.autoApproveJoin && !joinSettings?.autoRejectJoin) return;
 
         const action = joinSettings.autoApproveJoin ? 'approve' : 'reject';
-        await client.groupRequestParticipantsUpdate(groupJid, [participant], action);
-        KeithLogger.info(`Silently ${action}d group join request for ${participant} in ${groupJid}`);
+        if (typeof client.groupRequestParticipantsUpdate !== 'function') {
+            throw new Error('This WhatsApp connection does not support join-request updates');
+        }
+        const requestJid = participant.replace('@c.us', '@s.whatsapp.net');
+        await client.groupRequestParticipantsUpdate(groupJid, [requestJid], action);
+        KeithLogger.info(`Silently ${action}d group join request for ${requestJid} in ${groupJid}`);
     } catch (error) {
-        KeithLogger.error('Automatic group join-request action failed:', error);
+        KeithLogger.error(`Automatic group join-request ${requestAction || 'action'} failed for ${participant}:`, error);
     }
 });
 
