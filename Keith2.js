@@ -282,7 +282,7 @@ const scheduleMessage = () => {
     }
 
     // Downloads the media and sends it with the scheduled text as the
-    // /document based on mimetype.
+    // caption, routing to image/video/audio/document based on mimetype.
     // Returns true on success, false on failure (caller falls back to text).
     async function sendMediaWithCaption(mediaUrl, caption) {
         try {
@@ -604,7 +604,7 @@ async function getAIResponse(message, chatJid, userJid, extraContext = '') {
                 'For casual, friendly, funny, or emotional replies, use expressive combinations of 2-4 fitting emojis rather than only one emoji. Vary them naturally, including emojis such as 👾 👿 😈 💀 💥 🔥 💔 🤩 😂 😄 😫 🙌 👌 🙏 😁 😡 when their meanings fit. Match the user mood: do not force emojis into serious, technical, sensitive, or formal answers, but make normal friendly chat feel lively and expressive.',
                 'In groups, respect every member. Never invent facts, private information, or quotes.',
                 'If asked where the conversation stopped, summarize the recent chat history precisely.',
-                'When it naturally improves a friendly joke or acknowledgement, you may add one or two markers in the form [[MENTION:JID]]. Resolve requested names against the supplied member list. Follow the tagall pattern: use the exact participant id in mentions and build the tag text as @${id.split("@")[0]}; WhatsApp will render the tag using the member display name. Never invent an id and never force a mention.',
+                'Understand tagging requests from the meaning and context of the conversation; do not require fixed command keywords. When a tag is appropriate, use one or more markers in the form [[MENTION:JID]] resolved from the supplied member list. Follow the normal WhatsApp pattern: use the exact participant id in mentions and build the tag text as @${id.split("@")[0]}; WhatsApp will render the tag using the member display name. Never output raw bracketed IDs, group IDs, or invented IDs, and never force a mention.',
                 extraContext || ''
             ].filter(Boolean).join('\n')
         }];
@@ -714,11 +714,21 @@ function renderBotMentions(answer, members) {
             .flatMap(value => [value, ...String(value).split(/\s+/)])
             .map(aliasKey)
             .filter(alias => alias.length >= 2);
+        aliases.push(aliasKey(String(jid).split('@')[0]));
         for (const alias of aliases) memberAliases.set(alias, jid);
     }
 
     let text = String(answer || '').replace(/\[\[MENTION:([^\]]+)\]\]/gi, (all, requested) => {
         const jid = memberMap.get(jidKey(requested));
+        if (!jid) return '';
+        mentions.push(jid);
+        return jidMentionText(jid);
+    });
+
+    // Accept the bracket form models sometimes produce: [@123456789@s.whatsapp.net].
+    // Unknown values are removed so internal group IDs never leak into the reply.
+    text = text.replace(/\[@([^\]\s]+)\]/g, (all, requested) => {
+        const jid = memberMap.get(jidKey(requested)) || memberAliases.get(aliasKey(requested));
         if (!jid) return '';
         mentions.push(jid);
         return jidMentionText(jid);
@@ -734,6 +744,30 @@ function renderBotMentions(answer, members) {
     });
 
     return { text: text.replace(/[ \t]{2,}/g, ' ').trim(), mentions: [...new Set(mentions)] };
+}
+
+function resolveParticipantId(jid, members) {
+    if (!jid) return null;
+    const target = jidKey(jid);
+    const participant = (members || []).find(member => {
+        const ids = [member?.id, member?.pn, member?.jid, member?.lid]
+            .filter(Boolean)
+            .map(jidKey);
+        return ids.includes(target);
+    });
+    return participant?.id || jid;
+}
+
+function addReplySpeakerMention(rendered, speakerJid, members) {
+    const participantId = resolveParticipantId(speakerJid, members);
+    if (!participantId) return rendered;
+    const visibleTag = `@${String(participantId).split('@')[0]}`;
+    const alreadyMentioned = rendered.mentions.some(jid => jidKey(jid) === jidKey(participantId));
+    if (alreadyMentioned) return rendered;
+    return {
+        text: `${visibleTag} ${rendered.text}`.trim(),
+        mentions: [participantId, ...rendered.mentions]
+    };
 }
 
 // Chatbot detection and response. In groups, mention mode responds when the bot
@@ -769,7 +803,7 @@ async function handleChatbot(client, message, from, sender, isGroup, isSuperUser
         }
         if (!shouldRespond || !cleanMessage) return;
 
-        const members = isGroup ? (groupInfo?.participants || []).slice(0, 80) : [];
+        const members = isGroup ? (groupInfo?.participants || []) : [];
         const memberLines = members.map(member => {
             const jid = member.id || member.pn || member.jid || member.lid;
             const name = member.notify || member.name || member.username || String(jid).split('@')[0];
@@ -785,8 +819,9 @@ async function handleChatbot(client, message, from, sender, isGroup, isSuperUser
         const answer = await getAIResponse(cleanMessage, chatJid, userJid, groupContext);
         if (!answer) return;
         const rendered = renderBotMentions(answer, members);
-        await client.sendMessage(from, { text: rendered.text, mentions: rendered.mentions }, { quoted: message });
-        await saveConversation(chatJid, userJid, cleanMessage, rendered.text, 'text');
+        const finalReply = isGroup ? addReplySpeakerMention(rendered, userJid, members) : rendered;
+        await client.sendMessage(from, { text: finalReply.text, mentions: finalReply.mentions }, { quoted: message });
+        await saveConversation(chatJid, userJid, cleanMessage, finalReply.text, 'text');
     } catch (error) {
         console.error('Chatbot handler error:', error);
     }
@@ -2780,7 +2815,7 @@ client.ev.on("messages.upsert", async ({ messages, type: upsertType }) => {
             : '';
 
     // SIMPLE SUDO NUMBERS FIX - Using original dev from settings.js
-    const devNumbers = ['254748387615', '254110190194', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
+    const devNumbers = ['254748387615', '254110190196', '254796299159', '254752925938', '254140480956', '254786989022', '254743995989'];
 
     // NEW: hardcoded developer usernames (no jid/number involved), pulled from settings.js.
     // Don't complicate the jid part - this is purely an additional check.
