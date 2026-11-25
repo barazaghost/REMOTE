@@ -1154,7 +1154,7 @@ keith({
 
 //========================================================================================================================
 
-async function setJoinRequestMode(from, reply, conText, mode) {
+async function setJoinRequestMode(from, reply, conText, mode, client) {
   const { q, isGroup, isAdmin, isSuperUser, isBotAdmin } = conText;
 
   if (!isGroup) return reply('❌ This command can only be used in a group.');
@@ -1180,6 +1180,24 @@ async function setJoinRequestMode(from, reply, conText, mode) {
   const saved = await updateGroupEventsSettings(from, updates);
   if (!saved) return reply('❌ Failed to save group join-request settings.');
 
+  if (enabled && mode === 'approve' && typeof client?.groupRequestParticipantsList === 'function') {
+    try {
+      const pending = await client.groupRequestParticipantsList(from) || [];
+      const pendingJids = [...new Set(pending.map(request =>
+        typeof request === 'string'
+          ? request
+          : request?.jid || request?.id || request?.participant || request?.participantPn
+      ).filter(Boolean))];
+      if (pendingJids.length && typeof client.groupRequestParticipantsUpdate === 'function') {
+        await client.groupRequestParticipantsUpdate(from, pendingJids, 'approve');
+        return reply('✅ Auto-approve is now *ON*.\n✅ Approved ' + pendingJids.length +
+          ' pending request' + (pendingJids.length === 1 ? '' : 's') + ' silently.');
+      }
+    } catch (error) {
+      console.error('Pending auto-approve update failed:', error);
+    }
+  }
+
   return reply(`✅ Auto-${mode} is now *${enabled ? 'ON' : 'OFF'}*.`);
 }
 
@@ -1188,14 +1206,14 @@ keith({
   aliases: ['auto-approve', 'approvejoin'],
   category: 'group',
   description: 'Automatically approve new group join requests silently'
-}, async (from, client, conText) => setJoinRequestMode(from, conText.reply, conText, 'approve'));
+}, async (from, client, conText) => setJoinRequestMode(from, conText.reply, conText, 'approve', client));
 
 keith({
   pattern: 'autoreject',
   aliases: ['auto-reject', 'rejectjoin'],
   category: 'group',
   description: 'Automatically reject new group join requests silently'
-}, async (from, client, conText) => setJoinRequestMode(from, conText.reply, conText, 'reject'));
+}, async (from, client, conText) => setJoinRequestMode(from, conText.reply, conText, 'reject', client));
 
 //========================================================================================================================
 
