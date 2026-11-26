@@ -1,7 +1,14 @@
 
 
 const { keith } = require('../commandHandler');
-const { S_WHATSAPP_NET, downloadMediaMessage } = require('@whiskeysockets/baileys');
+const {
+  S_WHATSAPP_NET,
+  downloadMediaMessage,
+  downloadContentFromMessage,
+  downloadViewOnceMessage,
+  extractViewOnceMedia,
+  normalizeMessageContent,
+} = require('@whiskeysockets/baileys');
 const Jimp = require('jimp');
 const moment = require('moment-timezone');
 const fs = require('fs/promises');
@@ -38,6 +45,46 @@ function getRepliedKey({ mek, client, from, store }) {
     if (!fromMe && ctx.participant) key.participant = ctx.participant;
   }
   return key;
+}
+
+
+async function retrieveQuotedMedia({ quotedMsg, mek, client, from, store }) {
+  const key = getRepliedKey({ mek, client, from, store }) || {
+    remoteJid: from,
+    fromMe: false,
+    id: mek?.message?.extendedTextMessage?.contextInfo?.stanzaId || ''
+  };
+  let sourceContent = quotedMsg;
+  let stored;
+  try {
+    stored = await store?.loadMessage?.(from, key.id);
+    if (stored?.message) sourceContent = stored.message;
+  } catch {}
+  const message = { ...(stored || {}), key, message: sourceContent };
+  const extracted = extractViewOnceMedia?.(sourceContent);
+  const normalized = normalizeMessageContent?.(sourceContent) || sourceContent;
+  const type = Object.keys(normalized || {}).find((name) =>
+    ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage', 'ptvMessage'].includes(name)
+  );
+  if (!type) throw new Error('No media found in the quoted message');
+  const media = normalized[type];
+  const mediaType = type.replace('Message', '').replace('ptv', 'video');
+  const ctx = { reuploadRequest: client.updateMediaMessage, logger: console };
+  let buffer;
+  if (extracted?.isViewOnce && typeof downloadViewOnceMessage === 'function') {
+    buffer = await downloadViewOnceMessage(message, 'buffer', {}, ctx);
+  } else {
+    try {
+      buffer = await downloadMediaMessage(message, 'buffer', {}, ctx);
+    } catch (downloadError) {
+      if (!media) throw downloadError;
+      const stream = await downloadContentFromMessage(media, mediaType);
+      const chunks = [];
+      for await (const chunk of stream) chunks.push(chunk);
+      buffer = Buffer.concat(chunks);
+    }
+  }
+  return { buffer, media, type };
 }
 
 function pinGuards(conText) {
@@ -1197,101 +1244,61 @@ keith({
   category: "Owner",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, quoted, quotedMsg, reply, sender } = conText;
+  const { mek, quotedMsg, reply, sender, store } = conText;
   if (!quotedMsg) return reply("📌 Reply to a media message to retrieve it.");
   try {
-    if (quoted?.imageMessage) {
-      const caption = quoted.imageMessage.caption || "";
-      const buffer = await downloadMediaMessage(
-        { message: { imageMessage: quoted.imageMessage } },
-        'buffer',
-        {},
-        { reuploadRequest: client.updateMediaMessage, logger: console }
-      );
-      await client.sendMessage(sender, { image: buffer, caption }, { quoted: mek });
-    }
-    if (quoted?.videoMessage) {
-      const caption = quoted.videoMessage.caption || "";
-      const buffer = await downloadMediaMessage(
-        { message: { videoMessage: quoted.videoMessage } },
-        'buffer',
-        {},
-        { reuploadRequest: client.updateMediaMessage, logger: console }
-      );
-      await client.sendMessage(sender, { video: buffer, caption }, { quoted: mek });
-    }
-    if (quoted?.audioMessage) {
-      const buffer = await downloadMediaMessage(
-        { message: { audioMessage: quoted.audioMessage } },
-        'buffer',
-        {},
-        { reuploadRequest: client.updateMediaMessage, logger: console }
-      );
-      await client.sendMessage(sender, { audio: buffer, mimetype: 'audio/mpeg' }, { quoted: mek });
-    }
+    const { buffer, media, type } = await retrieveQuotedMedia({ quotedMsg, mek, client, from, store });
+    const caption = media?.caption || '';
+    const outputType = type === 'imageMessage' ? 'image'
+      : type === 'videoMessage' || type === 'ptvMessage' ? 'video'
+      : type === 'audioMessage' ? 'audio'
+      : type === 'documentMessage' ? 'document'
+      : 'sticker';
+    const payload = outputType === 'audio'
+      ? { audio: buffer, mimetype: media?.mimetype || 'audio/mpeg', ptt: media?.ptt || false }
+      : outputType === 'document'
+        ? { document: buffer, fileName: media?.fileName || 'document', mimetype: media?.mimetype || 'application/octet-stream', caption }
+        : outputType === 'sticker'
+          ? { sticker: buffer }
+          : { [outputType]: buffer, ...(caption ? { caption } : {}) };
+    await client.sendMessage(sender, payload, { quoted: mek });
   } catch (err) {
     console.error("vv2 command error:", err);
     reply("❌ Failed to retrieve media. Try again.");
   }
 });
-
 //========================================================================================================================
-
 keith({
   pattern: "vv",
   aliases: ["wow", "retrieve"],
-  description: "Retrieve quoted media (image, video, audio)",
+  description: "Retrieve quoted media (including view-once media)",
   category: "Owner",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, quoted, quotedMsg, reply } = conText;
-
+  const { mek, quotedMsg, reply, store } = conText;
   if (!quotedMsg) return reply("📌 Reply to a media message to retrieve it.");
-
   try {
-    if (quoted?.imageMessage) {
-      const caption = quoted.imageMessage.caption || "";
-      const buffer = await downloadMediaMessage(
-        { message: { imageMessage: quoted.imageMessage } },
-        'buffer',
-        {},
-        { reuploadRequest: client.updateMediaMessage, logger: console }
-      );
-      await client.sendMessage(from, { image: buffer, caption }, { quoted: mek });
-    }
-
-    if (quoted?.videoMessage) {
-      const caption = quoted.videoMessage.caption || "";
-      const buffer = await downloadMediaMessage(
-        { message: { videoMessage: quoted.videoMessage } },
-        'buffer',
-        {},
-        { reuploadRequest: client.updateMediaMessage, logger: console }
-      );
-      await client.sendMessage(from, { video: buffer, caption }, { quoted: mek });
-    }
-
-    if (quoted?.audioMessage) {
-      const buffer = await downloadMediaMessage(
-        { message: { audioMessage: quoted.audioMessage } },
-        'buffer',
-        {},
-        { reuploadRequest: client.updateMediaMessage, logger: console }
-      );
-      await client.sendMessage(from, { audio: buffer, mimetype: 'audio/mpeg' }, { quoted: mek });
-    }
-
+    const { buffer, media, type } = await retrieveQuotedMedia({ quotedMsg, mek, client, from, store });
+    const caption = media?.caption || '';
+    const outputType = type === 'imageMessage' ? 'image'
+      : type === 'videoMessage' || type === 'ptvMessage' ? 'video'
+      : type === 'audioMessage' ? 'audio'
+      : type === 'documentMessage' ? 'document'
+      : 'sticker';
+    const payload = outputType === 'audio'
+      ? { audio: buffer, mimetype: media?.mimetype || 'audio/mpeg', ptt: media?.ptt || false }
+      : outputType === 'document'
+        ? { document: buffer, fileName: media?.fileName || 'document', mimetype: media?.mimetype || 'application/octet-stream', caption }
+        : outputType === 'sticker'
+          ? { sticker: buffer }
+          : { [outputType]: buffer, ...(caption ? { caption } : {}) };
+    await client.sendMessage(from, payload, { quoted: mek });
   } catch (err) {
     console.error("vv command error:", err);
     reply("❌ Failed to retrieve media. Try again.");
   }
 });
 //========================================================================================================================
-
-//========================================================================================================================
-
-
-
 keith({
   pattern: "profile",
   aliases: ["getpp"],
