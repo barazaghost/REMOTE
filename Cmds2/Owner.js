@@ -49,17 +49,26 @@ function getRepliedKey({ mek, client, from, store }) {
 
 
 async function retrieveQuotedMedia({ quotedMsg, mek, client, from, store }) {
-  const key = getRepliedKey({ mek, client, from, store }) || {
-    remoteJid: from,
-    fromMe: false,
-    id: mek?.message?.extendedTextMessage?.contextInfo?.stanzaId || ''
-  };
+  const stanzaId = mek?.message?.extendedTextMessage?.contextInfo?.stanzaId || '';
   let sourceContent = quotedMsg;
   let stored;
   try {
-    stored = await store?.loadMessage?.(from, key.id);
-    if (stored?.message) sourceContent = stored.message;
+    stored = await store?.loadMessage?.(from, stanzaId);
+    if (!stored && stanzaId && store?.messages instanceof Map) {
+      for (const chatMessages of store.messages.values()) {
+        if (chatMessages?.get?.(stanzaId)) {
+          stored = chatMessages.get(stanzaId);
+          break;
+        }
+      }
+    }
   } catch {}
+  if (stored?.message) sourceContent = stored.message;
+  const key = stored?.key || getRepliedKey({ mek, client, from, store }) || {
+    remoteJid: from,
+    fromMe: false,
+    id: stanzaId
+  };
   const message = { ...(stored || {}), key, message: sourceContent };
   const extracted = extractViewOnceMedia?.(sourceContent);
   const normalized = normalizeMessageContent?.(sourceContent) || sourceContent;
