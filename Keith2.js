@@ -3283,6 +3283,7 @@ const reply = (teks) => {
                 const conText = {
                     m: ms,
                     mek: ms,
+                    store,
                     edit,
                     api: apiBaseUrl,
                     react,
